@@ -24,7 +24,7 @@ export default function Report() {
   const search = async () => {
     setLoading(true)
     try {
-      const employeeId = (username || selectedEmployee || '').trim()
+      const employeeId = (selectedEmployee || '').trim()
       const params = {}
       if (employeeId) params.employeeId = employeeId
       // Normalize date-only inputs to inclusive day range
@@ -84,7 +84,7 @@ export default function Report() {
               </select>
             </div>
             <div className="w-full sm:w-auto">
-              <label className="block text-xs font-medium text-gray-700 mb-1">User name (email)</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">User name (Optional)</label>
               <input className="w-full border rounded px-3 py-2 text-sm" placeholder="employee email" value={username} onChange={e=>setUsername(e.target.value)} />
             </div>
             <div className="w-full sm:w-auto">
