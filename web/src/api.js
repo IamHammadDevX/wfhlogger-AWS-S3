@@ -10,7 +10,7 @@ export function getApiBaseSync() {
   return cachedBase
 }
 
-const candidates = [cachedBase, 'http://127.0.0.1:4000', 'http://localhost:4000']
+const candidates = [cachedBase, 'http://127.0.0.1:4000', 'http://localhost:4000', 'https://tracker.vughy.com']
 const checks = candidates.map((base) => axios.get(`${base}/health`, { timeout: 250 })
   .then((r) => ({ base, r }))
   .catch(() => Promise.reject(base)))

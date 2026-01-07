@@ -345,8 +345,9 @@ app.get('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =>
 // ---- Admin/Manager: Delete an employee ----
 app.delete('/api/employees/:email', requireRole(['manager', 'super_admin']), (req, res) => {
   try {
-    const { email } = req.params;
+    let { email } = req.params;
     if (!email) return res.status(400).json({ error: 'Email is required' });
+    email = String(email).toLowerCase();
     const allUsers = readUsers();
     const employee = allUsers.find(u => u.role === 'employee' && String(u.email).toLowerCase() === String(email).toLowerCase());
     if (!employee) return res.status(404).json({ error: 'Employee not found' });
@@ -375,8 +376,9 @@ app.delete('/api/employees/:email', requireRole(['manager', 'super_admin']), (re
 // Admin/Manager: Set or reset an employee password (provision login if missing)
 app.post('/api/admin/employees/password', requireRole(['manager', 'super_admin']), (req, res) => {
   try {
-    const { email, password } = req.body || {};
+    let { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+    email = String(email).toLowerCase();
     const allUsers = readUsers();
     const employee = allUsers.find(u => u.role === 'employee' && u.email.toLowerCase() === String(email).toLowerCase());
     if (!employee) return res.status(404).json({ error: 'Employee not found' });

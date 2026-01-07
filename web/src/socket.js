@@ -1,6 +1,12 @@
 import { io } from 'socket.io-client'
 import { resolveApiBase, getApiBaseSync } from './api.js'
 let socket = null
+const listeners = new Set()
+
+export function onSocketChange(cb) {
+  listeners.add(cb)
+  return () => listeners.delete(cb)
+}
 
 function parseToken(token) {
   try {
@@ -41,6 +47,7 @@ export function getSocket() {
             transports: ['websocket'],
             path: '/socket.io',
           })
+          listeners.forEach(cb => cb(socket))
         }
       } catch {}
     })

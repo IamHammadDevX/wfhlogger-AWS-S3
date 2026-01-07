@@ -48,11 +48,11 @@ export { db }
 
 export function getUserByEmail(email) {
   if (db) {
-    const stmt = db.prepare('SELECT * FROM users WHERE email = ?')
+    const stmt = db.prepare('SELECT * FROM users WHERE lower(email) = lower(?)')
     return stmt.get(email)
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
-  return arr.find(u => u.email === email)
+  return arr.find(u => String(u.email).toLowerCase() === String(email).toLowerCase())
 }
 
 export function createUser({ email, password, role }) {

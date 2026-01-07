@@ -6,7 +6,7 @@ import threading
 import requests
 import socketio
 from urllib.parse import urlencode
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:
     import tkinter as tk
@@ -22,7 +22,7 @@ except Exception:
     raise RuntimeError('Install dependencies from requirements.txt (mss, Pillow).')
 
 
-BACKEND_URL = os.environ.get('BACKEND_URL', 'http://mail.vughy.com:10002')
+BACKEND_URL = os.environ.get('BACKEND_URL')
 SCREENSHOT_INTERVAL_SECONDS = int(os.environ.get('SCREENSHOT_INTERVAL_SECONDS', '180'))  # default 3 minutes
 LIVE_VIEW_INTERVAL_SECONDS = int(os.environ.get('LIVE_VIEW_INTERVAL_SECONDS', '5'))  # faster live frames
 HEARTBEAT_INTERVAL_SECONDS = int(os.environ.get('HEARTBEAT_INTERVAL_SECONDS', '60'))  # send idle heartbeat every 60s
@@ -399,11 +399,11 @@ class TimeTrackerApp:
             self.last_upload_var.set(f'Last upload failed: {e}')
 
     def _send_live_frame(self, small_jpeg: bytes):
-        if not self.sio or not self.live_view_active:
+        if not self.sio or not self.sio.connected or not self.live_view_active:
             return
         try:
             b64 = base64.b64encode(small_jpeg).decode('ascii')
-            self.sio.emit('live_view:frame', {'employeeId': self.email.get(), 'frameBase64': b64, 'ts': datetime.utcnow().isoformat()})
+            self.sio.emit('live_view:frame', {'employeeId': self.email.get(), 'frameBase64': b64, 'ts': datetime.now(timezone.utc).isoformat()})
             # update UI
             try:
                 self.live_last_frame_var.set(f"Last live frame: {time.strftime('%H:%M:%S')}")
@@ -593,8 +593,8 @@ class TimeTrackerApp:
         if env_url:
             candidates.append(env_url)
         candidates.extend([
-            'http://mail.vughy.com:10002',
             'http://127.0.0.1:4000', 'http://localhost:4000',
+            'https://tracker.vughy.com',
             'http://127.0.0.1:4011', 'http://localhost:4011',
         ])
         for url in candidates:
