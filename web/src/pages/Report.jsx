@@ -72,29 +72,33 @@ export default function Report() {
             <h2 className="text-lg font-semibold">Report</h2>
             <p className="text-sm text-gray-700">Filter screenshots and sessions by employee and date range.</p>
           </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="block text-xs text-gray-600">Employee</label>
-              <select className="border rounded px-3 py-2 min-w-56" value={selectedEmployee} onChange={e=>setSelectedEmployee(e.target.value)}>
+          <div className="flex flex-col lg:flex-row lg:items-end gap-4 bg-white p-4 rounded border shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-end gap-3">
+            <div className="w-full sm:w-auto">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Employee</label>
+              <select className="w-full border rounded px-3 py-2 text-sm" value={selectedEmployee} onChange={e=>setSelectedEmployee(e.target.value)}>
                 <option value="">Select employee…</option>
                 {employees.map(e => (
                   <option key={e.email} value={e.email}>{e.email}</option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600">User name (email)</label>
-              <input className="border rounded px-3 py-2 min-w-56" placeholder="employee email" value={username} onChange={e=>setUsername(e.target.value)} />
+            <div className="w-full sm:w-auto">
+              <label className="block text-xs font-medium text-gray-700 mb-1">User name (email)</label>
+              <input className="w-full border rounded px-3 py-2 text-sm" placeholder="employee email" value={username} onChange={e=>setUsername(e.target.value)} />
             </div>
-            <div>
-              <label className="block text-xs text-gray-600">From</label>
-              <input type="date" className="border rounded px-3 py-2" value={fromDate} onChange={e=>setFromDate(e.target.value)} />
+            <div className="w-full sm:w-auto">
+              <label className="block text-xs font-medium text-gray-700 mb-1">From</label>
+              <input type="date" className="w-full border rounded px-3 py-2 text-sm" value={fromDate} onChange={e=>setFromDate(e.target.value)} />
             </div>
-            <div>
-              <label className="block text-xs text-gray-600">To</label>
-              <input type="date" className="border rounded px-3 py-2" value={toDate} onChange={e=>setToDate(e.target.value)} />
+            <div className="w-full sm:w-auto">
+              <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
+              <input type="date" className="w-full border rounded px-3 py-2 text-sm" value={toDate} onChange={e=>setToDate(e.target.value)} />
             </div>
-            <button className="px-4 py-2.5 rounded bg-blue-600 text-white" onClick={search}>Search</button>
+            <div className="w-full sm:w-auto">
+              <button className="w-full sm:w-auto px-6 py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 transition" onClick={search}>Search</button>
+            </div>
+            </div>
           </div>
         </div>
 

@@ -151,11 +151,11 @@ export default function LiveView() {
             <h2 className="text-2xl md:text-3xl font-bold">Live View</h2>
             <p className="text-gray-700">Monitor an employee’s current activity in real-time.</p>
           </div>
-          <div className="flex items-end gap-2 flex-wrap">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 flex-wrap">
             {managers.length > 0 && (
-              <div>
+              <div className="w-full sm:w-auto">
                 <label className="block text-sm">Team Switcher (Super Admin)</label>
-                <select className="border rounded px-3 py-2 min-w-64" value={selectedManager} onChange={e=>setSelectedManager(e.target.value)}>
+                <select className="border rounded px-3 py-2 w-full sm:w-64" value={selectedManager} onChange={e=>setSelectedManager(e.target.value)}>
                   <option value="">All Managers</option>
                   {managers.map(m => (
                     <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
@@ -163,9 +163,9 @@ export default function LiveView() {
                 </select>
               </div>
             )}
-            <div>
+            <div className="w-full sm:w-auto">
               <label className="block text-sm">Employees</label>
-              <select className="border rounded px-3 py-2 min-w-64"
+              <select className="border rounded px-3 py-2 w-full sm:w-64"
                 value={employeeId}
                 onChange={e=>setEmployeeId(e.target.value)}>
                 <option value="">Select employee…</option>
@@ -177,8 +177,10 @@ export default function LiveView() {
                 <div className="text-xs text-gray-600 mt-1">No one is online.</div>
               )}
             </div>
-            <button className="px-4 py-2.5 rounded bg-green-600 text-white hover:bg-green-700" onClick={start}>Start</button>
-            <button className="px-4 py-2.5 rounded bg-gray-700 text-white hover:bg-gray-800" onClick={stop}>Stop</button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button className="flex-1 sm:flex-none px-4 py-2.5 rounded bg-green-600 text-white hover:bg-green-700" onClick={start}>Start</button>
+              <button className="flex-1 sm:flex-none px-4 py-2.5 rounded bg-gray-700 text-white hover:bg-gray-800" onClick={stop}>Stop</button>
+            </div>
             
           </div>
         </div>

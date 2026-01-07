@@ -171,7 +171,7 @@ export default function Admin() {
         <section className="bg-white border rounded p-4">
           <div className="font-semibold mb-2">Create Manager</div>
           <form className="space-y-3" onSubmit={submit}>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input className="border rounded px-3 py-2 flex-1" placeholder="Manager email" value={email} onChange={e=>setEmail(e.target.value)} />
               <input className="border rounded px-3 py-2 flex-1" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
             </div>
@@ -179,7 +179,7 @@ export default function Admin() {
               <input className="border rounded px-3 py-2 w-full" placeholder="Team name" value={orgName} onChange={e=>setOrgName(e.target.value)} />
             </div>
             <div>
-              <button className="px-3 py-2 rounded bg-blue-600 text-white" type="submit">Create Manager</button>
+              <button className="w-full sm:w-auto px-3 py-2 rounded bg-blue-600 text-white" type="submit">Create Manager</button>
             </div>
           </form>
         </section>

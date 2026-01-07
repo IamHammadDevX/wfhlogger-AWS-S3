@@ -107,9 +107,9 @@ export default function Dashboard() {
 
         {managers.length > 0 && (
           <div className="flex items-end gap-2">
-            <div>
+            <div className="w-full sm:w-auto">
               <label className="block text-sm">Team Switcher (Super Admin)</label>
-              <select className="border rounded px-3 py-2 min-w-64" value={selectedManager} onChange={e=>setSelectedManager(e.target.value)}>
+              <select className="border rounded px-3 py-2 w-full sm:w-64" value={selectedManager} onChange={e=>setSelectedManager(e.target.value)}>
                 <option value="">All Managers</option>
                 {managers.map(m => (
                   <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>

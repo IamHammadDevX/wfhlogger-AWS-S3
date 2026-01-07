@@ -85,7 +85,7 @@ export default function Setup() {
           <section className="bg-white border rounded p-4 space-y-3">
             <div className="font-semibold">Team</div>
             <div className="text-sm text-gray-600">Current: {team?.name || 'Not set'}</div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input className="border rounded px-3 py-2 flex-1" placeholder="Team name" value={teamName} onChange={e=>setTeamName(e.target.value)} />
               <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={saveOrg}>Save</button>
             </div>
@@ -94,18 +94,18 @@ export default function Setup() {
 
         <section className="bg-white border rounded p-4 space-y-3">
           <div className="font-semibold">Employees</div>
-          <div className="flex gap-2">
-            <input className="border rounded px-3 py-2" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
-            <input className="border rounded px-3 py-2" placeholder="Name (optional)" value={name} onChange={e=>setName(e.target.value)} />
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+            <input className="border rounded px-3 py-2 flex-1 min-w-[200px]" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
+            <input className="border rounded px-3 py-2 flex-1 min-w-[200px]" placeholder="Name (optional)" value={name} onChange={e=>setName(e.target.value)} />
             {role === 'super_admin' && (
-              <select className="border rounded px-3 py-2" value={assignManagerId} onChange={e=>setAssignManagerId(e.target.value)}>
+              <select className="border rounded px-3 py-2 flex-1 min-w-[200px]" value={assignManagerId} onChange={e=>setAssignManagerId(e.target.value)}>
                 <option value="">Assign manager…</option>
                 {managers.map(m => (
                   <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
                 ))}
               </select>
             )}
-            <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={addEmp}>Add</button>
+            <button className="w-full sm:w-auto px-3 py-2 rounded bg-blue-600 text-white" onClick={addEmp}>Add</button>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">

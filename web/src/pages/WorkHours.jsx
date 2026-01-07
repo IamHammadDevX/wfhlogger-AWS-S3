@@ -215,8 +215,8 @@ export default function WorkHours() {
                 {/* Interval config */}
                 <div className="space-y-1">
                   <div className="text-sm text-gray-700">Capture Interval: {intervalSecs ? `${Math.round(intervalSecs/60)} min` : 'Not assigned'}</div>
-                  <div className="flex items-center gap-2">
-                    <select className="border rounded px-2 py-1 text-sm"
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select className="border rounded px-2 py-1 text-sm flex-1 sm:flex-none"
                       value={assignMinutesByEmp[id] || '3'}
                       onChange={e => setAssignMinutesByEmp(prev => ({ ...prev, [id]: e.target.value }))}
                     >

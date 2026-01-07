@@ -26,9 +26,12 @@ export default function Login() {
   }
 
   return (
-    <div className="h-full grid place-items-center">
-      <form onSubmit={submit} className="bg-white shadow p-6 rounded w-[360px] space-y-3">
-        <h1 className="text-xl font-semibold">Login</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <form onSubmit={submit} className="bg-white shadow-lg p-6 rounded-lg w-full max-w-sm space-y-4">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Login</h1>
+          <p className="text-sm text-gray-600">Time Tracker System</p>
+        </div>
         {error && <div className="text-red-600 text-sm">{error}</div>}
         <div>
           <label className="block text-sm">Email</label>
