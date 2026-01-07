@@ -112,8 +112,8 @@ app.use(express.json({ limit: '2mb' }));
 app.use(morgan('dev'));
 // Serve uploaded images statically for the web UI
 app.use('/uploads', express.static(uploadPath));
-const desktopSrcPath = path.join(process.cwd(), 'desktop');
-app.use('/downloads', express.static(desktopSrcPath));
+const publicDownloadsPath = path.join(process.cwd(), 'public', 'downloads');
+app.use('/downloads', express.static(publicDownloadsPath));
 
 // Health check
 app.get('/health', (req, res) => {
