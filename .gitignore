@@ -39,7 +39,6 @@ coverage/
 # Build output (React, Next.js, etc.)
 build/
 dist/
-public/build/
 .next/
 out/
 
