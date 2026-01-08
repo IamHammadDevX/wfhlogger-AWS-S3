@@ -9,7 +9,7 @@ export default function Downloads() {
     resolveApiBase().then(setApiBase)
   }, [])
 
-  const downloadUrl = `${apiBase}/downloads/TimeTrackerClient.exe`
+  const downloadUrl = `${apiBase}/downloads/TimeTrackerSetup.exe`
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
@@ -21,7 +21,7 @@ export default function Downloads() {
           Track time effortlessly on Windows
         </h1>
         <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-          The all-new desktop client. No Python installation required. Just download, login, and start tracking your productivity securely.
+          The all-new desktop client. Professional installer included. Just download, install, and start tracking.
         </p>
         
         <div className="flex flex-col items-center gap-4">
@@ -32,7 +32,7 @@ export default function Downloads() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Download for Windows
+            Download Installer
           </a>
           <p className="text-sm text-gray-500">
             Version 1.0.0 • 64-bit • Windows 10/11
@@ -49,8 +49,8 @@ export default function Downloads() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h3 className="font-semibold text-lg mb-2">Instant Setup</h3>
-            <p className="text-gray-600 text-sm">No dependencies or scripts. Runs immediately after download.</p>
+            <h3 className="font-semibold text-lg mb-2">Easy Installation</h3>
+            <p className="text-gray-600 text-sm">Standard Windows installer wizard. Up and running in seconds.</p>
           </div>
           <div className="p-4">
             <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -80,15 +80,15 @@ export default function Downloads() {
           <div className="flex gap-4 items-start bg-white p-6 rounded-lg shadow-sm border border-gray-100">
             <div className="flex-shrink-0 w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center font-bold">1</div>
             <div>
-              <h4 className="font-semibold text-lg">Download the Client</h4>
-              <p className="text-gray-600">Click the button above to download <code>TimeTrackerClient.exe</code>.</p>
+              <h4 className="font-semibold text-lg">Download the Installer</h4>
+              <p className="text-gray-600">Click the button above to download <code>TimeTrackerSetup.exe</code>.</p>
             </div>
           </div>
           <div className="flex gap-4 items-start bg-white p-6 rounded-lg shadow-sm border border-gray-100">
             <div className="flex-shrink-0 w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center font-bold">2</div>
             <div>
-              <h4 className="font-semibold text-lg">Run the Installer</h4>
-              <p className="text-gray-600">Double-click the file. If Windows SmartScreen appears, click "More info" then "Run anyway" (internal release).</p>
+              <h4 className="font-semibold text-lg">Run the Setup</h4>
+              <p className="text-gray-600">Double-click the installer and follow the wizard instructions to install the application.</p>
             </div>
           </div>
           <div className="flex gap-4 items-start bg-white p-6 rounded-lg shadow-sm border border-gray-100">
