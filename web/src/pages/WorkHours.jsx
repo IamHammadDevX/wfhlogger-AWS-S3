@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import Nav from '../components/Nav.jsx'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { resolveApiBase } from '../api.js'
+
+let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 const allowedMinutes = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20]
 
 export default function WorkHours() {
@@ -26,43 +28,46 @@ export default function WorkHours() {
   }, [])
 
   useEffect(() => {
-    // Load employees, today summary, recent screenshots
-    const getEmployees = axios.get(`${API}/api/employees`, { headers })
-      .then(r => {
-        const list = r.data.users || []
-        setAllEmployees(list)
-        setEmployees(list)
-      })
-    const getSummary = axios.get(`${API}/api/work/summary/today`, { headers })
-      .then(r => {
-        const by = {}
-        const list = Array.isArray(r.data?.employees) ? r.data.employees : []
-        list.forEach(e => { by[e.employeeId] = e })
-        setSummaryByEmp(by)
-      })
-    const getSessions = axios.get(`${API}/api/work/sessions/today`, { headers })
-      .then(r => {
-        const by = {}
-        const list = Array.isArray(r.data?.employees) ? r.data.employees : []
-        list.forEach(e => { by[e.employeeId] = Array.isArray(e.sessions) ? e.sessions : [] })
-        setSessionsByEmp(by)
-      })
-    const getActivity = axios.get(`${API}/api/activity/recent`, { headers })
-      .then(r => {
-        const by = {}
-        const list = Array.isArray(r.data?.employees) ? r.data.employees : []
-        list.forEach(e => { by[e.employeeId] = e })
-        setShotsByEmp(by)
-      })
-    Promise.allSettled([getEmployees, getSummary, getSessions, getActivity])
-      .then(results => {
-        const failed = results.filter(r => r.status === 'rejected')
-        if (failed.length) {
-          const reason = failed[0]?.reason
-          setError(reason?.response?.data?.error || reason?.message || 'Failed to load some data')
-        }
-      })
-      .finally(() => setLoading(false))
+    resolveApiBase().then((BASE) => {
+      API = BASE
+      // Load employees, today summary, recent screenshots
+      const getEmployees = axios.get(`${BASE}/api/employees`, { headers })
+        .then(r => {
+          const list = r.data.users || []
+          setAllEmployees(list)
+          setEmployees(list)
+        })
+      const getSummary = axios.get(`${BASE}/api/work/summary/today`, { headers })
+        .then(r => {
+          const by = {}
+          const list = Array.isArray(r.data?.employees) ? r.data.employees : []
+          list.forEach(e => { by[e.employeeId] = e })
+          setSummaryByEmp(by)
+        })
+      const getSessions = axios.get(`${BASE}/api/work/sessions/today`, { headers })
+        .then(r => {
+          const by = {}
+          const list = Array.isArray(r.data?.employees) ? r.data.employees : []
+          list.forEach(e => { by[e.employeeId] = Array.isArray(e.sessions) ? e.sessions : [] })
+          setSessionsByEmp(by)
+        })
+      const getActivity = axios.get(`${BASE}/api/activity/recent`, { headers })
+        .then(r => {
+          const by = {}
+          const list = Array.isArray(r.data?.employees) ? r.data.employees : []
+          list.forEach(e => { by[e.employeeId] = e })
+          setShotsByEmp(by)
+        })
+      Promise.allSettled([getEmployees, getSummary, getSessions, getActivity])
+        .then(results => {
+          const failed = results.filter(r => r.status === 'rejected')
+          if (failed.length) {
+            const reason = failed[0]?.reason
+            setError(reason?.response?.data?.error || reason?.message || 'Failed to load some data')
+          }
+        })
+        .finally(() => setLoading(false))
+    })
   }, [headers])
 
   useEffect(() => {

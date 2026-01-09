@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import Nav from '../components/Nav.jsx'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+import { resolveApiBase } from '../api.js'
+
+let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 export default function Report() {
   const [employees, setEmployees] = useState([])
@@ -16,9 +18,12 @@ export default function Report() {
   const headers = useMemo(() => ({ Authorization: `Bearer ${localStorage.getItem('token')}` }), [])
 
   useEffect(() => {
-    axios.get(`${API}/api/employees`, { headers })
-      .then(r => setEmployees(r.data?.users || []))
-      .catch(()=> setEmployees([]))
+    resolveApiBase().then((BASE) => {
+      API = BASE
+      axios.get(`${BASE}/api/employees`, { headers })
+        .then(r => setEmployees(r.data?.users || []))
+        .catch(()=> setEmployees([]))
+    })
   }, [headers])
 
   const search = async () => {

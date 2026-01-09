@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client'
 import { resolveApiBase, getApiBaseSync } from './api.js'
+import { getWebSocketBase } from './config.js'
 let socket = null
 const listeners = new Set()
 
@@ -25,7 +26,7 @@ export function getSocket() {
   const { userId, uid } = parseToken(token)
 
   if (!socket) {
-    const initialBase = getApiBaseSync()
+    const initialBase = getWebSocketBase()
     socket = io(initialBase, {
       auth: { token },
       query: { userId, uid },
@@ -39,7 +40,7 @@ export function getSocket() {
       try {
         if (base && socket?.io?.uri && socket.io.uri !== base) {
           socket.disconnect()
-          socket = io(base, {
+          socket = io(getWebSocketBase(), {
             auth: { token },
             query: { userId, uid },
             autoConnect: true,

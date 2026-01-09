@@ -1,6 +1,7 @@
 import axios from 'axios'
+import { getApiBase } from './config.js'
 
-let cachedBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:4000'
+let cachedBase = getApiBase()
 
 export async function resolveApiBase() {
   return cachedBase
@@ -11,7 +12,7 @@ export function getApiBaseSync() {
 }
 
 const candidates = [cachedBase, 'https://backend-tracker.vughy.com', 'http://127.0.0.1:4000', 'http://localhost:4000']
-const checks = candidates.map((base) => axios.get(`${base}/health`, { timeout: 250 })
+const checks = candidates.map((base) => axios.get(`${base}/health`, { timeout: 2000 })
   .then((r) => ({ base, r }))
   .catch(() => Promise.reject(base)))
 Promise.any(checks).then(({ base, r }) => {

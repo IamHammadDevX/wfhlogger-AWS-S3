@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 import axios from 'axios'
 import Nav from '../components/Nav.jsx'
 
-const API = import.meta.env.VITE_API_URL
+import { resolveApiBase } from '../api.js'
+
+let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 export default function Setup() {
   const [teamName, setTeamName] = useState('')
@@ -22,16 +24,19 @@ export default function Setup() {
   const headers = { Authorization: `Bearer ${token}` }
 
   useEffect(() => {
-    axios.get(`${API}/api/org`, { headers }).then(r => setTeam(r.data.organization)).catch(()=>{})
-    axios.get(`${API}/api/employees`, { headers }).then(r => setUsers(r.data.users || [])).catch(()=>{})
-    // decode role from JWT for conditional UI
-    try {
-      const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-      setRole(payload?.role || '')
-      if (payload?.role === 'super_admin') {
-        axios.get(`${API}/api/admin/managers`, { headers }).then(r => setManagers(r.data?.managers || [])).catch(()=>{})
-      }
-    } catch {}
+    resolveApiBase().then((BASE) => {
+      API = BASE
+      axios.get(`${BASE}/api/org`, { headers }).then(r => setTeam(r.data.organization)).catch(()=>{})
+      axios.get(`${BASE}/api/employees`, { headers }).then(r => setUsers(r.data.users || [])).catch(()=>{})
+      // decode role from JWT for conditional UI
+      try {
+        const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+        setRole(payload?.role || '')
+        if (payload?.role === 'super_admin') {
+          axios.get(`${BASE}/api/admin/managers`, { headers }).then(r => setManagers(r.data?.managers || [])).catch(()=>{})
+        }
+      } catch {}
+    })
   }, [])
 
   const saveOrg = async () => {

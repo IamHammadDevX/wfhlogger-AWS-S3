@@ -4,9 +4,10 @@ import axios from 'axios'
 import { resolveApiBase } from '../api.js'
 import Nav from '../components/Nav.jsx'
 import { getSocket } from '../socket.js'
+import { getApiBase } from '../config.js'
 // presence is driven via Socket.IO events from backend
 
-let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+let API = getApiBase()
 
 export default function LiveView() {
   const [employeeId, setEmployeeId] = useState('')
