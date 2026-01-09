@@ -593,8 +593,8 @@ class TimeTrackerApp:
         if env_url:
             candidates.append(env_url)
         candidates.extend([
+            'https://backend-tracker.vughy.com',
             'http://127.0.0.1:4000', 'http://localhost:4000',
-            'https://tracker.vughy.com',
             'http://127.0.0.1:4011', 'http://localhost:4011',
         ])
         for url in candidates:
@@ -619,8 +619,8 @@ class TimeTrackerApp:
             r = requests.get(f'{self.backend_url}/health', timeout=3)
             return bool(r.ok)
         except Exception:
-            # Retry on alternate local URLs
-            for url in ['http://127.0.0.1:4000', 'http://localhost:4000', 'http://127.0.0.1:4011', 'http://localhost:4011']:
+            # Retry on alternate URLs
+            for url in ['https://backend-tracker.vughy.com', 'http://127.0.0.1:4000', 'http://localhost:4000', 'http://127.0.0.1:4011', 'http://localhost:4011']:
                 try:
                     r = requests.get(f'{url}/health', timeout=3)
                     if r.ok:
