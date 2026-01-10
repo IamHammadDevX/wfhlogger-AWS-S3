@@ -12,7 +12,15 @@ export function getApiBaseSync() {
 }
 
 const candidates = [cachedBase, 'https://backend-tracker.vughy.com', 'http://127.0.0.1:4000', 'http://localhost:4000']
-const checks = candidates.map((base) => axios.get(`${base}/health`, { timeout: 2000 })
+// Filter candidates to avoid mixed content errors (HTTPS site cannot call HTTP)
+const validCandidates = candidates.filter(url => {
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
+    return false;
+  }
+  return true;
+});
+
+const checks = validCandidates.map((base) => axios.get(`${base}/health`, { timeout: 2000 })
   .then((r) => ({ base, r }))
   .catch(() => Promise.reject(base)))
 Promise.any(checks).then(({ base, r }) => {

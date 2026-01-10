@@ -108,19 +108,23 @@ class TimeTrackerApp:
         login_tab = ttk.Frame(notebook, padding=16)
         notebook.add(login_tab, text='Sign In')
 
-        ttk.Label(login_tab, text='Email').grid(row=0, column=0, sticky='w', pady=(0, 6))
-        ttk.Entry(login_tab, textvariable=self.email, width=40).grid(row=0, column=1, sticky='ew', padx=8, pady=(0, 6))
-        ttk.Label(login_tab, text='Password').grid(row=1, column=0, sticky='w', pady=6)
-        ttk.Entry(login_tab, textvariable=self.password, width=40, show='*').grid(row=1, column=1, sticky='ew', padx=8, pady=6)
+        ttk.Label(login_tab, text='Server URL').grid(row=0, column=0, sticky='w', pady=(0, 6))
+        self.server_url_var = tk.StringVar(value=self.backend_url)
+        ttk.Entry(login_tab, textvariable=self.server_url_var, width=40).grid(row=0, column=1, sticky='ew', padx=8, pady=(0, 6))
+
+        ttk.Label(login_tab, text='Email').grid(row=1, column=0, sticky='w', pady=(0, 6))
+        ttk.Entry(login_tab, textvariable=self.email, width=40).grid(row=1, column=1, sticky='ew', padx=8, pady=(0, 6))
+        ttk.Label(login_tab, text='Password').grid(row=2, column=0, sticky='w', pady=6)
+        ttk.Entry(login_tab, textvariable=self.password, width=40, show='*').grid(row=2, column=1, sticky='ew', padx=8, pady=6)
         self.login_btn = ttk.Button(login_tab, text='Login', style='Primary.TButton', command=self.login)
-        self.login_btn.grid(row=0, column=2, rowspan=2, sticky='e', padx=8)
+        self.login_btn.grid(row=1, column=2, rowspan=2, sticky='e', padx=8)
 
         self.status_var = tk.StringVar(value='Not logged in')
-        ttk.Label(login_tab, textvariable=self.status_var, style='Muted.TLabel').grid(row=2, column=0, columnspan=3, sticky='w', pady=(12, 0))
+        ttk.Label(login_tab, textvariable=self.status_var, style='Muted.TLabel').grid(row=3, column=0, columnspan=3, sticky='w', pady=(12, 0))
         self.active_time_var = tk.StringVar(value='Active: 00:00:00')
         self.idle_time_var = tk.StringVar(value='Idle: 00:00:00')
-        ttk.Label(login_tab, textvariable=self.active_time_var, style='Muted.TLabel').grid(row=3, column=0, columnspan=3, sticky='w')
-        ttk.Label(login_tab, textvariable=self.idle_time_var, style='Muted.TLabel').grid(row=4, column=0, columnspan=3, sticky='w')
+        ttk.Label(login_tab, textvariable=self.active_time_var, style='Muted.TLabel').grid(row=4, column=0, columnspan=3, sticky='w')
+        ttk.Label(login_tab, textvariable=self.idle_time_var, style='Muted.TLabel').grid(row=5, column=0, columnspan=3, sticky='w')
         for i in range(3):
             login_tab.columnconfigure(i, weight=1)
 
@@ -139,6 +143,11 @@ class TimeTrackerApp:
         self.stop_btn = ttk.Button(header_controls, text='Stop', style='Danger.TButton', state=tk.DISABLED, command=self.stop_tracking)
 
     def login(self):
+        # Allow user to override backend URL
+        custom_url = self.server_url_var.get().strip().rstrip('/')
+        if custom_url:
+            self.backend_url = custom_url
+
         email = self.email.get().strip()
         password = self.password.get().strip()
         if not email or not password:
@@ -148,6 +157,10 @@ class TimeTrackerApp:
         if not self._ensure_server():
             messagebox.showerror('Login failed', f'Server not reachable at {self.backend_url}. Ensure backend is running on port 4000.')
             return
+        
+        # Update UI with the resolved URL (in case fallback logic changed it)
+        self.server_url_var.set(self.backend_url)
+
         try:
             resp = requests.post(f'{self.backend_url}/api/auth/login', json={'email': email, 'password': password}, timeout=10)
             resp.raise_for_status()
@@ -212,9 +225,18 @@ class TimeTrackerApp:
             self.sio.on('interval:assigned', self._on_interval_assigned)
             # Connect with JWT via auth and include userId in query for context
             qs = urlencode({'userId': email})
+
+            # Fix for production: Force Websocket transport and use wss:// scheme
+            socket_url = self.backend_url
+            if socket_url.startswith('https://'):
+                socket_url = socket_url.replace('https://', 'wss://')
+            elif socket_url.startswith('http://'):
+                socket_url = socket_url.replace('http://', 'ws://')
+
             self.sio.connect(
-                f"{self.backend_url}?{qs}",
+                f"{socket_url}?{qs}",
                 auth={'token': self.token},
+                transports=['websocket'],
                 socketio_path='socket.io',
                 wait=True,
                 wait_timeout=12,

@@ -268,5 +268,40 @@
     "file": "uploads/2026-01-09T10-19-02-212Z-screenshot.jpg",
     "employeeId": "testdev@mail.com",
     "ts": "2026-01-09T10:19:02.214Z"
+  },
+  {
+    "file": "uploads/2026-01-10T08-18-42-873Z-screenshot.jpg",
+    "employeeId": "testglobal@mail.com",
+    "ts": "2026-01-10T08:18:42.883Z"
+  },
+  {
+    "file": "uploads/2026-01-10T08-21-42-253Z-screenshot.jpg",
+    "employeeId": "testglobal@mail.com",
+    "ts": "2026-01-10T08:21:42.258Z"
+  },
+  {
+    "file": "uploads/2026-01-10T08-24-42-752Z-screenshot.jpg",
+    "employeeId": "testglobal@mail.com",
+    "ts": "2026-01-10T08:24:42.784Z"
+  },
+  {
+    "file": "uploads/2026-01-10T08-27-43-210Z-screenshot.jpg",
+    "employeeId": "testglobal@mail.com",
+    "ts": "2026-01-10T08:27:43.231Z"
+  },
+  {
+    "file": "uploads/2026-01-10T08-30-43-623Z-screenshot.jpg",
+    "employeeId": "testglobal@mail.com",
+    "ts": "2026-01-10T08:30:43.654Z"
+  },
+  {
+    "file": "uploads/2026-01-10T08-39-02-989Z-screenshot.jpg",
+    "employeeId": "testglobal@mail.com",
+    "ts": "2026-01-10T08:39:02.999Z"
+  },
+  {
+    "file": "uploads/2026-01-10T08-42-03-352Z-screenshot.jpg",
+    "employeeId": "testglobal@mail.com",
+    "ts": "2026-01-10T08:42:03.371Z"
   }
 ]

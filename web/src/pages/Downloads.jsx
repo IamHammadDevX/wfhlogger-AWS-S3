@@ -24,7 +24,8 @@ export default function Downloads() {
     )
   }
 
-  const downloadUrl = `${apiBase}/downloads/TimeTrackerSetup.exe`
+  // Use relative URL to allow serving from frontend domain (via proxy or static)
+  const downloadUrl = '/downloads/TimeTrackerSetup.exe'
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">

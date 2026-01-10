@@ -97,7 +97,8 @@ const io = new SocketIOServer(httpServer, {
   cors: {
     origin: '*',
     credentials: false
-  }
+  },
+  transports: ['websocket', 'polling'] // Explicitly allow both
 });
 
 // Middlewares
@@ -113,6 +114,33 @@ app.use(morgan('dev'));
 // Serve uploaded images statically for the web UI
 app.use('/uploads', express.static(uploadPath));
 const publicDownloadsPath = path.join(process.cwd(), 'public', 'downloads');
+// Robust download serving: check public/downloads, then desktop folder candidates
+app.use('/downloads', (req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  
+  const requestedFile = req.path.replace(/^\//, ''); // e.g. "TimeTrackerSetup.exe"
+  if (!requestedFile) return next();
+  
+  // Candidates for the file
+  const candidates = [
+    path.join(publicDownloadsPath, requestedFile),
+    path.join(process.cwd(), 'desktop', requestedFile),
+    path.join(process.cwd(), '..', 'desktop', requestedFile),
+    path.join(process.cwd(), '..', 'desktop', 'dist', requestedFile),
+    // Fallback for TimeTrackerSetup.exe -> TimeTracker.exe if setup not found
+    (requestedFile === 'TimeTrackerSetup.exe') ? path.join(process.cwd(), 'desktop', 'TimeTracker.exe') : null,
+    (requestedFile === 'TimeTrackerSetup.exe') ? path.join(process.cwd(), '..', 'desktop', 'TimeTracker.exe') : null
+  ].filter(Boolean);
+
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return res.download(file, requestedFile); // Serve with correct name
+    }
+  }
+  
+  // If no file found, let express.static handle or 404
+  next();
+});
 app.use('/downloads', express.static(publicDownloadsPath));
 
 // Health check
