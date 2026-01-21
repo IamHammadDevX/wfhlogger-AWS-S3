@@ -1,339 +1,156 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import Nav from '../components/Nav.jsx'
-
 import { resolveApiBase } from '../api.js'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
-const allowedMinutes = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20]
+
+const ALLOWED_MINUTES = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20]
 
 export default function WorkHours() {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [intervalMinutes, setIntervalMinutes] = useState(3)
   const [employees, setEmployees] = useState([])
-  const [allEmployees, setAllEmployees] = useState([])
-  const [managers, setManagers] = useState([])
-  const [selectedManager, setSelectedManager] = useState('')
-  const [summaryByEmp, setSummaryByEmp] = useState({})
-  const [sessionsByEmp, setSessionsByEmp] = useState({})
-  const [shotsByEmp, setShotsByEmp] = useState({})
-  const [intervalsByEmp, setIntervalsByEmp] = useState({})
-  const [assignMinutesByEmp, setAssignMinutesByEmp] = useState({})
-  const [assignMsg, setAssignMsg] = useState('')
-  const [expanded, setExpanded] = useState({})
-
-  const headers = useMemo(() => {
-    const token = localStorage.getItem('token')
-    return { Authorization: `Bearer ${token}` }
-  }, [])
+  const [selectedEmployee, setSelectedEmployee] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [role, setRole] = useState('')
 
   useEffect(() => {
-    resolveApiBase().then((BASE) => {
+    const token = localStorage.getItem('token')
+    const headers = { Authorization: `Bearer ${token}` }
+    
+    // Decode role
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+      setRole(payload.role || '')
+    } catch {}
+
+    resolveApiBase().then(BASE => {
       API = BASE
-      // Load employees, today summary, recent screenshots
-      const getEmployees = axios.get(`${BASE}/api/employees`, { headers })
+      // Fetch employees for dropdown
+      axios.get(`${BASE}/api/employees`, { headers })
         .then(r => {
           const list = r.data.users || []
-          setAllEmployees(list)
           setEmployees(list)
+          if (list.length > 0) setSelectedEmployee(list[0].email)
         })
-      const getSummary = axios.get(`${BASE}/api/work/summary/today`, { headers })
-        .then(r => {
-          const by = {}
-          const list = Array.isArray(r.data?.employees) ? r.data.employees : []
-          list.forEach(e => { by[e.employeeId] = e })
-          setSummaryByEmp(by)
-        })
-      const getSessions = axios.get(`${BASE}/api/work/sessions/today`, { headers })
-        .then(r => {
-          const by = {}
-          const list = Array.isArray(r.data?.employees) ? r.data.employees : []
-          list.forEach(e => { by[e.employeeId] = Array.isArray(e.sessions) ? e.sessions : [] })
-          setSessionsByEmp(by)
-        })
-      const getActivity = axios.get(`${BASE}/api/activity/recent`, { headers })
-        .then(r => {
-          const by = {}
-          const list = Array.isArray(r.data?.employees) ? r.data.employees : []
-          list.forEach(e => { by[e.employeeId] = e })
-          setShotsByEmp(by)
-        })
-      Promise.allSettled([getEmployees, getSummary, getSessions, getActivity])
-        .then(results => {
-          const failed = results.filter(r => r.status === 'rejected')
-          if (failed.length) {
-            const reason = failed[0]?.reason
-            setError(reason?.response?.data?.error || reason?.message || 'Failed to load some data')
-          }
-        })
-        .finally(() => setLoading(false))
+        .catch(()=>{})
     })
-  }, [headers])
-
-  useEffect(() => {
-    const refresh = () => {
-      const getSummary = axios.get(`${API}/api/work/summary/today`, { headers })
-        .then(r => {
-          const by = {}
-          const list = Array.isArray(r.data?.employees) ? r.data.employees : []
-          list.forEach(e => { by[e.employeeId] = e })
-          setSummaryByEmp(by)
-        }).catch(()=>{})
-      const getSessions = axios.get(`${API}/api/work/sessions/today`, { headers })
-        .then(r => {
-          const by = {}
-          const list = Array.isArray(r.data?.employees) ? r.data.employees : []
-          list.forEach(e => { by[e.employeeId] = Array.isArray(e.sessions) ? e.sessions : [] })
-          setSessionsByEmp(by)
-        }).catch(()=>{})
-      Promise.allSettled([getSummary, getSessions]).catch(()=>{})
-    }
-    const id = setInterval(refresh, 30000)
-    return () => clearInterval(id)
-  }, [headers])
-
-  // Load managers list for super admin team switcher
-  useEffect(() => {
-    try {
-      const token = localStorage.getItem('token')
-      const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-      if (payload?.role === 'super_admin') {
-        axios.get(`${API}/api/admin/managers`, { headers }).then(r => setManagers(r.data?.managers || []))
-      }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Apply selected manager filter client-side (super admin only)
   useEffect(() => {
-    if (!selectedManager) { setEmployees(allEmployees); return }
-    const filtered = allEmployees.filter(e => String(e.managerId || '') === String(selectedManager))
-    setEmployees(filtered)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedManager, allEmployees])
-
-  useEffect(() => {
-    // After employees loaded, fetch intervals for each
-    if (!employees.length) return
-    const run = async () => {
-      const out = {}
-      for (const emp of employees) {
-        try {
-          const r = await axios.get(`${API}/api/capture-interval`, { headers, params: { employeeId: emp.email } })
-          out[emp.email] = r.data?.intervalSeconds || null
-        } catch {
-          out[emp.email] = null
+    if (!selectedEmployee) return
+    const token = localStorage.getItem('token')
+    const headers = { Authorization: `Bearer ${token}` }
+    
+    axios.get(`${API}/api/capture-interval?employeeId=${selectedEmployee}`, { headers })
+      .then(r => {
+        if(r.data.intervalSeconds) {
+          // Convert seconds to nearest allowed minute
+          const mins = Math.round(r.data.intervalSeconds / 60)
+          if (ALLOWED_MINUTES.includes(mins)) {
+            setIntervalMinutes(mins)
+          } else {
+            // fallback to closest
+            const closest = ALLOWED_MINUTES.reduce((prev, curr) => 
+              Math.abs(curr - mins) < Math.abs(prev - mins) ? curr : prev
+            )
+            setIntervalMinutes(closest)
+          }
         }
-      }
-      setIntervalsByEmp(out)
-      // initialize assign minutes dropdowns based on current interval or default 3
-      const mins = {}
-      for (const emp of employees) {
-        const sec = out[emp.email]
-        mins[emp.email] = sec ? String(Math.round(sec / 60)) : '3'
-      }
-      setAssignMinutesByEmp(mins)
-    }
-    run()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employees])
+      })
+      .catch(()=>{})
+  }, [selectedEmployee])
 
-  const updateInterval = async (employeeId) => {
-    setAssignMsg('')
-    const minutes = Number(assignMinutesByEmp[employeeId] || 3)
+  const save = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setMsg('')
     try {
-      await axios.post(`${API}/api/capture-interval`, { employeeId, intervalMinutes: minutes }, { headers })
-      const secs = minutes * 60
-      setIntervalsByEmp(prev => ({ ...prev, [employeeId]: secs }))
-      setAssignMsg(`Updated interval for ${employeeId} to ${minutes} minutes.`)
-      setTimeout(() => setAssignMsg(''), 3000)
+      const token = localStorage.getItem('token')
+      const headers = { Authorization: `Bearer ${token}` }
+      
+      await axios.post(`${API}/api/capture-interval`, { 
+        employeeId: selectedEmployee,
+        intervalMinutes: Number(intervalMinutes) 
+      }, { headers })
+      
+      setMsg('Configuration saved successfully.')
     } catch (e) {
-      setAssignMsg(e?.response?.data?.error || e.message)
-      setTimeout(() => setAssignMsg(''), 5000)
+      setMsg('Error saving configuration: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setLoading(false)
     }
   }
-
-  const fmtSeconds = (sec) => {
-    const s = Math.max(0, Number(sec) || 0)
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const r = s % 60
-    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`
-  }
-  const fmtTime = (iso) => {
-    try { return new Date(iso).toLocaleString() } catch { return iso || '' }
-  }
-  const firstLogin = (sum) => (sum?.loginTimes || []).length ? sum.loginTimes[0] : null
-  const lastLogout = (sum) => (sum?.logoutTimes || []).length ? sum.logoutTimes[sum.logoutTimes.length - 1] : null
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-slate-50 to-white">
-      <Nav />
-      <main className="max-w-6xl mx-auto px-6 md:px-10 py-6 md:py-10 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold">Activity Timing &amp; Work Hours Tracking</h2>
-            <p className="text-gray-700">Per-employee login/logout, active vs idle time, screenshots, and capture intervals.</p>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Work Hours & Config</h1>
+        <p className="mt-1 text-slate-500">Manage tracking parameters and schedule settings.</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 max-w-2xl">
+        <h2 className="text-xl font-bold text-slate-900 mb-6">Capture Settings</h2>
+        
+        {msg && (
+          <div className={`mb-6 p-4 rounded-lg text-sm flex items-center ${msg.startsWith('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {msg.startsWith('Error') ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              )}
+            </svg>
+            {msg}
           </div>
-          {managers.length > 0 && (
-            <div>
-              <label className="block text-sm">Team Switcher (Super Admin)</label>
-              <select className="border rounded px-3 py-2 min-w-64" value={selectedManager} onChange={e=>setSelectedManager(e.target.value)}>
-                <option value="">All Managers</option>
-                {managers.map(m => (
-                  <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
+        )}
+
+        <form onSubmit={save} className="space-y-6">
+          {/* Employee Selector */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Select Employee</label>
+            <select
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white transition-colors"
+              value={selectedEmployee}
+              onChange={e => setSelectedEmployee(e.target.value)}
+              disabled={employees.length === 0}
+            >
+              {employees.length === 0 ? <option>Loading employees...</option> : null}
+              {employees.map(e => (
+                <option key={e.email} value={e.email}>{e.email} ({e.name || 'No Name'})</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Interval Selector */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Screenshot Interval</label>
+            <div className="flex items-center gap-4">
+              <select
+                className="w-full md:w-48 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white transition-colors"
+                value={intervalMinutes}
+                onChange={e => setIntervalMinutes(Number(e.target.value))}
+              >
+                {ALLOWED_MINUTES.map(m => (
+                  <option key={m} value={m}>{m} minutes</option>
                 ))}
               </select>
             </div>
-          )}
-        </div>
+            <p className="mt-2 text-sm text-slate-500">
+              How often the desktop client captures a screenshot for this employee.
+            </p>
+          </div>
 
-        {error && <div className="text-red-600 text-sm">{error}</div>}
-        {loading && <div>Loading…</div>}
-        {assignMsg && <div className="text-sm text-blue-700">{assignMsg}</div>}
-
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {employees.length === 0 && !loading && (
-            <div className="text-sm text-gray-700">No employees configured. Go to Setup to add employees.</div>
-          )}
-          {employees.map(emp => {
-            const id = emp.email
-            const sum = summaryByEmp[id]
-            const shots = shotsByEmp[id]
-            const intervalSecs = intervalsByEmp[id]
-            const totalActive = sum?.totalActiveSeconds || 0
-            const totalIdle = sum?.totalIdleSeconds || 0
-            const netActive = sum ? Math.max(0, sum.totalActiveSeconds - sum.totalIdleSeconds) : 0
-            const sessions = sessionsByEmp[id] || []
-            return (
-              <div key={id} className="rounded-xl border bg-white p-4 shadow-sm space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-semibold">{emp.name || id}</div>
-                    <div className="text-xs text-gray-600">{id}</div>
-                  </div>
-                  <button className="px-2 py-1 rounded text-xs border hover:bg-gray-50" onClick={() => setExpanded(prev => ({ ...prev, [id]: !prev[id] }))}>
-                    {expanded[id] ? 'Hide Details' : 'Show Details'}
-                  </button>
-                </div>
-
-                {/* Interval config */}
-                <div className="space-y-1">
-                  <div className="text-sm text-gray-700">Capture Interval: {intervalSecs ? `${Math.round(intervalSecs/60)} min` : 'Not assigned'}</div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select className="border rounded px-2 py-1 text-sm flex-1 sm:flex-none"
-                      value={assignMinutesByEmp[id] || '3'}
-                      onChange={e => setAssignMinutesByEmp(prev => ({ ...prev, [id]: e.target.value }))}
-                    >
-                      {allowedMinutes.map(m => <option key={m} value={m}>{m} minutes</option>)}
-                    </select>
-                    <button className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700" onClick={() => updateInterval(id)}>Update</button>
-                  </div>
-                </div>
-
-                {/* Work hours summary */}
-                <div className="space-y-1">
-                  <div className="font-semibold">Today’s Work Hours</div>
-                  {!sum && (
-                    <div className="text-sm text-gray-600">No work sessions yet today.</div>
-                  )}
-                  {sum && (
-                    <div className="text-sm text-gray-700">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-50 text-green-700 border">Active: {fmtSeconds(totalActive)}</span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-yellow-50 text-yellow-700 border">Idle: {fmtSeconds(totalIdle)}</span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-blue-700 border">Net: {fmtSeconds(netActive)}</span>
-                      </div>
-                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <div>
-                          <div className="text-xs text-gray-600">First Login</div>
-                          <div className="text-xs">{firstLogin(sum) ? fmtTime(firstLogin(sum)) : '-'}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-600">Last Logout</div>
-                          <div className="text-xs">{lastLogout(sum) ? fmtTime(lastLogout(sum)) : (sessions.some(s=>s.isActive) ? 'Active' : '-')}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-600">Sessions Today</div>
-                          <div className="text-xs">{sessions.length}</div>
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="text-xs text-gray-600">Logins</div>
-                        <ul className="text-xs list-disc pl-4 space-y-0.5">
-                          {(sum.loginTimes || []).map((t, i) => <li key={i}>{fmtTime(t)}</li>)}
-                        </ul>
-                      </div>
-                      <div className="mt-2">
-                        <div className="text-xs text-gray-600">Logouts</div>
-                        <ul className="text-xs list-disc pl-4 space-y-0.5">
-                          {(sum.logoutTimes || []).map((t, i) => <li key={i}>{fmtTime(t)}</li>)}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Per-session details */}
-                {expanded[id] && (
-                  <div className="space-y-2">
-                    <div className="font-semibold">Session Details</div>
-                    {sessions.length === 0 && (
-                      <div className="text-xs text-gray-600">No sessions today.</div>
-                    )}
-                    {sessions.length > 0 && (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-xs">
-                          <thead>
-                            <tr className="text-left">
-                              <th className="py-1 pr-3">Start</th>
-                              <th className="py-1 pr-3">End</th>
-                              <th className="py-1 pr-3">Duration</th>
-                              <th className="py-1 pr-3">Idle</th>
-                              <th className="py-1 pr-3">Net Active</th>
-                              <th className="py-1 pr-3">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sessions.map((s, i) => (
-                              <tr key={i} className="border-t">
-                                <td className="py-1 pr-3">{fmtTime(s.startedAt)}</td>
-                                <td className="py-1 pr-3">{s.endedAt ? fmtTime(s.endedAt) : '-'}</td>
-                                <td className="py-1 pr-3">{fmtSeconds(s.activeSeconds)}</td>
-                                <td className="py-1 pr-3">{fmtSeconds(s.idleSeconds)}</td>
-                                <td className="py-1 pr-3">{fmtSeconds(s.netActiveSeconds)}</td>
-                                <td className="py-1 pr-3">{s.isActive ? 'Active' : 'Closed'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Recent screenshots with timestamps */}
-                <div>
-                  <div className="font-semibold">Recent Screenshots</div>
-                  {!shots && <div className="text-xs text-gray-600">No screenshots yet.</div>}
-                  {shots && (
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      {(Array.isArray(shots?.latest) ? shots.latest : []).map((f, i) => (
-                        <div key={i} className="text-center">
-                          <a href={`${API}/${f.file}`} target="_blank" rel="noreferrer">
-                            <img className="w-full h-24 object-cover border rounded" src={`${API}/${f.file}`} alt="Screenshot" />
-                          </a>
-                          <div className="text-[10px] text-gray-600 mt-1">{fmtTime(f.ts)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </section>
-      </main>
+          <div className="pt-4 border-t border-slate-100">
+            <button 
+              disabled={loading || !selectedEmployee} 
+              className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-70"
+            >
+              {loading ? 'Saving...' : 'Update Configuration'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

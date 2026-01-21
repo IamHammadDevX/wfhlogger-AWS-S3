@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { Link } from 'react-router-dom'
-import Nav from '../components/Nav.jsx'
 import { resolveApiBase } from '../api.js'
 import { getSocket } from '../socket.js'
 
@@ -71,90 +70,106 @@ export default function Dashboard() {
   const filteredFiles = selectedManager ? recentFiles.filter(f => filteredEmployees.map(e=>e.email).includes(f.employeeId)) : recentFiles
 
   const Stat = ({label, value}) => (
-    <div className="rounded-xl border bg-white p-5 shadow-sm">
-      <div className="text-sm text-gray-600">{label}</div>
-      <div className="mt-1 text-2xl font-bold">{value}</div>
+    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      <div className="text-sm font-medium text-slate-500">{label}</div>
+      <div className="mt-2 text-3xl font-bold text-slate-900">{value}</div>
     </div>
   )
 
   const Quick = ({to, title, desc, icon}) => (
-    <Link to={to} className="group rounded-xl border bg-white p-5 shadow-sm hover:shadow-md transition block">
-      <div className="flex items-center gap-3">
-        <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-700">
+    <Link to={to} className="group flex flex-col p-6 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all">
+      <div className="flex items-center gap-4 mb-4">
+        <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
           {icon}
         </span>
-        <div className="font-semibold">{title}</div>
+        <div className="font-bold text-lg text-slate-900">{title}</div>
       </div>
-      <div className="mt-2 text-sm text-gray-700">{desc}</div>
+      <div className="text-sm text-slate-600 leading-relaxed">{desc}</div>
     </Link>
   )
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-slate-50 to-white">
-      <Nav />
-      <main className="max-w-6xl mx-auto px-6 md:px-10 py-6 md:py-10 space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold">Dashboard</h2>
-            <p className="text-gray-700">Overview of your team and recent activity.</p>
-          </div>
-          {role === 'super_admin' && (
-            <div>
-              <Link to="/setup" className="px-4 py-2.5 rounded bg-blue-600 text-white hover:bg-blue-700">Team Setup</Link>
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-slate-500">Overview of your team and recent activity.</p>
+        </div>
+        {role === 'super_admin' && (
+          <Link to="/setup" className="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
+            Configure Team
+          </Link>
+        )}
+      </div>
+
+      {managers.length > 0 && (
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm inline-block">
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Team Context</label>
+          <select 
+            className="block w-full md:w-64 rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+            value={selectedManager} 
+            onChange={e=>setSelectedManager(e.target.value)}
+          >
+            <option value="">All Managers</option>
+            {managers.map(m => (
+              <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Stats */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Stat label="Active Team" value={team?.name || 'Not configured'} />
+        <Stat label="Total Employees" value={filteredEmployees.length} />
+        <Stat label="Recent Screenshots" value={filteredFiles.length} />
+        <Stat label="System Status" value={loading ? 'Loading…' : 'Operational'} />
+      </section>
+
+      {/* Quick actions */}
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Quick to="/live" title="Live View" desc="Monitor active employee screens in real-time." icon={<SvgLive/>} />
+          <Quick to="/report" title="Reports" desc="Generate productivity reports and analyze work sessions." icon={<SvgCamera/>} />
+          <Quick to="/activity" title="Activity Logs" desc="Detailed timeline of user activities and idle time." icon={<SvgChart/>} />
+          <Quick to="/setup" title="Organization" desc="Manage team settings, invites, and permissions." icon={<SvgCog/>} />
+          <Quick to="/downloads" title="Client Download" desc="Get the latest desktop tracker for Windows." icon={<SvgDownload/>} />
+        </div>
+      </section>
+
+      {/* Recent screenshots */}
+      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="font-bold text-slate-900">Latest Screenshots</h2>
+          <Link to="/activity" className="text-sm font-medium text-blue-600 hover:text-blue-700">View All</Link>
+        </div>
+        
+        <div className="p-6">
+          {recentFiles.length === 0 ? (
+            <div className="text-center py-12 text-slate-500">
+              No screenshots captured recently.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {filteredFiles.map((f, i) => (
+                <div key={i} className="group relative aspect-video bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                  <img 
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                    src={`${API}/${f.file}`} 
+                    alt="Screenshot" 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                    <span className="text-xs text-white font-medium truncate w-full">
+                      {new Date(f.ts || '').toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
-
-        {managers.length > 0 && (
-          <div className="flex items-end gap-2">
-            <div className="w-full sm:w-auto">
-              <label className="block text-sm">Team Switcher (Super Admin)</label>
-              <select className="border rounded px-3 py-2 w-full sm:w-64" value={selectedManager} onChange={e=>setSelectedManager(e.target.value)}>
-                <option value="">All Managers</option>
-                {managers.map(m => (
-                  <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* Stats */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Stat label="Team" value={team?.name || 'Not configured'} />
-          <Stat label="Employees" value={filteredEmployees.length} />
-          <Stat label="Recent Screenshots" value={filteredFiles.length} />
-          <Stat label="Status" value={loading ? 'Loading…' : 'Healthy'} />
-        </section>
-
-        {/* Quick actions */}
-        <section>
-          <h3 className="text-lg font-semibold">Quick Actions</h3>
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Quick to="/live" title="Live View" desc="See employee screens in real-time." icon={<SvgLive/>} />
-            <Quick to="/report" title="Report" desc="Filter screenshots and sessions by date." icon={<SvgCamera/>} />
-            <Quick to="/activity" title="Activity" desc="Review recent activity by employee." icon={<SvgChart/>} />
-            <Quick to="/setup" title="Setup" desc="Configure team and invite users." icon={<SvgCog/>} />
-            <Quick to="/downloads" title="Downloads" desc="Get the desktop tracker client." icon={<SvgDownload/>} />
-          </div>
-        </section>
-
-        {/* Recent screenshots */}
-        <section>
-          <h3 className="text-lg font-semibold">Latest Screenshots</h3>
-          {recentFiles.length === 0 && (
-            <div className="mt-3 text-sm text-gray-600">No screenshots yet. Once employees start tracking, screenshots will appear here.</div>
-          )}
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {filteredFiles.map((f, i) => (
-              <div key={i} className="text-center">
-                <img className="w-full h-auto border rounded" src={`${API}/${f.file}`} alt="Screenshot" />
-                <div className="text-[10px] text-gray-600 mt-1">{new Date(f.ts || '').toLocaleString()}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
+      </section>
     </div>
   )
 }

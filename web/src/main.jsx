@@ -1,6 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './index.css'
 import './api.js'
 import Login from './pages/Login.jsx'
@@ -13,21 +13,31 @@ import Setup from './pages/Setup.jsx'
 import Downloads from './pages/Downloads.jsx'
 import Home from './pages/Home.jsx'
 import Admin from './pages/Admin.jsx'
+import Layout from './components/Layout.jsx'
+
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
+  return <Layout>{children}</Layout>
+}
 
 function AppRoutes() {
-  const token = localStorage.getItem('token')
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Home />} />
-      <Route path="/dashboard" element={token ? <Dashboard /> : <Navigate to="/login" replace />} />
-      <Route path="/live" element={token ? <LiveView /> : <Navigate to="/login" replace />} />
-      <Route path="/report" element={token ? <Report /> : <Navigate to="/login" replace />} />
-      <Route path="/activity" element={token ? <Activity /> : <Navigate to="/login" replace />} />
-      <Route path="/work-hours" element={token ? <WorkHours /> : <Navigate to="/login" replace />} />
-      <Route path="/setup" element={token ? <Setup /> : <Navigate to="/login" replace />} />
-      <Route path="/downloads" element={token ? <Downloads /> : <Navigate to="/login" replace />} />
-      <Route path="/admin" element={token ? <Admin /> : <Navigate to="/login" replace />} />
+      
+      {/* Protected Routes wrapped in Layout */}
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/live" element={<ProtectedRoute><LiveView /></ProtectedRoute>} />
+      <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
+      <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
+      <Route path="/work-hours" element={<ProtectedRoute><WorkHours /></ProtectedRoute>} />
+      <Route path="/setup" element={<ProtectedRoute><Setup /></ProtectedRoute>} />
+      <Route path="/downloads" element={<ProtectedRoute><Downloads /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
     </Routes>
   )
 }

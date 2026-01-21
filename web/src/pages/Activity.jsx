@@ -1,111 +1,101 @@
-import React from 'react'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import Nav from '../components/Nav.jsx'
 import { resolveApiBase } from '../api.js'
-import { getSocket } from '../socket.js'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 export default function Activity() {
-  const [items, setItems] = useState([])
+  const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [hours, setHours] = useState([])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     const headers = { Authorization: `Bearer ${token}` }
     resolveApiBase().then((BASE)=>{
       API = BASE
-      const getShots = axios.get(`${BASE}/api/activity/recent`, { headers })
-        .then(r => setItems(r.data.employees || []))
-      const getHours = axios.get(`${BASE}/api/work/summary/today`, { headers })
-        .then(r => setHours(r.data.employees || []))
-      Promise.allSettled([getShots, getHours])
-        .catch(e => setError(e?.response?.data?.error || e.message))
+      // Fetch activity for the last 30 days by default
+      const to = new Date()
+      const from = new Date()
+      from.setDate(from.getDate() - 30)
+      
+      const params = {
+        from: from.toISOString(),
+        to: to.toISOString()
+      }
+
+      axios.get(`${BASE}/api/work/sessions/range`, { headers, params })
+        .then(r => {
+          // Flatten sessions for a simple activity feed
+          const all = []
+          const emps = r.data.employees || []
+          emps.forEach(e => {
+            (e.sessions || []).forEach(s => {
+              // Normalize field names: backend uses startedAt/endedAt, frontend used startTime/endTime
+              all.push({ 
+                ...s, 
+                employee: e.employeeId,
+                startTime: s.startedAt || s.startTime,
+                endTime: s.endedAt || s.endTime
+              })
+            })
+          })
+          all.sort((a,b) => new Date(b.startTime) - new Date(a.startTime))
+          setActivities(all)
+        })
+        .catch(() => setActivities([]))
         .finally(() => setLoading(false))
     })
   }, [])
 
-  useEffect(() => {
-    const s = getSocket()
-    const token = localStorage.getItem('token')
-    const headers = { Authorization: `Bearer ${token}` }
-    const refresh = () => {
-      resolveApiBase().then((BASE)=>{
-        axios.get(`${BASE}/api/activity/recent`, { headers }).then(r => setItems(r.data.employees || [])).catch(()=>{})
-      })
-    }
-    s.on('uploads:cleanup_done', refresh)
-    return () => { s.off('uploads:cleanup_done', refresh) }
-  }, [])
-
   return (
-    <div className="min-h-full">
-      <Nav />
-      <main className="p-4 space-y-4">
-        <h2 className="text-lg font-semibold">Activity</h2>
-        {error && <div className="text-red-600 text-sm">{error}</div>}
-        {loading && <div>Loading…</div>}
-        {/* Today’s Work Hours */}
-        <section className="bg-white border rounded p-3">
-          <div className="font-semibold mb-2">Today’s Work Hours</div>
-          {hours.length === 0 && (
-            <div className="text-sm text-gray-600">No work sessions yet today.</div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {hours.map((h) => (
-              <div key={h.employeeId} className="border rounded p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-semibold">{h.employeeId}</div>
-                </div>
-                <div className="text-sm text-gray-700">Login: {formatTime((h.loginTimes||[])[0]) || '-'}</div>
-                <div className="text-sm text-gray-700">Logout: {formatTime((h.logoutTimes||[])[(h.logoutTimes||[]).length-1]) || '-'}</div>
-                <div className="text-sm mt-2">
-                  <span className="inline-block mr-2 px-2 py-1 rounded bg-blue-50 text-blue-700">Active: {fmtDuration(h.totalActiveSeconds)}</span>
-                  <span className="inline-block mr-2 px-2 py-1 rounded bg-yellow-50 text-yellow-700">Idle: {fmtDuration(h.totalIdleSeconds)}</span>
-                  <span className="inline-block px-2 py-1 rounded bg-green-50 text-green-700">Net: {fmtDuration(h.netActiveSeconds)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((emp) => (
-            <div key={emp.employeeId} className="bg-white border rounded p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-semibold">{emp.employeeId}</div>
-                <div className="text-sm text-gray-600">{emp.count} shots</div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {(Array.isArray(emp.latest) ? emp.latest : []).map((f, i) => (
-                  <div key={i} className="text-center">
-                    <a href={`${API}/${f.file}`} target="_blank" rel="noreferrer">
-                      <img className="w-full h-24 object-cover border rounded" src={`${API}/${f.file}`} alt="Screenshot" />
-                    </a>
-                    <div className="text-[10px] text-gray-600 mt-1">{new Date(f.ts || '').toLocaleString()}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Activity Log</h1>
+        <p className="mt-1 text-slate-500">Recent work sessions (Last 30 days).</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Employee</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Start Time</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">End Time</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Duration</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-slate-200">
+              {loading ? (
+                <tr><td colSpan="5" className="px-6 py-8 text-center text-sm text-slate-500">Loading activity...</td></tr>
+              ) : activities.length === 0 ? (
+                <tr><td colSpan="5" className="px-6 py-8 text-center text-sm text-slate-500">No activity recorded yet.</td></tr>
+              ) : (
+                activities.map((a, i) => {
+                  const start = new Date(a.startTime)
+                  const end = a.endTime ? new Date(a.endTime) : null
+                  const dur = end ? Math.round((end - start)/1000/60) : 0
+                  const isActive = !end
+                  return (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{a.employee}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{start.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{end ? end.toLocaleString() : '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{end ? `${Math.floor(dur/60)}h ${dur%60}m` : '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
+                          {isActive ? 'Active' : 'Completed'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      </main>
+      </div>
     </div>
   )
-}
-
-function fmtDuration(totalSeconds = 0){
-  const s = Math.max(0, Math.floor(totalSeconds))
-  const h = Math.floor(s/3600)
-  const m = Math.floor((s%3600)/60)
-  return `${h}h ${m}m`
-}
-function formatTime(iso){
-  if (!iso) return ''
-  try {
-    const d = new Date(iso)
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  } catch { return '' }
 }

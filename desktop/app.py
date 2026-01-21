@@ -17,60 +17,112 @@ except Exception:
 
 try:
     import mss
-    from PIL import Image
+    from PIL import Image, ImageTk
 except Exception:
     raise RuntimeError('Install dependencies from requirements.txt (mss, Pillow).')
 
 
-BACKEND_URL = os.environ.get('BACKEND_URL')
-SCREENSHOT_INTERVAL_SECONDS = int(os.environ.get('SCREENSHOT_INTERVAL_SECONDS', '180'))  # default 3 minutes
-LIVE_VIEW_INTERVAL_SECONDS = int(os.environ.get('LIVE_VIEW_INTERVAL_SECONDS', '5'))  # faster live frames
-HEARTBEAT_INTERVAL_SECONDS = int(os.environ.get('HEARTBEAT_INTERVAL_SECONDS', '60'))  # send idle heartbeat every 60s
+# Default configuration
+DEFAULT_BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:4000')
+SCREENSHOT_INTERVAL_SECONDS = int(os.environ.get('SCREENSHOT_INTERVAL_SECONDS', '180'))
+LIVE_VIEW_INTERVAL_SECONDS = 2
+HEARTBEAT_INTERVAL_SECONDS = int(os.environ.get('HEARTBEAT_INTERVAL_SECONDS', '60'))
 
 
 class TimeTrackerApp:
     def __init__(self, root):
         self.root = root
-        root.title('Time Tracker Client')
-        root.geometry('720x460')
-        root.minsize(640, 420)
+        root.title('TimeTracker')
+        # Square-ish modern aspect ratio
+        root.geometry('400x480')
+        root.resizable(False, False)
 
         # ----- Modern styling -----
         self.style = ttk.Style()
         try:
-            self.style.theme_use('vista')
-        except tk.TclError:
             self.style.theme_use('clam')
+        except tk.TclError:
+            pass
 
+        # Fonts
         self.font_body = tkfont.Font(family='Segoe UI', size=10)
-        self.font_heading = tkfont.Font(family='Segoe UI', size=12, weight='bold')
-        self.font_title = tkfont.Font(family='Segoe UI', size=16, weight='bold')
+        self.font_small = tkfont.Font(family='Segoe UI', size=9)
+        self.font_heading = tkfont.Font(family='Segoe UI', size=14, weight='bold')
+        self.font_hero = tkfont.Font(family='Segoe UI', size=28, weight='bold')
         self.root.option_add('*Font', self.font_body)
 
-        # Colors
-        self.color_bg = '#0F172A'
-        self.color_text = '#F9FAFB'
-        self.color_muted = '#94A3B8'
-        self.color_primary = '#2563EB'
-        self.color_success = '#16A34A'
-        self.color_secondary = '#4B5563'
-        self.color_error = '#DC2626'
+        # Colors - SaaS Palette
+        self.color_bg = '#F8FAFC'      # Slate 50
+        self.color_surface = '#FFFFFF' # White
+        self.color_text = '#0F172A'    # Slate 900
+        self.color_muted = '#64748B'   # Slate 500
+        self.color_primary = '#2563EB' # Blue 600
+        self.color_primary_hover = '#1D4ED8' # Blue 700
+        self.color_success = '#16A34A' # Green 600
+        self.color_error = '#EF4444'   # Red 500
+        self.color_border = '#E2E8F0'  # Slate 200
 
-        # Button styles
-        self.style.configure('Primary.TButton', padding=8, foreground='white', background=self.color_primary)
-        self.style.map('Primary.TButton', background=[('active', '#1D4ED8'), ('pressed', '#1E40AF')])
-        self.style.configure('Success.TButton', padding=8, foreground='white', background=self.color_success)
-        self.style.map('Success.TButton', background=[('active', '#15803D'), ('pressed', '#166534')])
-        self.style.configure('Secondary.TButton', padding=8, foreground='white', background=self.color_secondary)
-        self.style.map('Secondary.TButton', background=[('active', '#374151'), ('pressed', '#1F2937')])
-        self.style.configure('Danger.TButton', padding=8, foreground='white', background=self.color_error)
-        self.style.map('Danger.TButton', background=[('active', '#991B1B'), ('pressed', '#B91C1C')])
-        self.style.configure('Header.TLabel', font=self.font_title, foreground=self.color_text)
-        self.style.configure('Muted.TLabel', foreground=self.color_muted)
+        self.root.configure(bg=self.color_bg)
 
+        # Configure TTK Styles
+        self.style.configure('TFrame', background=self.color_bg)
+        self.style.configure('Surface.TFrame', background=self.color_surface, relief='flat')
+        
+        self.style.configure('TLabel', background=self.color_bg, foreground=self.color_text)
+        self.style.configure('Surface.TLabel', background=self.color_surface, foreground=self.color_text)
+        self.style.configure('Muted.TLabel', background=self.color_bg, foreground=self.color_muted, font=self.font_small)
+        self.style.configure('Heading.TLabel', background=self.color_bg, foreground=self.color_text, font=self.font_heading)
+        self.style.configure('Hero.TLabel', background=self.color_bg, foreground=self.color_text, font=self.font_hero)
+        
+        # Modern Buttons
+        self.style.configure('Primary.TButton', 
+            font=('Segoe UI', 10, 'bold'), 
+            background=self.color_primary, 
+            foreground='white', 
+            borderwidth=0, 
+            focuscolor=self.color_primary,
+            padding=10
+        )
+        self.style.map('Primary.TButton', 
+            background=[('active', self.color_primary_hover), ('pressed', self.color_primary_hover)]
+        )
+
+        self.style.configure('Danger.TButton', 
+            font=('Segoe UI', 10, 'bold'), 
+            background=self.color_error, 
+            foreground='white', 
+            borderwidth=0, 
+            focuscolor=self.color_error,
+            padding=10
+        )
+        self.style.map('Danger.TButton', 
+            background=[('active', '#DC2626'), ('pressed', '#B91C1C')]
+        )
+        
+        self.style.configure('Ghost.TButton',
+            font=('Segoe UI', 9),
+            background=self.color_bg,
+            foreground=self.color_muted,
+            borderwidth=0,
+            padding=4
+        )
+        self.style.map('Ghost.TButton',
+            foreground=[('active', self.color_text)]
+        )
+
+        # Input fields
+        self.style.configure('TEntry', 
+            fieldbackground=self.color_surface, 
+            borderwidth=1, 
+            relief='solid', 
+            padding=8
+        )
+
+        # State
         self.token = None
         self.email = tk.StringVar()
         self.password = tk.StringVar()
+        self.server_url = tk.StringVar(value=DEFAULT_BACKEND_URL)
         self.tracking = False
         self.live_view_active = False
         self.sio = None
@@ -80,249 +132,157 @@ class TimeTrackerApp:
         self._live_stop_event = threading.Event()
         self.live_thread = None
         self.capture_interval_seconds = SCREENSHOT_INTERVAL_SECONDS
+        self.backend_url = DEFAULT_BACKEND_URL
 
-        # Resolve backend URL proactively with health-check and fallbacks
-        self.backend_url = self._resolve_backend_url()
+        # Build UI Container
+        self.container = ttk.Frame(self.root)
+        self.container.pack(fill=tk.BOTH, expand=True)
 
-        self._build_ui()
+        self.current_frame = None
+        self._show_login_frame()
+
         try:
             self.root.protocol('WM_DELETE_WINDOW', self._on_close)
         except Exception:
             pass
 
-    def _build_ui(self):
-        # Header bar
-        header = tk.Frame(self.root, bg=self.color_bg)
+    def _clear_frame(self):
+        if self.current_frame:
+            self.current_frame.destroy()
+        self.current_frame = None
+
+    def _show_login_frame(self):
+        self._clear_frame()
+        self.current_frame = ttk.Frame(self.container, padding=30)
+        self.current_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Logo / Brand
+        ttk.Label(self.current_frame, text="TimeTracker", style='Heading.TLabel').pack(pady=(20, 5))
+        ttk.Label(self.current_frame, text="Sign in to your workspace", style='Muted.TLabel').pack(pady=(0, 25))
+
+        # Form
+        form_frame = ttk.Frame(self.current_frame)
+        form_frame.pack(fill=tk.X)
+
+        # Server Input
+        ttk.Label(form_frame, text="Server Address", style='Muted.TLabel').pack(anchor='w', pady=(0, 4))
+        srv_entry = ttk.Entry(form_frame, textvariable=self.server_url)
+        srv_entry.pack(fill=tk.X, pady=(0, 12))
+
+        # Credentials
+        ttk.Label(form_frame, text="Email", style='Muted.TLabel').pack(anchor='w', pady=(0, 4))
+        ttk.Entry(form_frame, textvariable=self.email).pack(fill=tk.X, pady=(0, 12))
+
+        ttk.Label(form_frame, text="Password", style='Muted.TLabel').pack(anchor='w', pady=(0, 4))
+        ttk.Entry(form_frame, textvariable=self.password, show="•").pack(fill=tk.X, pady=(0, 20))
+
+        # Login Button
+        self.login_btn = ttk.Button(form_frame, text="Continue", style='Primary.TButton', command=self.login)
+        self.login_btn.pack(fill=tk.X)
+
+        # Footer
+        ttk.Label(self.current_frame, text="v1.0.0 • Secure Client", style='Muted.TLabel', font=('Segoe UI', 8)).pack(side=tk.BOTTOM, pady=10)
+
+    def _show_dashboard_frame(self):
+        self._clear_frame()
+        self.current_frame = ttk.Frame(self.container)
+        self.current_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 1. Header
+        header = ttk.Frame(self.current_frame, style='Surface.TFrame', padding=(20, 15))
         header.pack(fill=tk.X)
-        ttk.Label(header, text='Time Tracker Client', style='Header.TLabel', background=self.color_bg).pack(side=tk.LEFT, padx=16, pady=12)
-        self.header_status = ttk.Label(header, text='Not logged in', style='Muted.TLabel')
-        self.header_status.pack(side=tk.RIGHT, padx=16, pady=12)
-
-        container = ttk.Frame(self.root, padding=16)
-        container.pack(fill=tk.BOTH, expand=True)
-
-        notebook = ttk.Notebook(container)
-        notebook.pack(fill=tk.BOTH, expand=True)
-
-        # Sign In tab (only tab visible)
-        login_tab = ttk.Frame(notebook, padding=16)
-        notebook.add(login_tab, text='Sign In')
-
-        ttk.Label(login_tab, text='Server URL').grid(row=0, column=0, sticky='w', pady=(0, 6))
-        self.server_url_var = tk.StringVar(value=self.backend_url)
-        ttk.Entry(login_tab, textvariable=self.server_url_var, width=40).grid(row=0, column=1, sticky='ew', padx=8, pady=(0, 6))
-
-        ttk.Label(login_tab, text='Email').grid(row=1, column=0, sticky='w', pady=(0, 6))
-        ttk.Entry(login_tab, textvariable=self.email, width=40).grid(row=1, column=1, sticky='ew', padx=8, pady=(0, 6))
-        ttk.Label(login_tab, text='Password').grid(row=2, column=0, sticky='w', pady=6)
-        ttk.Entry(login_tab, textvariable=self.password, width=40, show='*').grid(row=2, column=1, sticky='ew', padx=8, pady=6)
-        self.login_btn = ttk.Button(login_tab, text='Login', style='Primary.TButton', command=self.login)
-        self.login_btn.grid(row=1, column=2, rowspan=2, sticky='e', padx=8)
-
-        self.status_var = tk.StringVar(value='Not logged in')
-        ttk.Label(login_tab, textvariable=self.status_var, style='Muted.TLabel').grid(row=3, column=0, columnspan=3, sticky='w', pady=(12, 0))
-        self.active_time_var = tk.StringVar(value='Active: 00:00:00')
-        self.idle_time_var = tk.StringVar(value='Idle: 00:00:00')
-        ttk.Label(login_tab, textvariable=self.active_time_var, style='Muted.TLabel').grid(row=4, column=0, columnspan=3, sticky='w')
-        ttk.Label(login_tab, textvariable=self.idle_time_var, style='Muted.TLabel').grid(row=5, column=0, columnspan=3, sticky='w')
-        for i in range(3):
-            login_tab.columnconfigure(i, weight=1)
-
-        # Tracking and Live View tabs removed; controls moved to header
-        self.live_indicator = tk.StringVar(value='')
-        self.last_upload_var = tk.StringVar(value='')
-        self.progress_var = tk.IntVar(value=0)
-        self.progress = ttk.Progressbar(login_tab, orient=tk.HORIZONTAL, length=420, mode='determinate')
-        self.progress.configure(maximum=self.capture_interval_seconds, variable=self.progress_var)
-        self.countdown_var = tk.StringVar(value=f'Next capture in {self.capture_interval_seconds}s')
-
-        # Header controls: Start/Stop Tracking
-        header_controls = tk.Frame(header, bg=self.color_bg)
-        header_controls.pack(side=tk.RIGHT, padx=8, pady=8)
-        self.start_btn = ttk.Button(header_controls, text='Start Tracking', style='Success.TButton', state=tk.DISABLED, command=self.start_tracking)
-        self.stop_btn = ttk.Button(header_controls, text='Stop', style='Danger.TButton', state=tk.DISABLED, command=self.stop_tracking)
-
-    def login(self):
-        # Allow user to override backend URL
-        custom_url = self.server_url_var.get().strip().rstrip('/')
-        if custom_url:
-            self.backend_url = custom_url
-
-        email = self.email.get().strip()
-        password = self.password.get().strip()
-        if not email or not password:
-            messagebox.showwarning('Missing', 'Email and password are required.')
-            return
-        # Ensure backend is reachable before attempting login
-        if not self._ensure_server():
-            messagebox.showerror('Login failed', f'Server not reachable at {self.backend_url}. Ensure backend is running on port 4000.')
-            return
         
-        # Update UI with the resolved URL (in case fallback logic changed it)
-        self.server_url_var.set(self.backend_url)
+        # Flex layout manually
+        header.columnconfigure(1, weight=1)
+        
+        # Avatar
+        avatar_bg = self.color_primary
+        avatar = tk.Label(header, text=self.email.get()[0].upper(), bg=avatar_bg, fg='white', 
+                         font=('Segoe UI', 11, 'bold'), width=3, height=1)
+        avatar.grid(row=0, column=0, rowspan=2, padx=(0, 10))
+        
+        # User details
+        ttk.Label(header, text=self.email.get(), style='Surface.TLabel', font=('Segoe UI', 9, 'bold')).grid(row=0, column=1, sticky='w')
+        self.status_lbl = ttk.Label(header, text="Online", style='Muted.TLabel', foreground=self.color_success)
+        self.status_lbl.grid(row=1, column=1, sticky='w')
 
-        try:
-            resp = requests.post(f'{self.backend_url}/api/auth/login', json={'email': email, 'password': password}, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-            self.token = data.get('token')
-            if not self.token:
-                raise ValueError('No token received')
-        except requests.exceptions.HTTPError as e:
-            messagebox.showerror('Login failed', f'HTTP error: {e}')
-            return
-        except requests.exceptions.RequestException as e:
-            messagebox.showerror('Login failed', f'Connection error: {e}')
-            return
+        # Logout Icon Button
+        ttk.Button(header, text="Sign Out", style='Ghost.TButton', command=self.logout).grid(row=0, column=2, rowspan=2)
 
-        self.status_var.set(f'Logged in as {email}')
-        self.header_status.configure(text=f'Logged in as {email}')
-        # Determine role; desktop tracking is only for employees
-        role = 'employee'
-        try:
-            payload = self._parse_jwt(self.token)
-            role = payload.get('role') or 'employee'
-        except Exception:
-            role = 'employee'
-        if role != 'employee':
-            try:
-                self.start_btn.configure(state=tk.DISABLED)
-                self.stop_btn.configure(state=tk.DISABLED)
-            except Exception:
-                pass
-            messagebox.showinfo('Login', f'Logged in as {role}. Desktop tracking is only available for employees.')
-            return
+        # 2. Hero Section
+        hero = ttk.Frame(self.current_frame, padding=30)
+        hero.pack(fill=tk.BOTH, expand=True)
 
-        # Connect Socket.IO for live view signaling (UI hidden for employees)
-        self._connect_socket(email)
-        # Fetch capture interval and auto-start tracking
-        self._fetch_capture_interval()
-        try:
-            if not self.tracking:
-                self.start_tracking()
-        except Exception:
-            pass
-        # Immediately start live view streaming on successful login
-        try:
-            self.live_view_active = True
-            self._set_live_indicator(True)
-            self._start_live_loop()
-        except Exception as e:
-            print('[live] auto-start error:', e)
-        try:
-            self.login_btn.configure(text='Logout', command=self.logout)
-        except Exception:
-            pass
+        # Stats Grid
+        stats_frame = ttk.Frame(hero)
+        stats_frame.pack(fill=tk.X, pady=(20, 30))
+        
+        # Active Time (Left)
+        active_col = ttk.Frame(stats_frame)
+        active_col.pack(side=tk.LEFT, expand=True)
+        ttk.Label(active_col, text="ACTIVE TIME", style='Muted.TLabel', font=('Segoe UI', 8, 'bold'), foreground=self.color_primary).pack()
+        self.active_time_var = tk.StringVar(value="00:00:00")
+        ttk.Label(active_col, textvariable=self.active_time_var, style='Hero.TLabel', font=('Segoe UI', 22, 'bold')).pack()
 
-    def _connect_socket(self, email):
-        try:
-            self.sio = socketio.Client(reconnection=True, reconnection_attempts=10, reconnection_delay=1)
-            # Register event handlers
-            self.sio.on('live_view:initiate', self._on_live_view_start)
-            self.sio.on('live_view:terminate', self._on_live_view_stop)
-            self.sio.on('live_view:frame', lambda data: None)  # managers receive frames; employee ignores
-            # Interval assignment push from backend
-            self.sio.on('interval:assigned', self._on_interval_assigned)
-            # Connect with JWT via auth and include userId in query for context
-            qs = urlencode({'userId': email})
+        # Idle Time (Right)
+        idle_col = ttk.Frame(stats_frame)
+        idle_col.pack(side=tk.RIGHT, expand=True)
+        ttk.Label(idle_col, text="IDLE TIME", style='Muted.TLabel', font=('Segoe UI', 8, 'bold'), foreground=self.color_error).pack()
+        self.idle_time_var = tk.StringVar(value="00:00:00")
+        ttk.Label(idle_col, textvariable=self.idle_time_var, style='Hero.TLabel', font=('Segoe UI', 22, 'bold')).pack()
 
-            # Fix for production: Force Websocket transport and use wss:// scheme
-            socket_url = self.backend_url
-            if socket_url.startswith('https://'):
-                socket_url = socket_url.replace('https://', 'wss://')
-            elif socket_url.startswith('http://'):
-                socket_url = socket_url.replace('http://', 'ws://')
+        # Big Action Button
+        self.action_btn = ttk.Button(hero, text="Start Tracking", style='Primary.TButton', command=self.toggle_tracking)
+        self.action_btn.pack(fill=tk.X, ipady=4)
 
-            self.sio.connect(
-                f"{socket_url}?{qs}",
-                auth={'token': self.token},
-                transports=['websocket'],
-                socketio_path='socket.io',
-                wait=True,
-                wait_timeout=12,
-            )
-        except Exception as e:
-            print('[socket] connection error:', repr(e))
+        # Status
+        self.capture_status_var = tk.StringVar(value="Ready to start")
+        ttk.Label(hero, textvariable=self.capture_status_var, style='Muted.TLabel', justify='center').pack(pady=15)
 
-    def _fetch_capture_interval(self):
-        try:
-            headers = { 'Authorization': f'Bearer {self.token}' } if self.token else {}
-            resp = requests.get(f'{self.backend_url}/api/capture-interval', headers=headers, timeout=10)
-            data = resp.json()
-            secs = int(data.get('intervalSeconds') or 0)
-            if data.get('assigned') and secs > 0:
-                self.capture_interval_seconds = secs
-            # Always enable tracking; fall back to default interval if not assigned
-            try:
-                self.progress.configure(maximum=self.capture_interval_seconds)
-            except Exception:
-                pass
-            self.countdown_var.set(f'Next capture in {self.capture_interval_seconds}s')
-            self.start_btn.configure(state=tk.NORMAL)
-        except Exception as e:
-            print('[interval] fetch error:', e)
-            self.start_btn.configure(state=tk.DISABLED)
+        # 3. Footer Stats
+        footer = ttk.Frame(self.current_frame, style='Surface.TFrame', padding=15)
+        footer.pack(fill=tk.X, side=tk.BOTTOM)
+        
+        f_grid = ttk.Frame(footer, style='Surface.TFrame')
+        f_grid.pack(fill=tk.X)
+        
+        # Last Sync (Center)
+        center = ttk.Frame(f_grid, style='Surface.TFrame')
+        center.pack(expand=True)
+        ttk.Label(center, text="LAST UPLOAD", style='Muted.TLabel', font=('Segoe UI', 7, 'bold')).pack(side=tk.LEFT, padx=(0,5))
+        self.last_upload_var = tk.StringVar(value="-")
+        ttk.Label(center, textvariable=self.last_upload_var, style='Surface.TLabel', font=('Segoe UI', 9)).pack(side=tk.LEFT)
 
-    def _on_interval_assigned(self, data=None):
-        try:
-            secs = int((data or {}).get('intervalSeconds') or 0)
-        except Exception:
-            secs = 0
-        if secs > 0:
-            self.capture_interval_seconds = secs
-            try:
-                self.progress.configure(maximum=self.capture_interval_seconds)
-            except Exception:
-                pass
-            self.countdown_var.set(f'Next capture in {self.capture_interval_seconds}s')
-            self.start_btn.configure(state=tk.NORMAL)
-            # Auto-start tracking if not already running
-            if not self.tracking:
-                try:
-                    self.start_tracking()
-                except Exception:
-                    pass
+    # --- Logic Methods ---
 
-    def _on_live_view_start(self, data=None):
-        self.live_view_active = True
-        self._set_live_indicator(True)
-        self._start_live_loop()
-
-    def _on_live_view_stop(self, data=None):
-        self.live_view_active = False
-        self._set_live_indicator(False)
-        self._stop_live_loop()
-
-    def _set_live_indicator(self, active: bool):
-        self.live_indicator.set(f'Live View: {"active" if active else "inactive"}')
-        try:
-            # Emphasize transparency: red text when active
-            self.live_indicator_label.configure(foreground=(self.color_error if active else self.color_muted))
-        except Exception:
-            pass
+    def toggle_tracking(self):
+        if self.tracking:
+            self.stop_tracking()
+        else:
+            self.start_tracking()
 
     def start_tracking(self):
-        if self.tracking:
-            return
         self.tracking = True
         self._stop_event.clear()
-        try:
-            self.session_start_ts = time.time()
-            self.total_idle_seconds = 0
-            self.active_time_var.set('Active: 00:00:00')
-            self.idle_time_var.set('Idle: 00:00:00')
-        except Exception:
-            pass
-        self.status_var.set('Tracking…')
-        self.header_status.configure(text='Tracking…')
-        self.start_btn.configure(state=tk.DISABLED)
-        self.stop_btn.configure(state=tk.NORMAL)
+        
+        # UI Updates
+        self.action_btn.configure(text="Stop Tracking", style='Danger.TButton')
+        self.status_lbl.configure(text="Tracking Active", foreground=self.color_success)
+        
+        # Reset counters
+        self.session_start_ts = time.time()
+        self.total_idle_seconds = 0
+        self.active_time_var.set("00:00:00")
+        self.idle_time_var.set("00:00:00")
+        
+        # Start Threads
         self.tracker_thread = threading.Thread(target=self._tracking_loop, daemon=True)
         self.tracker_thread.start()
-        # start heartbeat loop
+        
         self.heartbeat_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
         self.heartbeat_thread.start()
-        # notify backend start
+        
+        # Notify Backend
         try:
             headers = { 'Authorization': f'Bearer {self.token}' }
             requests.post(f'{self.backend_url}/api/work/start', headers=headers, timeout=10)
@@ -330,338 +290,278 @@ class TimeTrackerApp:
             print('[work] start error:', e)
 
     def stop_tracking(self):
-        if not self.tracking:
-            return
-        self._stop_event.set()
+        if not self.tracking: return
         self.tracking = False
-        self.status_var.set('Tracking stopped')
-        self.header_status.configure(text='Tracking stopped')
-        self.start_btn.configure(state=tk.NORMAL)
-        self.stop_btn.configure(state=tk.DISABLED)
-        self.countdown_var.set(f'Next capture in {self.capture_interval_seconds}s')
-        self.progress_var.set(0)
-        # If live view is active, notify backend and turn off
+        self._stop_event.set()
+        
+        # UI Updates
+        self.action_btn.configure(text="Start Tracking", style='Primary.TButton')
+        self.status_lbl.configure(text="Online (Idle)", foreground=self.color_muted)
+        self.capture_status_var.set("Session ended")
+        
+        # Live View Stop
         try:
             if self.live_view_active and self.sio:
                 self.live_view_active = False
-                self._set_live_indicator(False)
                 self.sio.emit('live_view:terminate', {'employeeId': self.email.get()})
         except Exception:
             pass
-        # Ensure live loop stops
         self._stop_live_loop()
-        # notify backend stop
+        
+        # Notify Backend
         try:
             headers = { 'Authorization': f'Bearer {self.token}' }
             requests.post(f'{self.backend_url}/api/work/stop', headers=headers, timeout=10)
         except Exception as e:
             print('[work] stop error:', e)
 
-    def _on_close(self):
+    def login(self):
+        email = self.email.get().strip()
+        password = self.password.get().strip()
+        url = self.server_url.get().strip().rstrip('/')
+        
+        if not email or not password or not url:
+            messagebox.showwarning('Missing', 'All fields are required.')
+            return
+        
+        self.backend_url = url
+        
+        if not self._ensure_server():
+            messagebox.showerror('Connection Error', f'Could not connect to {url}')
+            return
+
         try:
-            if self.tracking:
+            resp = requests.post(f'{self.backend_url}/api/auth/login', json={'email': email, 'password': password}, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            self.token = data.get('token')
+        except Exception as e:
+            messagebox.showerror('Login Failed', str(e))
+            return
+
+        # Check Role
+        role = 'employee'
+        try:
+            payload = self._parse_jwt(self.token)
+            role = payload.get('role') or 'employee'
+        except: pass
+        
+        if role != 'employee':
+            messagebox.showinfo('Access Denied', 'Desktop app is for employees only.')
+            return
+
+        # Success
+        self._show_dashboard_frame()
+        self._connect_socket(email)
+        self._fetch_capture_interval()
+        
+        # Auto-start live view - REMOVED for on-demand only
+        # self.live_view_active = True
+        # self._start_live_loop()
+
+    def logout(self):
+        if self.tracking:
+            self.stop_tracking()
+        self.disable_live_view()
+        if self.sio:
+            try: self.sio.disconnect()
+            except: pass
+        self.token = None
+        self._show_login_frame()
+
+    # --- Core Logic ---
+
+    def _connect_socket(self, email):
+        try:
+            self.sio = socketio.Client(reconnection=True)
+            self.sio.on('live_view:initiate', self._on_live_view_start)
+            self.sio.on('live_view:terminate', self._on_live_view_stop)
+            self.sio.on('interval:assigned', self._on_interval_assigned)
+            
+            qs = urlencode({'userId': email})
+            
+            self.sio.connect(
+                f"{self.backend_url}?{qs}", 
+                auth={'token': self.token}, 
+                transports=['websocket', 'polling'], 
+                socketio_path='socket.io',
+                wait=True,
+                wait_timeout=10
+            )
+        except Exception as e:
+            print('[socket] error:', e)
+
+    def _fetch_capture_interval(self):
+        try:
+            headers = { 'Authorization': f'Bearer {self.token}' }
+            resp = requests.get(f'{self.backend_url}/api/capture-interval', headers=headers, timeout=5)
+            data = resp.json()
+            secs = int(data.get('intervalSeconds') or 0)
+            if data.get('assigned') and secs > 0:
+                self.capture_interval_seconds = secs
+        except Exception:
+            pass
+
+    def _on_interval_assigned(self, data=None):
+        try:
+            secs = int((data or {}).get('intervalSeconds') or 0)
+            if secs > 0:
+                self.capture_interval_seconds = secs
+                if not self.tracking:
+                    self.start_tracking()
+        except: pass
+
+    def _on_live_view_start(self, data=None):
+        self.live_view_active = True
+        self._start_live_loop()
+
+    def _on_live_view_stop(self, data=None):
+        self.live_view_active = False
+        self._stop_live_loop()
+
+    def _tracking_loop(self):
+        next_capture = time.time() + self.capture_interval_seconds
+        while not self._stop_event.is_set():
+            now = time.time()
+            elapsed = int(now - self.session_start_ts)
+            self.active_time_var.set(self._format_hms(elapsed))
+            
+            remaining = int(next_capture - now)
+            if remaining < 0: remaining = 0
+            self.capture_status_var.set(f"Screenshot in {remaining}s")
+
+            if now >= next_capture:
                 try:
-                    self.stop_tracking()
-                except Exception:
-                    pass
-            else:
-                try:
-                    if self.token:
-                        headers = { 'Authorization': f'Bearer {self.token}' }
-                        requests.post(f'{self.backend_url}/api/work/stop', headers=headers, timeout=10)
-                except Exception:
-                    pass
-            try:
-                self.disable_live_view()
-            except Exception:
-                pass
-            try:
-                if self.sio:
-                    self.sio.disconnect()
-            except Exception:
-                pass
-        finally:
-            try:
-                self.root.destroy()
-            except Exception:
-                os._exit(0)
+                    full, small = self._capture_screenshot()
+                    self._upload_screenshot(full)
+                    self._send_live_frame(small)
+                except Exception as e:
+                    print('[tracking] error:', e)
+                next_capture = now + self.capture_interval_seconds
+            
+            time.sleep(0.5)
 
     def _capture_screenshot(self):
         with mss.mss() as sct:
             monitor = sct.monitors[1]
             img = sct.grab(monitor)
-            # Convert to PIL Image
             pil_img = Image.frombytes('RGB', img.size, img.bgra, 'raw', 'BGRX')
-            # Resize down for live view to reduce bandwidth
+            
             pil_small = pil_img.copy()
             pil_small.thumbnail((960, 540))
 
-            # Encode JPEG
             buf = io.BytesIO()
             pil_img.save(buf, format='JPEG', quality=70)
-            full_jpeg = buf.getvalue()
+            full = buf.getvalue()
 
             buf_small = io.BytesIO()
             pil_small.save(buf_small, format='JPEG', quality=60)
-            small_jpeg = buf_small.getvalue()
+            small = buf_small.getvalue()
+            return full, small
 
-            return full_jpeg, small_jpeg
-
-    def _upload_screenshot(self, jpeg_bytes: bytes):
+    def _upload_screenshot(self, jpeg_bytes):
         try:
             files = { 'screenshot': ('screenshot.jpg', jpeg_bytes, 'image/jpeg') }
             data = { 'employeeId': self.email.get() }
-            headers = { 'Authorization': f'Bearer {self.token}' } if self.token else {}
-            resp = requests.post(f'{self.backend_url}/api/uploads/screenshot', files=files, data=data, headers=headers, timeout=30)
-            resp.raise_for_status()
-            # update UI on successful upload
-            self.last_upload_var.set(f"Last upload: {time.strftime('%H:%M:%S')} ✅")
-        except Exception as e:
-            print('[upload] error:', e)
-            self.last_upload_var.set(f'Last upload failed: {e}')
+            headers = { 'Authorization': f'Bearer {self.token}' }
+            requests.post(f'{self.backend_url}/api/uploads/screenshot', files=files, data=data, headers=headers, timeout=30)
+            self.last_upload_var.set(time.strftime('%H:%M'))
+        except:
+            self.last_upload_var.set("Failed")
 
-    def _send_live_frame(self, small_jpeg: bytes):
-        if not self.sio or not self.sio.connected or not self.live_view_active:
-            return
+    def _send_live_frame(self, small_jpeg):
+        if not self.sio or not self.sio.connected or not self.live_view_active: return
         try:
             b64 = base64.b64encode(small_jpeg).decode('ascii')
             self.sio.emit('live_view:frame', {'employeeId': self.email.get(), 'frameBase64': b64, 'ts': datetime.now(timezone.utc).isoformat()})
-            # update UI
-            try:
-                self.live_last_frame_var.set(f"Last live frame: {time.strftime('%H:%M:%S')}")
-            except Exception:
-                pass
-        except Exception as e:
-            print('[live] emit error:', e)
+        except: pass
 
     def _start_live_loop(self):
-        if self.live_thread and self.live_thread.is_alive():
-            return
+        if self.live_thread and self.live_thread.is_alive(): return
         self._live_stop_event.clear()
         self.live_thread = threading.Thread(target=self._live_view_loop, daemon=True)
         self.live_thread.start()
 
     def _stop_live_loop(self):
-        try:
-            self._live_stop_event.set()
-        except Exception:
-            pass
+        self._live_stop_event.set()
 
     def _live_view_loop(self):
-        # Stream small frames more frequently while live view is active
         while not self._live_stop_event.is_set():
             if self.live_view_active:
                 try:
-                    _, small_jpeg = self._capture_screenshot()
-                    self._send_live_frame(small_jpeg)
-                except Exception as e:
-                    print('[live] capture error:', e)
-            # sleep regardless to avoid tight loop
-            for _ in range(LIVE_VIEW_INTERVAL_SECONDS * 2):
-                if self._live_stop_event.is_set():
-                    break
-                time.sleep(0.5)
+                    _, small = self._capture_screenshot()
+                    self._send_live_frame(small)
+                except: pass
+                time.sleep(LIVE_VIEW_INTERVAL_SECONDS)
+            else:
+                time.sleep(1)
 
-    def _tracking_loop(self):
-        next_capture = time.time()
+    def _heartbeat_loop(self):
+        prev_idle = 0
         while not self._stop_event.is_set():
-            now = time.time()
-            if now >= next_capture:
-                try:
-                    full_jpeg, small_jpeg = self._capture_screenshot()
-                    self._upload_screenshot(full_jpeg)
-                    # Optional: also send one frame on full capture; the live loop handles frequent streaming
-                    self._send_live_frame(small_jpeg)
-                except Exception as e:
-                    print('[tracking] capture error:', e)
-                next_capture = now + self.capture_interval_seconds
-                # restart countdown
-                self._schedule_countdown_update(self.capture_interval_seconds)
-            time.sleep(0.5)
+            time.sleep(HEARTBEAT_INTERVAL_SECONDS)
+            if self._stop_event.is_set(): break
+            try:
+                curr_idle = max(0, self._get_idle_seconds() - 180)
+                delta = max(0, curr_idle - prev_idle) if curr_idle > 0 else 0
+                if curr_idle == 0: prev_idle = 0
+                else: prev_idle = curr_idle
+                
+                self.total_idle_seconds += delta
+                self.idle_time_var.set(self._format_hms(self.total_idle_seconds))
+                
+                requests.post(f'{self.backend_url}/api/work/heartbeat', 
+                    json={'idleDeltaSeconds': delta}, 
+                    headers={'Authorization': f'Bearer {self.token}'}, timeout=5)
+            except: pass
 
-    def _get_idle_seconds(self) -> int:
-        # Windows idle time via GetLastInputInfo; fallback 0 on failure
+    def _get_idle_seconds(self):
         try:
             import ctypes
             class LASTINPUTINFO(ctypes.Structure):
                 _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
             lii = LASTINPUTINFO()
             lii.cbSize = ctypes.sizeof(LASTINPUTINFO)
-            if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)):
-                return 0
+            if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)): return 0
             millis = ctypes.windll.kernel32.GetTickCount() - lii.dwTime
-            return int(millis // 1000)
-        except Exception:
-            return 0
+            return int(millis / 1000)
+        except: return 0
 
-    def _parse_jwt(self, token: str) -> dict:
+    def _ensure_server(self):
+        try: return requests.get(f'{self.backend_url}/health', timeout=2).ok
+        except: return False
+
+    def _parse_jwt(self, token):
         try:
-            parts = (token or '').split('.')
-            if len(parts) < 2:
-                return {}
-            import json, base64
+            import json
+            parts = token.split('.')
             b64 = parts[1].replace('-', '+').replace('_', '/')
-            # Add padding if necessary
             pad = '=' * (-len(b64) % 4)
-            decoded = base64.b64decode(b64 + pad)
-            return json.loads(decoded.decode('utf-8'))
-        except Exception:
-            return {}
+            return json.loads(base64.b64decode(b64 + pad))
+        except: return {}
 
-    def _heartbeat_loop(self):
-        # Periodically send idle delta/duration to backend while tracking
-        prev_idle_duration = 0
-        while not self._stop_event.is_set():
-            time.sleep(HEARTBEAT_INTERVAL_SECONDS)
-            if self._stop_event.is_set():
-                break
-            try:
-                since_last_input = self._get_idle_seconds()
-                current_idle_duration = max(0, since_last_input - 180)
-                delta = 0
-                if current_idle_duration > 0:
-                    delta = max(0, current_idle_duration - prev_idle_duration)
-                else:
-                    prev_idle_duration = 0
-                prev_idle_duration = current_idle_duration
-                try:
-                    self.total_idle_seconds = max(0, (self.total_idle_seconds or 0) + delta)
-                    self.idle_time_var.set(f"Idle: {self._format_hms(self.total_idle_seconds)}")
-                except Exception:
-                    pass
-                headers = { 'Authorization': f'Bearer {self.token}' }
-                payload = { 'idleDeltaSeconds': delta, 'idleDurationSeconds': current_idle_duration }
-                requests.post(f'{self.backend_url}/api/work/heartbeat', json=payload, headers=headers, timeout=10)
-            except Exception as e:
-                print('[work] heartbeat error:', e)
+    def _format_hms(self, s):
+        h = s // 3600
+        m = (s % 3600) // 60
+        r = s % 60
+        return f"{h:02}:{m:02}:{r:02}"
 
     def disable_live_view(self):
-        # Employee-side manual termination for transparency
-        if not self.live_view_active:
-            return
         self.live_view_active = False
-        self._set_live_indicator(False)
         self._stop_live_loop()
-        try:
-            if self.sio:
-                self.sio.emit('live_view:terminate', {'employeeId': self.email.get()})
-        except Exception:
-            pass
+        try: self.sio.emit('live_view:terminate', {'employeeId': self.email.get()})
+        except: pass
 
-    def _schedule_countdown_update(self, seconds: int):
-        # Update progress and countdown label every second
-        def tick(remaining):
-            if self._stop_event.is_set():
-                self.countdown_var.set(f'Next capture in {self.capture_interval_seconds}s')
-                self.progress_var.set(0)
-                return
-            try:
-                self.progress_var.set(self.capture_interval_seconds - remaining)
-            except Exception:
-                pass
-            self.countdown_var.set(f'Next capture in {remaining}s')
-            try:
-                if getattr(self, 'session_start_ts', None):
-                    elapsed = max(0, int(time.time() - self.session_start_ts))
-                    self.active_time_var.set(f"Active: {self._format_hms(elapsed)}")
-                if remaining > 0:
-                    self.root.after(1000, lambda: tick(remaining - 1))
-                else:
-                    self.root.after(1000, lambda: tick(self.capture_interval_seconds))
-                return
-            except Exception:
-                pass
-            if remaining > 0:
-                self.root.after(1000, lambda: tick(remaining - 1))
-        tick(seconds)
-
-    def _format_hms(self, s: int) -> str:
-        try:
-            s = max(0, int(s))
-            h = s // 3600
-            m = (s % 3600) // 60
-            r = s % 60
-            return f"{str(h).zfill(2)}:{str(m).zfill(2)}:{str(r).zfill(2)}"
-        except Exception:
-            return "00:00:00"
-
-    def logout(self):
-        try:
-            if self.tracking:
-                try:
-                    self.stop_tracking()
-                except Exception:
-                    pass
-            self.disable_live_view()
-            try:
-                if self.sio:
-                    self.sio.disconnect()
-            except Exception:
-                pass
-            self.token = None
-            self.status_var.set('Not logged in')
-            self.header_status.configure(text='Not logged in')
-            try:
-                self.login_btn.configure(text='Login', command=self.login)
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    def _resolve_backend_url(self) -> str:
-        # Try env-provided URL, then common local ports (4000, 4011)
-        candidates = []
-        env_url = BACKEND_URL
-        if env_url:
-            candidates.append(env_url)
-        candidates.extend([
-            'https://backend-tracker.vughy.com',
-            'http://127.0.0.1:4000', 'http://localhost:4000',
-            'http://127.0.0.1:4011', 'http://localhost:4011',
-        ])
-        for url in candidates:
-            try:
-                r = requests.get(f'{url}/health', timeout=2)
-                if r.ok:
-                    try:
-                        self.header_status.configure(text=f'Server: {url}')
-                    except Exception:
-                        pass
-                    return url
-            except Exception:
-                continue
-        try:
-            self.header_status.configure(text=f'Server unreachable')
-        except Exception:
-            pass
-        return env_url or 'http://localhost:4000'
-
-    def _ensure_server(self) -> bool:
-        try:
-            r = requests.get(f'{self.backend_url}/health', timeout=3)
-            return bool(r.ok)
-        except Exception:
-            # Retry on alternate URLs
-            for url in ['https://backend-tracker.vughy.com', 'http://127.0.0.1:4000', 'http://localhost:4000', 'http://127.0.0.1:4011', 'http://localhost:4011']:
-                try:
-                    r = requests.get(f'{url}/health', timeout=3)
-                    if r.ok:
-                        self.backend_url = url
-                        try:
-                            self.header_status.configure(text=f'Server: {url}')
-                        except Exception:
-                            pass
-                        return True
-                except Exception:
-                    continue
-        return False
+    def _on_close(self):
+        self.logout()
+        try: self.root.destroy()
+        except: os._exit(0)
 
 
 def main():
     root = tk.Tk()
     app = TimeTrackerApp(root)
     root.mainloop()
-
 
 if __name__ == '__main__':
     main()

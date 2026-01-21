@@ -1,11 +1,8 @@
-import React from 'react'
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
-import Nav from '../components/Nav.jsx'
 import { getSocket } from '../socket.js'
 import { getApiBase } from '../config.js'
-// presence is driven via Socket.IO events from backend
 
 let API = getApiBase()
 
@@ -17,58 +14,93 @@ export default function LiveView() {
   const [managers, setManagers] = useState([])
   const [selectedManager, setSelectedManager] = useState('')
   const [role, setRole] = useState('')
-  const [status, setStatus] = useState('idle') // idle | active | offline
+  const [status, setStatus] = useState('idle') // idle | connecting | active | offline
   const [frames, setFrames] = useState([]) // [{b64, ts}]
   
   const socketRef = useRef(null)
 
-  // Rehydrate previously selected employee so streaming persists across tabs
+  // Restore saved state on mount
   useEffect(() => {
-    const saved = localStorage.getItem('liveview_employee')
-    if (saved) setEmployeeId(saved)
+    const savedEmp = localStorage.getItem('liveview_employee')
+    const wasActive = localStorage.getItem('liveview_is_active') === 'true'
+    
+    if (savedEmp) {
+      setEmployeeId(savedEmp)
+      // If we were previously watching this employee, try to reconnect automatically
+      if (wasActive) {
+        setStatus('connecting')
+        // We defer the socket emit slightly to ensure socket is ready
+      }
+    }
   }, [])
 
   useEffect(() => {
     resolveApiBase().then(base => { API = base })
-    // Use shared socket instance so connection persists across route changes
     const s = getSocket()
     socketRef.current = s
+    
+    // On mount, if we are in 'connecting' state (restored), emit start
+    if (status === 'connecting' && employeeId) {
+       if (s.connected) {
+         s.emit('live_view:start', { employeeId })
+       } else {
+         s.once('connect', () => s.emit('live_view:start', { employeeId }))
+       }
+    }
+
     s.on('live_view:frame', (payload) => {
       if (payload?.employeeId === employeeId) {
         const item = { b64: payload.frameBase64, ts: payload.ts || new Date().toISOString() }
         setFrames(prev => [item, ...prev].slice(0, 50))
         setStatus('active')
+        // Ensure persistence is true
+        localStorage.setItem('liveview_is_active', 'true')
       }
     })
+    
     s.on('live_view:terminate', (payload) => {
-      if (payload?.by === employeeId || status === 'active') {
+      // If terminated by employee or by self-stop
+      if (payload?.by === employeeId || status === 'active' || status === 'connecting') {
         setStatus('idle')
+        localStorage.setItem('liveview_is_active', 'false')
       }
     })
-    // Presence events
+    
     s.on('presence:list', ({ users }) => {
       let list = Array.isArray(users) ? users : []
-      // For managers, ensure list only includes team members
       if (role === 'manager' && allEmployees.length) {
         const teamSet = new Set(allEmployees.map(e => e.email))
         list = list.filter(u => teamSet.has(u))
       }
       setOnlineEmployees(list)
+      // If previously selected employee is online, keep them. Otherwise select first available if none selected
       if (!employeeId && list.length) setEmployeeId(list[0])
     })
+    
     s.on('presence:online', ({ userId }) => {
-      // Only add if belongs to manager's team when role is manager
       if (role === 'manager' && allEmployees.length) {
         const teamSet = new Set(allEmployees.map(e => e.email))
         if (!teamSet.has(userId)) return
       }
       setOnlineEmployees(prev => Array.from(new Set([userId, ...prev])))
+      
+      // If the selected employee just came online, reset status to idle (Ready)
+      if (userId === employeeId) {
+        setStatus(prev => prev === 'offline' ? 'idle' : prev)
+      }
     })
+    
     s.on('presence:offline', ({ userId }) => {
       setOnlineEmployees(prev => prev.filter(u => u !== userId))
-      if (employeeId === userId) setStatus('idle')
+      if (employeeId === userId) {
+        setStatus('offline')
+        setFrames([]) // Clear frames to show offline placeholder
+        // Don't clear persistence yet; if they come back online we might want to resume?
+        // But for now, let's keep it simple. If they go offline, we stop.
+        localStorage.setItem('liveview_is_active', 'false')
+      }
     })
-    // Do NOT disconnect on unmount; only remove listeners
+
     return () => {
       s.off('live_view:frame')
       s.off('live_view:terminate')
@@ -76,9 +108,8 @@ export default function LiveView() {
       s.off('presence:online')
       s.off('presence:offline')
     }
-  }, [employeeId])
+  }, [employeeId, role, allEmployees, status])
 
-  // Load employees and managers for super admin team switcher
   useEffect(() => {
     const token = localStorage.getItem('token')
     const headers = { Authorization: `Bearer ${token}` }
@@ -98,13 +129,10 @@ export default function LiveView() {
         axios.get(`${BASE}/api/admin/managers`, { headers }).then(r => setManagers(r.data?.managers || [])).catch(()=>{})
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Apply filter to online employees when manager selected (super_admin view)
   useEffect(() => {
     if (!selectedManager) {
-      // For managers, already filtered onlineEmployees to team; for super_admin, show all online
       setFilteredOnline(onlineEmployees)
       return
     }
@@ -114,116 +142,198 @@ export default function LiveView() {
     setFilteredOnline(filtered)
   }, [selectedManager, onlineEmployees, allEmployees, managers])
 
-  // Auto-start live view when selecting an employee
   useEffect(() => {
     if (employeeId) {
       localStorage.setItem('liveview_employee', employeeId)
-      setFrames([])
+      
+      // If we are changing employee manually (via dropdown), we should probably reset state
+      // unless this is the initial mount restore
+      const savedEmp = localStorage.getItem('liveview_employee')
+      const wasActive = localStorage.getItem('liveview_is_active') === 'true'
+      
+      // If user switches employee, stop previous stream if active
+      if (status === 'active' && employeeId !== savedEmp) {
+        setStatus('idle')
+        setFrames([])
+        localStorage.setItem('liveview_is_active', 'false')
+        // We don't emit stop here because the socket room join is per-employee
+        // We just stop listening/displaying. The backend will handle room switch if we start new one.
+      }
+    }
+  }, [employeeId])
+
+  const toggleStream = () => {
+    if (!employeeId) return
+
+    if (status === 'active' || status === 'connecting') {
+      // Stop
+      socketRef.current?.emit('live_view:stop', { employeeId })
       setStatus('idle')
+      setFrames([]) // Clear frames to show initial placeholder
+      localStorage.setItem('liveview_is_active', 'false')
+    } else {
+      // Start
+      setStatus('connecting')
+      setFrames([])
+      localStorage.setItem('liveview_is_active', 'true') // Optimistically save
       const s = getSocket()
       if (s && s.connected) {
         s.emit('live_view:start', { employeeId })
       } else {
         s?.once('connect', () => s.emit('live_view:start', { employeeId }))
       }
+      
+      // Fallback timeout if no connection established
+      setTimeout(() => {
+        if (status === 'connecting') {
+           // check if we got any frames? if not, maybe offline or error
+        }
+      }, 5000)
     }
-  }, [employeeId])
-
-  const start = () => {
-    setStatus('idle')
-    setFrames([])
-    socketRef.current?.emit('live_view:start', { employeeId })
   }
-  const stop = () => {
-    socketRef.current?.emit('live_view:stop', { employeeId })
-    setStatus('idle')
-  }
-
-  
 
   const latest = frames[0]
+  const isOnline = onlineEmployees.includes(employeeId)
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-slate-50 to-white">
-      <Nav />
-      <main className="max-w-6xl mx-auto px-6 md:px-10 py-6 md:py-10 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold">Live View</h2>
-            <p className="text-gray-700">Monitor an employee’s current activity in real-time.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 flex-wrap">
-            {managers.length > 0 && (
-              <div className="w-full sm:w-auto">
-                <label className="block text-sm">Team Switcher (Super Admin)</label>
-                <select className="border rounded px-3 py-2 w-full sm:w-64" value={selectedManager} onChange={e=>setSelectedManager(e.target.value)}>
-                  <option value="">All Managers</option>
-                  {managers.map(m => (
-                    <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
-                  ))}
-                </select>
-              </div>
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Live View</h1>
+          <p className="mt-1 text-slate-500">Monitor employee screens in real-time.</p>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3">
+          {managers.length > 0 && (
+            <select 
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white" 
+              value={selectedManager} 
+              onChange={e=>setSelectedManager(e.target.value)}
+            >
+              <option value="">All Managers</option>
+              {managers.map(m => (
+                <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
+              ))}
+            </select>
+          )}
+          
+          <select 
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white min-w-[250px]"
+            value={employeeId}
+            onChange={e=>setEmployeeId(e.target.value)}
+          >
+            <option value="">{filteredOnline.length > 0 ? "Select active employee..." : "No employees online"}</option>
+            {filteredOnline.map(email => (
+              <option key={email} value={email}>
+                {email} {status === 'active' && employeeId === email ? '(Viewing)' : ''}
+              </option>
+            ))}
+            {/* Only show selected offline employee if explicitly selected previously */}
+            {employeeId && !filteredOnline.includes(employeeId) && (
+              <option value={employeeId}>{employeeId} (Offline)</option>
             )}
-            <div className="w-full sm:w-auto">
-              <label className="block text-sm">Employees</label>
-              <select className="border rounded px-3 py-2 w-full sm:w-64"
-                value={employeeId}
-                onChange={e=>setEmployeeId(e.target.value)}>
-                <option value="">Select employee…</option>
-                {filteredOnline.map(email => (
-                  <option key={email} value={email}>{email}</option>
-                ))}
-              </select>
-              {filteredOnline.length === 0 && (
-                <div className="text-xs text-gray-600 mt-1">No one is online.</div>
-              )}
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <button className="flex-1 sm:flex-none px-4 py-2.5 rounded bg-green-600 text-white hover:bg-green-700" onClick={start}>Start</button>
-              <button className="flex-1 sm:flex-none px-4 py-2.5 rounded bg-gray-700 text-white hover:bg-gray-800" onClick={stop}>Stop</button>
+          </select>
+
+          <button 
+            onClick={toggleStream}
+            disabled={!employeeId || !isOnline}
+            className={`
+              px-6 py-2 font-medium rounded-lg transition-all shadow-sm flex items-center gap-2 min-w-[140px] justify-center
+              ${!employeeId || !isOnline 
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                : status === 'active' || status === 'connecting'
+                  ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
+              }
+            `}
+          >
+            {status === 'connecting' ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Connecting
+              </>
+            ) : status === 'active' ? (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>
+                Stop View
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                Start View
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Viewer */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${status === 'active' ? 'bg-red-500 animate-pulse' : isOnline ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                <span className="text-sm font-medium text-slate-700">
+                  {status === 'active' ? 'Live Streaming' : status === 'connecting' ? 'Connecting...' : isOnline ? 'Online - Ready' : 'Offline'}
+                </span>
+              </div>
+              <div className="text-xs text-slate-500 font-mono">{employeeId || 'No user selected'}</div>
             </div>
             
+            <div className="aspect-video bg-slate-900 relative flex items-center justify-center">
+              {latest ? (
+                <>
+                  <img className="w-full h-full object-contain" src={`data:image/jpeg;base64,${latest.b64}`} alt="Live frame" />
+                  <div className="absolute bottom-3 right-3 text-xs bg-black/70 text-white px-2 py-1 rounded backdrop-blur-sm font-mono">
+                    {new Date(latest.ts).toLocaleTimeString()}
+                  </div>
+                  <div className="absolute top-3 left-3 px-2 py-1 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded animate-pulse shadow-sm">
+                    LIVE
+                  </div>
+                </>
+              ) : (
+                <div className="text-center text-slate-500 p-8">
+                  <div className="bg-slate-800/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-10 h-10 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <p className="font-medium text-slate-400">
+                    {!employeeId ? 'Select an employee to begin' : 
+                     !isOnline ? 'Employee is currently offline' :
+                     'Click "Start View" to connect'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Status + Viewer */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-2">
-            <div className="rounded-xl border bg-white overflow-hidden">
-              <div className="flex items-center justify-between p-3 border-b">
-                <div className="text-sm text-gray-700">Session Status: {status === 'active' ? 'Active' : 'Idle'}</div>
-                <div className={`text-xs px-2 py-1 rounded ${status==='active'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-700'}`}>{status==='active'?'Streaming':'Not streaming'}</div>
-              </div>
-              <div className="aspect-video bg-gray-100 grid place-items-center">
-                {latest ? (
-                  <div className="relative w-full h-full">
-                    <img className="w-full h-full object-contain" src={`data:image/jpeg;base64,${latest.b64}`} alt="Live frame" />
-                    <div className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-1 rounded">{new Date(latest.ts).toLocaleString()}</div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-600">No live frames yet. Click Start to initiate.</div>
-                )}
-              </div>
-            </div>
+        {/* Frame History */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 h-fit">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-slate-900">Recent Frames</h3>
+            <span className="text-xs font-mono text-slate-400">{frames.length} frames</span>
           </div>
-          <div>
-            <div className="rounded-xl border bg-white p-3">
-              <div className="font-semibold">Frame History</div>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {frames.slice(0, 12).map((f, i) => (
-                  <div key={i} className="text-center">
-                    <img className="w-full h-auto border rounded" src={`data:image/jpeg;base64,${f.b64}`} />
-                    <div className="text-[10px] text-gray-600 mt-1">{new Date(f.ts).toLocaleString()}</div>
-                  </div>
-                ))}
+          <div className="grid grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
+            {frames.slice(0, 12).map((f, i) => (
+              <div key={i} className="group relative rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all bg-slate-100">
+                <img className="w-full h-20 object-cover" src={`data:image/jpeg;base64,${f.b64}`} alt="Frame" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
+                <div className="absolute bottom-1 right-1 text-[10px] text-white bg-black/50 px-1 rounded">
+                  {new Date(f.ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}
+                </div>
               </div>
-            </div>
-            <div className="mt-6 text-xs text-gray-600">
-              Streaming is authenticated via JWT. For production, use HTTPS/WSS to ensure encryption in transit.
-            </div>
+            ))}
+            {frames.length === 0 && (
+              <div className="col-span-2 py-12 text-center border-2 border-dashed border-slate-100 rounded-lg">
+                <p className="text-xs text-slate-400">No frames captured yet</p>
+              </div>
+            )}
           </div>
-        </section>
-      </main>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import Nav from '../components/Nav.jsx'
 import { resolveApiBase } from '../api.js'
-
-const DEFAULT_API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 export default function Admin() {
   const [email, setEmail] = useState('manager@example.com')
@@ -32,7 +29,6 @@ export default function Admin() {
       const r = await axios.post(`${BASE}/api/admin/managers`, { email, password, orgName }, { headers })
       setMsg(`Manager ${r.data?.manager?.email} created${r.data?.organization ? ' with team '+r.data.organization.name : ''}.`)
       setEmail(''); setPassword(''); setOrgName('')
-      // refresh managers
       loadManagers()
     } catch (e) {
       setError(e?.response?.data?.error || e.message)
@@ -105,12 +101,10 @@ export default function Admin() {
     loadManagers()
     loadLogs()
     loadEmployees()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     loadLogs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterManagerId, filterEmployeeId])
 
   const removeManager = async (id) => {
@@ -142,152 +136,162 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-full">
-      <Nav />
-      <main className="p-4 space-y-6">
-        <h2 className="text-lg font-semibold">Super Admin</h2>
-        <p className="text-sm text-gray-700">Create manager accounts and assign teams.</p>
-        {error && <div className="text-red-600 text-sm">{error}</div>}
-        {msg && <div className="text-blue-700 text-sm">{msg}</div>}
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Admin Console</h1>
+        <p className="mt-1 text-slate-500">System-wide configuration and user management.</p>
+      </div>
 
-        <section className="bg-white border rounded p-4">
-          <div className="font-semibold mb-2">Storage Cleanup</div>
-          <div className="text-sm text-gray-700 mb-2">Delete screenshots between dates. User records and sessions are not affected.</div>
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="block text-xs text-gray-600">From</label>
-              <input type="date" className="border rounded px-3 py-2" value={cleanupFrom} onChange={e=>setCleanupFrom(e.target.value)} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Create Manager */}
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-4">Create Manager</h2>
+          <form className="space-y-4" onSubmit={submit}>
+            {error && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">{error}</div>}
+            {msg && <div className="text-blue-700 text-sm bg-blue-50 p-3 rounded-lg">{msg}</div>}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Email</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="manager@example.com" value={email} onChange={e=>setEmail(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Password</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" type="password" placeholder="Secret" value={password} onChange={e=>setPassword(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Team Name</label>
+                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="Engineering" value={orgName} onChange={e=>setOrgName(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600">To</label>
-              <input type="date" className="border rounded px-3 py-2" value={cleanupTo} onChange={e=>setCleanupTo(e.target.value)} />
-            </div>
-            <button className="px-3 py-2 rounded bg-red-600 text-white" onClick={cleanupScreenshots}>Delete Screenshots</button>
-          </div>
-          {cleanupErr && <div className="text-red-600 text-sm mt-2">{cleanupErr}</div>}
-          {cleanupMsg && <div className="text-green-700 text-sm mt-2">{cleanupMsg}</div>}
-        </section>
-
-        <section className="bg-white border rounded p-4">
-          <div className="font-semibold mb-2">Create Manager</div>
-          <form className="space-y-3" onSubmit={submit}>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input className="border rounded px-3 py-2 flex-1" placeholder="Manager email" value={email} onChange={e=>setEmail(e.target.value)} />
-              <input className="border rounded px-3 py-2 flex-1" type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
-            </div>
-            <div>
-              <input className="border rounded px-3 py-2 w-full" placeholder="Team name" value={orgName} onChange={e=>setOrgName(e.target.value)} />
-            </div>
-            <div>
-              <button className="w-full sm:w-auto px-3 py-2 rounded bg-blue-600 text-white" type="submit">Create Manager</button>
-            </div>
+            <button className="w-full px-4 py-2.5 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm" type="submit">Create Account</button>
           </form>
         </section>
 
-        <section className="bg-white border rounded p-4">
-          <div className="font-semibold mb-2">Managers Overview</div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="py-2 px-2">Manager</th>
-                  <th className="py-2 px-2">Team</th>
-                  <th className="py-2 px-2">Employees</th>
-                  <th className="py-2 px-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {managers.map(m => (
-                  <tr key={m.id} className="border-b">
-                    <td className="py-2 px-2">{m.email}</td>
-                    <td className="py-2 px-2">{m.organization?.name || '-'}</td>
-                    <td className="py-2 px-2">{m.employeeCount}</td>
-                    <td className="py-2 px-2">
-                      <button className="px-2 py-1 rounded bg-red-600 text-white" onClick={()=>removeManager(m.id)}>Remove</button>
-                    </td>
-                  </tr>
-                ))}
-                {managers.length === 0 && (
-                  <tr><td className="py-2 px-2 text-gray-600" colSpan="3">No managers yet.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="bg-white border rounded p-4">
-          <div className="font-semibold mb-2">Employees</div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="py-2 px-2">Email</th>
-                  <th className="py-2 px-2">Name</th>
-                  <th className="py-2 px-2">Manager</th>
-                  <th className="py-2 px-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map((u, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="py-2 px-2">{u.email}</td>
-                    <td className="py-2 px-2">{u.name || '-'}</td>
-                    <td className="py-2 px-2">{u.managerId || '-'}</td>
-                    <td className="py-2 px-2">
-                      <button className="px-2 py-1 rounded bg-red-600 text-white" onClick={()=>removeEmployee(u.email)}>Remove</button>
-                    </td>
-                  </tr>
-                ))}
-                {employees.length === 0 && (
-                  <tr><td className="py-2 px-2 text-gray-600" colSpan="4">No employees.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="bg-white border rounded p-4">
-          <div className="font-semibold mb-2">Audit Logs</div>
-          <div className="flex items-end gap-3 mb-3">
-            <div>
-              <label className="block text-xs text-gray-600">Filter by Manager ID</label>
-              <input className="border rounded px-3 py-2" placeholder="manager id/email" value={filterManagerId} onChange={e=>setFilterManagerId(e.target.value)} />
+        {/* Storage Cleanup */}
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Storage Cleanup</h2>
+          <p className="text-sm text-slate-500 mb-4">Delete old screenshots to free up space. This action cannot be undone.</p>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">From Date</label>
+                <input type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={cleanupFrom} onChange={e=>setCleanupFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">To Date</label>
+                <input type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={cleanupTo} onChange={e=>setCleanupTo(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-gray-600">Filter by Employee</label>
-              <input className="border rounded px-3 py-2" placeholder="employee email" value={filterEmployeeId} onChange={e=>setFilterEmployeeId(e.target.value)} />
-            </div>
-            <button className="px-3 py-2 rounded bg-gray-700 text-white" onClick={loadLogs}>Refresh</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="py-2 px-2">Time</th>
-                  <th className="py-2 px-2">Actor</th>
-                  <th className="py-2 px-2">Type</th>
-                  <th className="py-2 px-2">Employee</th>
-                  <th className="py-2 px-2">Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((l, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="py-2 px-2">{new Date(l.ts || l.time || Date.now()).toLocaleString()}</td>
-                    <td className="py-2 px-2">{l.details?.actorId || '-'}</td>
-                    <td className="py-2 px-2">{l.type}</td>
-                    <td className="py-2 px-2">{l.details?.employeeId || '-'}</td>
-                    <td className="py-2 px-2">{l.details?.intervalMinutes ? `${l.details.intervalMinutes}m` : '-'}</td>
-                  </tr>
-                ))}
-                {logs.length === 0 && (
-                  <tr><td className="py-2 px-2 text-gray-600" colSpan="5">No logs.</td></tr>
-                )}
-              </tbody>
-            </table>
+            <button className="w-full px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm" onClick={cleanupScreenshots}>
+              Delete Screenshots
+            </button>
+            {cleanupErr && <div className="text-red-600 text-sm mt-2">{cleanupErr}</div>}
+            {cleanupMsg && <div className="text-green-700 text-sm mt-2">{cleanupMsg}</div>}
           </div>
         </section>
-      </main>
+      </div>
+
+      {/* Managers List */}
+      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h3 className="font-bold text-slate-900">Managers ({managers.length})</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Manager</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Team</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Employees</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-slate-200">
+              {managers.map(m => (
+                <tr key={m.id} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{m.email}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{m.organization?.name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{m.employeeCount}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button className="text-red-600 hover:text-red-800 text-sm font-medium" onClick={()=>removeManager(m.id)}>Remove</button>
+                  </td>
+                </tr>
+              ))}
+              {managers.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500">No managers found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Employees List */}
+      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h3 className="font-bold text-slate-900">All Employees ({employees.length})</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Manager ID</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-slate-200">
+              {employees.map((u, i) => (
+                <tr key={i} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{u.email}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{u.name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 font-mono">{u.managerId || '-'}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button className="text-red-600 hover:text-red-800 text-sm font-medium" onClick={()=>removeEmployee(u.email)}>Remove</button>
+                  </td>
+                </tr>
+              ))}
+              {employees.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500">No employees found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Audit Logs */}
+      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900">Audit Logs</h3>
+          <button className="text-sm text-blue-600 hover:text-blue-800 font-medium" onClick={loadLogs}>Refresh</button>
+        </div>
+        <div className="p-4 border-b border-slate-100 bg-slate-50 flex gap-4">
+          <input className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Filter by Manager ID..." value={filterManagerId} onChange={e=>setFilterManagerId(e.target.value)} />
+          <input className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Filter by Employee Email..." value={filterEmployeeId} onChange={e=>setFilterEmployeeId(e.target.value)} />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Time</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actor</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Event</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Target</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Details</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-slate-200">
+              {logs.map((l, i) => (
+                <tr key={i} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{new Date(l.ts || l.time || Date.now()).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{l.details?.actorId || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700"><span className="px-2 py-1 rounded bg-slate-100 text-xs font-medium border border-slate-200">{l.type}</span></td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{l.details?.employeeId || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 truncate max-w-xs" title={JSON.stringify(l.details)}>{l.details?.intervalMinutes ? `${l.details.intervalMinutes}m` : '-'}</td>
+                </tr>
+              ))}
+              {logs.length === 0 && <tr><td colSpan="5" className="px-6 py-8 text-center text-sm text-slate-500">No logs found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }

@@ -3,134 +3,121 @@ import { Link } from 'react-router-dom'
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white text-gray-900">
-      {/* Hero */}
-      <header className="px-6 md:px-10 py-8 md:py-14">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-8 items-center">
-          <div>
-            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
-              Time Tracker System
-            </h1>
-            <p className="mt-4 text-lg md:text-xl text-gray-700">
-              A productivity monitoring platform for managers and teams.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/login" className="px-5 py-2.5 rounded bg-blue-600 text-white hover:bg-blue-700">Get Started</Link>
-              <Link to="/downloads" className="px-5 py-2.5 rounded border border-gray-300 hover:bg-gray-100">Download Desktop App</Link>
-            </div>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col">
+      <header className="px-6 py-6 flex items-center justify-between max-w-7xl mx-auto w-full">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-          <div className="hidden md:block">
-            <div className="relative rounded-xl border bg-white shadow p-6">
-              <div className="text-sm text-gray-600">Live View Preview</div>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {[1,2,3,4,5,6].map(i => (
-                  <div key={i} className="aspect-video rounded-lg bg-gray-100 border" />
-                ))}
-              </div>
-            </div>
-          </div>
+          <span className="font-bold text-xl tracking-tight text-slate-900">TimeTracker</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Log In</Link>
+          <Link to="/login" className="px-5 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition-all shadow-md hover:shadow-lg">
+            Get Started
+          </Link>
         </div>
       </header>
 
-      {/* Features */}
-      <section className="px-6 md:px-10 py-8 md:py-12">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold">Platform Features</h2>
-          <p className="mt-2 text-gray-700">Modern, secure, and responsive tools for monitoring productivity.</p>
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f) => (
-              <div key={f.title} className="group rounded-xl border bg-white p-5 shadow hover:shadow-md transition">
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-700">
-                    {f.icon}
-                  </span>
-                  <div className="font-semibold">{f.title}</div>
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 md:py-20">
+        <div className="text-center max-w-4xl mx-auto space-y-8">
+          <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight leading-tight">
+            Productivity tracking for <br/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">modern teams.</span>
+          </h1>
+          
+          <p className="text-xl md:text-2xl text-slate-500 max-w-2xl mx-auto leading-relaxed">
+            Gain visibility into work hours, automate timesheets, and boost team efficiency with our secure, enterprise-ready platform.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <Link to="/login" className="px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/25 hover:-translate-y-1">
+              Start Tracking Now
+            </Link>
+            <Link to="/downloads" className="px-8 py-4 bg-white text-slate-700 text-lg font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all hover:-translate-y-1">
+              Download Client
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-20 w-full max-w-6xl mx-auto">
+          <div className="relative rounded-2xl bg-slate-900 p-2 shadow-2xl shadow-slate-900/20 ring-1 ring-white/10">
+            <div className="rounded-xl bg-slate-800 overflow-hidden aspect-[16/10] relative group">
+              {/* Mockup UI */}
+              <div className="absolute inset-0 flex flex-col bg-slate-900">
+                {/* Browser Bar */}
+                <div className="h-10 bg-slate-800 border-b border-white/10 flex items-center px-4 gap-2">
+                  <div className="flex gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#FF5F57]"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#FEBC2E]"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#28C840]"></div>
+                  </div>
+                  <div className="flex-1 mx-4">
+                    <div className="h-6 w-1/3 bg-slate-900/50 rounded-md mx-auto"></div>
+                  </div>
                 </div>
-                <p className="mt-3 text-sm text-gray-700">{f.desc}</p>
+                
+                {/* App Content */}
+                <div className="flex-1 flex overflow-hidden">
+                  {/* Sidebar */}
+                  <div className="w-48 bg-slate-900 border-r border-white/5 p-4 space-y-4 hidden md:block">
+                    <div className="h-8 w-24 bg-white/5 rounded animate-pulse"></div>
+                    <div className="space-y-2 pt-4">
+                      <div className="h-4 w-full bg-white/5 rounded"></div>
+                      <div className="h-4 w-3/4 bg-white/5 rounded"></div>
+                      <div className="h-4 w-5/6 bg-white/5 rounded"></div>
+                    </div>
+                  </div>
+                  
+                  {/* Main */}
+                  <div className="flex-1 p-6 bg-[#0B1120]">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                      {[1,2,3].map(i => (
+                        <div key={i} className="bg-slate-800/50 rounded-xl p-4 border border-white/5">
+                          <div className="h-8 w-8 rounded-lg bg-blue-500/20 mb-3"></div>
+                          <div className="h-4 w-24 bg-white/10 rounded mb-2"></div>
+                          <div className="h-6 w-16 bg-white/20 rounded"></div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="bg-slate-800/50 rounded-xl border border-white/5 h-64 p-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="h-5 w-32 bg-white/10 rounded"></div>
+                        <div className="h-8 w-24 bg-blue-600/20 rounded-lg"></div>
+                      </div>
+                      <div className="space-y-3">
+                        {[1,2,3,4].map(i => (
+                          <div key={i} className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-white/5"></div>
+                            <div className="flex-1 h-3 bg-white/5 rounded"></div>
+                            <div className="w-20 h-3 bg-white/5 rounded"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
-      </section>
+      </main>
 
-      {/* CTA */}
-      <section className="px-6 md:px-10 py-10">
-        <div className="max-w-6xl mx-auto rounded-2xl bg-blue-600 text-white p-8 md:p-10 flex flex-col md:flex-row items-center gap-6">
-          <div className="flex-1">
-            <h3 className="text-2xl font-bold">Ready to monitor your team effectively?</h3>
-            <p className="mt-2 text-blue-100">Log in to set up your organization, invite employees, and start tracking.</p>
+      <footer className="border-t border-slate-200 bg-white py-12">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-sm text-slate-500">
+            © 2026 Time Tracker System. Built for enterprise.
           </div>
-          <div className="flex gap-3">
-            <Link to="/login" className="px-5 py-2.5 rounded bg-white text-blue-700 font-semibold hover:bg-blue-50">Login</Link>
-            <Link to="/setup" className="px-5 py-2.5 rounded border border-white/40 hover:bg-blue-500">Organization Setup</Link>
+          <div className="flex gap-6 text-sm font-medium text-slate-600">
+            <a href="#" className="hover:text-slate-900">Privacy</a>
+            <a href="#" className="hover:text-slate-900">Terms</a>
+            <a href="#" className="hover:text-slate-900">Support</a>
           </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="px-6 md:px-10 py-8 border-t bg-white">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-3 justify-between">
-          <div className="font-semibold">Time Tracker System</div>
-          <div className="text-sm text-gray-600">© {new Date().getFullYear()} All rights reserved.</div>
         </div>
       </footer>
     </div>
   )
 }
-
-const features = [
-  {
-    title: 'Real-time Live View',
-    desc: 'Observe employee screens in real-time for coaching and support.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-3 3v-3H5a2 2 0 0 1-2-2V5z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Automated Screenshots',
-    desc: 'Periodic captures with metadata to visualize activity over time.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7zm7 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Activity Dashboard',
-    desc: 'Recent activity grouped by employee for quick oversight.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M3 13h6v8H3v-8zm12-6h6v14h-6V7zM9 3h6v18H9V3z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Easy Setup',
-    desc: 'Configure organization and invite employees in minutes.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 5h-2v6h6v-2h-4V7z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Secure JWT Auth',
-    desc: 'Role-based access via JWT tokens for managers and employees.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M12 1l9 4v6c0 5.25-3.5 10.06-9 11-5.5-.94-9-5.75-9-11V5l9-4zm0 6a3 3 0 1 1 0 6 3 3 0 0 1 0-6z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Cross-platform Desktop',
-    desc: 'Python desktop app integrates via REST and Socket.IO.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-        <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-5l1 3H10l1-3H6a2 2 0 0 1-2-2V6z" />
-      </svg>
-    )
-  }
-]

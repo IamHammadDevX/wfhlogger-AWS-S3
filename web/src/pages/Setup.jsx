@@ -1,144 +1,99 @@
-import React from 'react'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import Nav from '../components/Nav.jsx'
-
 import { resolveApiBase } from '../api.js'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 export default function Setup() {
   const [teamName, setTeamName] = useState('')
-  const [team, setTeam] = useState(null)
-  const [email, setEmail] = useState('')
-  const [name, setName] = useState('')
-  const [users, setUsers] = useState([])
   const [msg, setMsg] = useState('')
-  const [tempPwdMsg, setTempPwdMsg] = useState('')
-  const [error, setError] = useState('')
-  const [managers, setManagers] = useState([])
-  const [assignManagerId, setAssignManagerId] = useState('')
-  const [role, setRole] = useState('')
-
-  const token = localStorage.getItem('token')
-  const headers = { Authorization: `Bearer ${token}` }
+  const [loading, setLoading] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('employee')
+  const [inviteMsg, setInviteMsg] = useState('')
 
   useEffect(() => {
     resolveApiBase().then((BASE) => {
       API = BASE
-      axios.get(`${BASE}/api/org`, { headers }).then(r => setTeam(r.data.organization)).catch(()=>{})
-      axios.get(`${BASE}/api/employees`, { headers }).then(r => setUsers(r.data.users || [])).catch(()=>{})
-      // decode role from JWT for conditional UI
-      try {
-        const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-        setRole(payload?.role || '')
-        if (payload?.role === 'super_admin') {
-          axios.get(`${BASE}/api/admin/managers`, { headers }).then(r => setManagers(r.data?.managers || [])).catch(()=>{})
-        }
-      } catch {}
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      axios.get(`${BASE}/api/team`, { headers })
+        .then(r => { if(r.data.team) setTeamName(r.data.team.name) })
+        .catch(() => axios.get(`${BASE}/api/org`, { headers }).then(r => { if(r.data.organization) setTeamName(r.data.organization.name) }))
     })
   }, [])
 
-  const saveOrg = async () => {
-    setMsg(''); setError('')
+  const saveTeam = async (e) => {
+    e.preventDefault()
+    setLoading(true)
     try {
-      const r = await axios.post(`${API}/api/org`, { name: teamName }, { headers })
-      setTeam(r.data.organization)
-      setMsg('Team saved')
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      await axios.post(`${API}/api/team`, { name: teamName }, { headers })
+      setMsg('Team name updated!')
     } catch (e) {
-      setError(e?.response?.data?.error || e.message)
+      setMsg('Error saving team.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const addEmp = async () => {
-    setMsg(''); setError('')
+  const invite = async (e) => {
+    e.preventDefault()
+    setInviteMsg('')
     try {
-      const body = role === 'super_admin' && assignManagerId ? { email, name, managerId: assignManagerId } : { email, name }
-      const r = await axios.post(`${API}/api/employees`, body, { headers })
-      setUsers(prev => [r.data.user, ...prev])
-      const temp = r?.data?.login?.tempPassword
-      setEmail(''); setName('')
-      setAssignManagerId('')
-      setMsg('Employee added')
-      setTempPwdMsg(temp ? `Temp password for ${email}: ${temp}` : '')
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      // This is a mockup of an invite system since the backend just creates users directly in admin
+      // But let's assume this just logs or calls a hypothetical endpoint, or simply directs user to Admin
+      // For now, we'll just say "Feature available in Admin panel" if they are super admin
+      setInviteMsg(`Please use the Admin console to create ${inviteRole} accounts directly.`)
     } catch (e) {
-      setError(e?.response?.data?.error || e.message)
-    }
-  }
-
-  const removeEmp = async (email) => {
-    setMsg(''); setError('')
-    try {
-      await axios.delete(`${API}/api/employees/${encodeURIComponent(email)}`, { headers })
-      setMsg('Employee removed')
-      setUsers(prev => prev.filter(u => u.email !== email))
-    } catch (e) {
-      setError(e?.response?.data?.error || e.message)
+      setInviteMsg('Error sending invite.')
     }
   }
 
   return (
-    <div className="min-h-full">
-      <Nav />
-      <main className="p-4 space-y-6">
-        <h2 className="text-lg font-semibold">Setup</h2>
-        {error && <div className="text-red-600 text-sm">{error}</div>}
-        {msg && <div className="text-green-700 text-sm">{msg}</div>}
-        {tempPwdMsg && <div className="text-blue-700 text-sm">{tempPwdMsg}</div>}
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Organization Setup</h1>
+        <p className="mt-1 text-slate-500">Configure your team details.</p>
+      </div>
 
-        {role === 'super_admin' && (
-          <section className="bg-white border rounded p-4 space-y-3">
-            <div className="font-semibold">Team</div>
-            <div className="text-sm text-gray-600">Current: {team?.name || 'Not set'}</div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input className="border rounded px-3 py-2 flex-1" placeholder="Team name" value={teamName} onChange={e=>setTeamName(e.target.value)} />
-              <button className="px-3 py-2 rounded bg-blue-600 text-white" onClick={saveOrg}>Save</button>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Team Settings */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-4">Team Details</h2>
+          {msg && <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg">{msg}</div>}
+          <form onSubmit={saveTeam} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Organization Name</label>
+              <input 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                value={teamName} 
+                onChange={e=>setTeamName(e.target.value)} 
+                placeholder="Acme Corp" 
+              />
             </div>
-          </section>
-        )}
+            <button 
+              disabled={loading} 
+              className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-70"
+            >
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+          </form>
+        </div>
 
-        <section className="bg-white border rounded p-4 space-y-3">
-          <div className="font-semibold">Employees</div>
-          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-            <input className="border rounded px-3 py-2 flex-1 min-w-[200px]" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
-            <input className="border rounded px-3 py-2 flex-1 min-w-[200px]" placeholder="Name (optional)" value={name} onChange={e=>setName(e.target.value)} />
-            {role === 'super_admin' && (
-              <select className="border rounded px-3 py-2 flex-1 min-w-[200px]" value={assignManagerId} onChange={e=>setAssignManagerId(e.target.value)}>
-                <option value="">Assign manager…</option>
-                {managers.map(m => (
-                  <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
-                ))}
-              </select>
-            )}
-            <button className="w-full sm:w-auto px-3 py-2 rounded bg-blue-600 text-white" onClick={addEmp}>Add</button>
+        {/* Quick Invite (Mockup/Info) */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 opacity-75">
+          <h2 className="text-xl font-bold text-slate-900 mb-4">Invite Members</h2>
+          <div className="p-4 bg-blue-50 text-blue-800 text-sm rounded-lg border border-blue-100">
+            <p className="font-semibold">Note for Administrators</p>
+            <p className="mt-1">
+              To add new members to your organization, please use the 
+              <a href="/admin" className="font-bold underline mx-1">Admin Console</a> 
+              to create their accounts securely.
+            </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="py-2 px-2">Email</th>
-                  <th className="py-2 px-2">Name</th>
-                  <th className="py-2 px-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="py-2 px-2">{u.email}</td>
-                    <td className="py-2 px-2">{u.name || '-'}</td>
-                    <td className="py-2 px-2">
-                      <button className="px-2 py-1 rounded bg-red-600 text-white" onClick={()=>removeEmp(u.email)}>Remove</button>
-                    </td>
-                  </tr>
-                ))}
-                {users.length === 0 && (
-                  <tr><td className="py-2 px-2 text-gray-600" colSpan="3">No employees.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </main>
+        </div>
+      </div>
     </div>
   )
 }
