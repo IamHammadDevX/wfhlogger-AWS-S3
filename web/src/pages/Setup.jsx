@@ -41,12 +41,14 @@ export default function Setup() {
     setInviteMsg('')
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      // This is a mockup of an invite system since the backend just creates users directly in admin
-      // But let's assume this just logs or calls a hypothetical endpoint, or simply directs user to Admin
-      // For now, we'll just say "Feature available in Admin panel" if they are super admin
-      setInviteMsg(`Please use the Admin console to create ${inviteRole} accounts directly.`)
+      const body = { email: inviteEmail, name: '', managerId: null, password: null } // Optional: allow manager to set temp password?
+      // Call /api/employees directly to create the user
+      const r = await axios.post(`${API}/api/employees`, body, { headers })
+      const login = r.data?.login
+      setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}`)
+      setInviteEmail('')
     } catch (e) {
-      setInviteMsg('Error sending invite.')
+      setInviteMsg(e?.response?.data?.error || 'Error creating employee.')
     }
   }
 
@@ -81,17 +83,31 @@ export default function Setup() {
           </form>
         </div>
 
-        {/* Quick Invite (Mockup/Info) */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 opacity-75">
-          <h2 className="text-xl font-bold text-slate-900 mb-4">Invite Members</h2>
-          <div className="p-4 bg-blue-50 text-blue-800 text-sm rounded-lg border border-blue-100">
-            <p className="font-semibold">Note for Administrators</p>
-            <p className="mt-1">
-              To add new members to your organization, please use the 
-              <a href="/admin" className="font-bold underline mx-1">Admin Console</a> 
-              to create their accounts securely.
+        {/* Add Employee (Direct) */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-4">Add Employee</h2>
+          {inviteMsg && <div className={`mb-4 p-3 text-sm rounded-lg ${inviteMsg.startsWith('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{inviteMsg}</div>}
+          <form onSubmit={invite} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Employee Email</label>
+              <input 
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                value={inviteEmail} 
+                onChange={e=>setInviteEmail(e.target.value)} 
+                placeholder="employee@company.com" 
+                type="email"
+                required
+              />
+            </div>
+            <button 
+              className="px-6 py-2.5 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm"
+            >
+              Create Account
+            </button>
+            <p className="text-xs text-slate-500 mt-2">
+              A temporary password will be generated automatically.
             </p>
-          </div>
+          </form>
         </div>
       </div>
     </div>

@@ -22,6 +22,12 @@ export default function Dashboard() {
     resolveApiBase().then((BASE)=>{
       API = BASE
       try { const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); setRole(payload?.role || '') } catch {}
+      
+      // If user is company owner (super_admin), get company info directly from signup/login response context or API?
+      // Actually /api/org returns the organization. For super_admin owner, we might want company name.
+      // Let's modify /api/org backend to return company name for owner if available?
+      // Or just use the team name which we set to Company Name on signup.
+      
       const getTeamReq = axios.get(`${BASE}/api/team`, { headers })
         .then(r => {
           const t = r.data?.team || null
@@ -120,7 +126,7 @@ export default function Dashboard() {
 
       {/* Stats */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Stat label="Active Team" value={team?.name || 'Not configured'} />
+        <Stat label={role === 'super_admin' ? "Company" : "Active Team"} value={team?.name || 'Not configured'} />
         <Stat label="Total Employees" value={filteredEmployees.length} />
         <Stat label="Recent Screenshots" value={filteredFiles.length} />
         <Stat label="System Status" value={loading ? 'Loading…' : 'Operational'} />

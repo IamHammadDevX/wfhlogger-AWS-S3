@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import './index.css'
 import './api.js'
 import Login from './pages/Login.jsx'
+import Signup from './pages/Signup.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import LiveView from './pages/LiveView.jsx'
 import Report from './pages/Report.jsx'
@@ -27,6 +28,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
       <Route path="/" element={<Home />} />
       
       {/* Protected Routes wrapped in Layout */}

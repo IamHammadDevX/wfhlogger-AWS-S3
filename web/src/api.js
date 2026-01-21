@@ -11,7 +11,7 @@ export function getApiBaseSync() {
   return cachedBase
 }
 
-const candidates = [cachedBase, 'https://backend-tracker.vughy.com', 'http://127.0.0.1:4000', 'http://localhost:4000']
+const candidates = [cachedBase, 'http://127.0.0.1:4000', 'http://localhost:4000']
 // Filter candidates to avoid mixed content errors (HTTPS site cannot call HTTP)
 const validCandidates = candidates.filter(url => {
   if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {

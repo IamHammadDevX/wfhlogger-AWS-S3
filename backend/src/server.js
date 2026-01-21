@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany } from './sqlite.js';
 import bcrypt from 'bcryptjs';
 
 dotenv.config();
@@ -166,15 +166,57 @@ app.post('/api/auth/login', (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
     const user = getUserByEmail(email);
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    // If role provided, enforce role match
-    if (role && user.role !== role) return res.status(403).json({ error: 'Forbidden: role mismatch' });
+    
+    // Role Check: If role is provided, validate it.
+    // Allow 'super_admin' to login even if they selected 'manager' (downwards compatibility) or vice versa if roles overlap?
+    // STRICT MODE: Enforce exact match or hierarchy?
+    // For now: 
+    // - If user is super_admin, they can login as super_admin or manager (dashboard access)
+    // - If user is manager, they can only login as manager
+    
+    if (role) {
+      if (user.role === 'super_admin') {
+        // Super admin can access everything, pass
+      } else if (user.role !== role) {
+        return res.status(403).json({ error: 'Forbidden: role mismatch' });
+      }
+    }
+
     const ok = verifyPassword(user, password);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id }, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: user.company_id }, JWT_SECRET, { expiresIn: '8h' });
     res.json({ token });
   } catch (e) {
     console.error('[auth:login] error:', e);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Signup (Multi-tenant)
+app.post('/api/auth/signup', (req, res) => {
+  try {
+    const { companyName, email, password } = req.body || {};
+    if (!companyName || !email || !password) return res.status(400).json({ error: 'All fields are required' });
+    
+    const existing = getUserByEmail(email);
+    if (existing) return res.status(409).json({ error: 'User already exists' });
+
+    // Create Company
+    const company = createCompany({ name: companyName });
+    
+    // Create Admin User (Super Admin role) linked to company - The first user is the Owner
+    const user = createUser({ email, password, role: 'super_admin', company_id: company.id });
+    
+    // Create Default Team (Organization) linked to company
+    createOrganization({ name: `${companyName}`, managerId: user.id, company_id: company.id });
+
+    // Generate Token
+    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: company.id }, JWT_SECRET, { expiresIn: '8h' });
+    
+    res.status(201).json({ token, company, user: { id: user.id, email: user.email, role: user.role } });
+  } catch (e) {
+    console.error('[auth:signup] error:', e);
+    res.status(500).json({ error: 'Signup failed' });
   }
 });
 
@@ -218,6 +260,14 @@ app.get('/api/org', requireRole(['manager', 'super_admin']), (req, res) => {
 // Team info for the authenticated manager (maps to organization by manager)
 app.get('/api/team', requireRole(['manager', 'super_admin']), (req, res) => {
   try {
+    const company_id = req.user?.company_id;
+    // For super_admin owner, we return the company info as the "team"
+    if (req.user?.role === 'super_admin') {
+      const { getCompanyById } = require('./sqlite.js');
+      const company = getCompanyById(company_id);
+      if (company) return res.json({ team: { id: company.id, name: company.name } });
+    }
+
     if (req.user?.role === 'manager') {
       const mgrId = req.user?.uid;
       const mgrEmail = req.user?.sub;
@@ -226,10 +276,12 @@ app.get('/api/team', requireRole(['manager', 'super_admin']), (req, res) => {
       if (!org) {
         try { org = getOrganizationByManagerId(mgrEmail); } catch {}
       }
-      if (org) return res.json({ team: { id: org.id, name: org.name } });
+      // Ensure org belongs to same company
+      if (org && org.company_id == company_id) {
+        return res.json({ team: { id: org.id, name: org.name } });
+      }
       return res.json({ team: null });
     }
-    // super_admin has no single team context
     return res.json({ team: null });
   } catch {
     return res.json({ team: null });
@@ -242,6 +294,8 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
   if (!email) return res.status(400).json({ error: 'Email is required' });
   try {
     const users = readUsers();
+    // Scope check: Check if user exists in THIS company? 
+    // Email is globally unique usually.
     if (users.find(u => u.email.toLowerCase() === String(email).toLowerCase())) {
       return res.status(409).json({ error: 'User already exists' });
     }
@@ -251,19 +305,20 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
       return res.status(409).json({ error: 'Login user already exists' });
     }
     const requesterRole = req.user?.role;
-    const requesterUid = req.user?.uid || req.user?.sub; // prefer uid; fallback to email
+    const requesterUid = req.user?.uid || req.user?.sub;
     const managerId = (requesterRole === 'manager') ? requesterUid : (bodyManagerId || requesterUid || null);
+    const company_id = req.user?.company_id;
 
     // Generate a temporary password if not provided
     const tempPassword = password && String(password).trim()
       ? String(password).trim()
       : Math.random().toString(36).slice(2, 10);
 
-    // Create login user in sqlite (or JSON fallback)
-    const loginUser = createUser({ email, password: tempPassword, role: 'employee' });
+    // Create login user in sqlite (or JSON fallback) with company_id
+    const loginUser = createUser({ email, password: tempPassword, role: 'employee', company_id });
 
     // Store team mapping and display name in simple JSON store
-    const record = { email, name: name || '', role: 'employee', managerId, createdAt: new Date().toISOString() };
+    const record = { email, name: name || '', role: 'employee', managerId, company_id, createdAt: new Date().toISOString() };
     users.push(record);
     writeUsers(users);
 
@@ -297,12 +352,17 @@ app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
 // ---- Super Admin: Managers list with employee counts ----
 app.get('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
   try {
-    const managers = listManagers();
-    const employees = readUsers().filter(u => u.role === 'employee');
+    const company_id = req.user?.company_id;
+    const managers = listManagers(company_id);
+    const allUsers = readUsers();
+    // Scope employees to company
+    const employees = allUsers.filter(u => u.role === 'employee' && u.company_id == company_id);
     const enriched = managers.map(m => {
       const org = getOrganizationByManagerId(m.id) || null;
+      // Extra check: ensure org belongs to company
+      const orgData = (org && org.company_id == company_id) ? { id: org.id, name: org.name } : null;
       const count = employees.filter(e => e.managerId === m.id || e.managerId === m.email).length;
-      return { id: m.id, email: m.email, employeeCount: count, organization: org ? { id: org.id, name: org.name } : null };
+      return { id: m.id, email: m.email, employeeCount: count, organization: orgData };
     });
     res.json({ managers: enriched });
   } catch (e) {
@@ -357,7 +417,11 @@ app.get('/api/admin/audit-logs', requireRole(['super_admin']), (req, res) => {
 
 app.get('/api/employees', requireRole(['manager', 'super_admin']), (req, res) => {
   try {
-    const users = readUsers();
+    const allUsers = readUsers();
+    const company_id = req.user?.company_id;
+    // Filter by company
+    const users = allUsers.filter(u => u.company_id == company_id);
+
     const role = req.user?.role;
     if (role === 'manager') {
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
@@ -486,12 +550,13 @@ function todayStr(){ return new Date().toISOString().slice(0,10); }
 app.post('/api/work/start', requireRole(['employee']), (req, res) => {
   try {
     const employeeId = req.user?.sub;
+    const company_id = req.user?.company_id;
     const sessions = readSessions();
     // If an active session exists, return it
     const active = sessions.find(s => s.employeeId === employeeId && s.isActive);
     if (active) return res.json({ ok: true, session: active });
     const now = new Date().toISOString();
-    const record = { id: `${employeeId}-${Date.now()}`, employeeId, startedAt: now, endedAt: null, isActive: true, idleSeconds: 0, lastHeartbeatAt: now, date: todayStr() };
+    const record = { id: `${employeeId}-${Date.now()}`, employeeId, company_id, startedAt: now, endedAt: null, isActive: true, idleSeconds: 0, lastHeartbeatAt: now, date: todayStr() };
     sessions.push(record);
     writeSessions(sessions);
     res.status(201).json({ ok: true, session: record });
@@ -546,9 +611,16 @@ app.post('/api/work/stop', requireRole(['employee']), (req, res) => {
 app.get('/api/work/summary/today', requireRole(['manager', 'super_admin']), (req, res) => {
   try {
     const sessions = readSessions();
+    
+    // Filter by company
+    const company_id = req.user?.company_id;
+    const allUsers = readUsers();
+    const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
+    const companySessions = sessions.filter(s => companyUserEmails.has(s.employeeId));
+
     const today = todayStr();
     const byEmp = {};
-    for (const s of sessions.filter(x => x.date === today)) {
+    for (const s of companySessions.filter(x => x.date === today)) {
       const k = s.employeeId;
       if (!byEmp[k]) byEmp[k] = [];
       byEmp[k].push(s);
@@ -586,9 +658,16 @@ app.get('/api/work/summary/today', requireRole(['manager', 'super_admin']), (req
 app.get('/api/work/sessions/today', requireRole(['manager', 'super_admin']), (req, res) => {
   try {
     const sessions = readSessions();
+    
+    // Filter by company
+    const company_id = req.user?.company_id;
+    const allUsers = readUsers();
+    const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
+    const companySessions = sessions.filter(s => companyUserEmails.has(s.employeeId));
+
     const today = todayStr();
     const byEmp = {};
-    for (const s of sessions.filter(x => x.date === today)) {
+    for (const s of companySessions.filter(x => x.date === today)) {
       const k = s.employeeId;
       if (!byEmp[k]) byEmp[k] = [];
       const startMs = new Date(s.startedAt).getTime();
@@ -624,7 +703,8 @@ app.post('/api/uploads/screenshot', requireRole(['employee']), upload.single('sc
   try {
     const fileRelPath = path.relative(process.cwd(), req.file.path);
     const employeeId = (req.body && (req.body.employeeId || req.body.email)) || 'unknown';
-    const record = { file: fileRelPath.replace(/\\/g, '/'), employeeId, ts: new Date().toISOString() };
+    const company_id = req.user?.company_id;
+    const record = { file: fileRelPath.replace(/\\/g, '/'), employeeId, company_id, ts: new Date().toISOString() };
     // Append metadata to uploads/index.json (simple dev store)
     try {
       const arr = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
@@ -638,7 +718,12 @@ app.post('/api/uploads/screenshot', requireRole(['employee']), upload.single('sc
     // Mark employee as online upon receiving a screenshot (helps Live View selection)
     if (employeeId && employeeId !== 'unknown') {
       onlineEmployees.add(employeeId);
-      io.emit('presence:online', { userId: employeeId });
+      // Broadcast to company room if we have context, or global fallback
+      if (company_id) {
+        io.to(`company:${company_id}`).emit('presence:online', { userId: employeeId });
+      } else {
+        io.emit('presence:online', { userId: employeeId });
+      }
     }
 
     // If a manager has started live view for this employee, relay the frame to viewers
@@ -714,6 +799,11 @@ app.get('/api/uploads/list', requireRole(['manager', 'super_admin']), async (req
     const files = fs.readdirSync(uploadPath).filter(f => /\.(jpg|jpeg|png)$/i.test(f)).sort();
     let meta = [];
     try { meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8')); } catch {}
+    
+    const company_id = req.user?.company_id;
+    const allUsers = readUsers();
+    const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
+
     let items = files.map(f => {
       const rel = `uploads/${f}`;
       const m = meta.find(x => x.file === rel);
@@ -723,6 +813,10 @@ app.get('/api/uploads/list', requireRole(['manager', 'super_admin']), async (req
       }
       return { file: rel, ts, employeeId: m?.employeeId };
     });
+    
+    // Filter by company
+    items = items.filter(it => it.employeeId && companyUserEmails.has(it.employeeId));
+
     if (req.user?.role === 'manager') {
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
       items = items.filter(it => it.employeeId && teamEmails.includes(it.employeeId));
@@ -740,6 +834,13 @@ app.get('/api/uploads/query', requireRole(['manager', 'super_admin']), async (re
     const { employeeId, from, to } = req.query || {};
     let meta = [];
     try { meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8')); } catch {}
+    
+    // Filter by company
+    const company_id = req.user?.company_id;
+    const allUsers = readUsers();
+    const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
+    meta = meta.filter(m => m.employeeId && companyUserEmails.has(m.employeeId));
+
     // Manager scoping to team
     if (req.user?.role === 'manager') {
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
@@ -768,9 +869,16 @@ app.get('/api/work/sessions/range', requireRole(['manager', 'super_admin']), (re
   try {
     const { employeeId, from, to } = req.query || {};
     const sessions = readSessions();
+    
+    // Filter by company
+    const company_id = req.user?.company_id;
+    const allUsers = readUsers();
+    const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
+    const companySessions = sessions.filter(s => companyUserEmails.has(s.employeeId));
+
     const fromStr = from ? String(from).slice(0,10) : null;
     const toStr = to ? String(to).slice(0,10) : null;
-    const inRange = sessions.filter(s => {
+    const inRange = companySessions.filter(s => {
       const d = s.date;
       if (fromStr && d < fromStr) return false;
       if (toStr && d > toStr) return false;
@@ -815,9 +923,14 @@ app.get('/api/activity/recent', requireRole(['manager', 'super_admin']), (req, r
   try {
     const arr = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
     // group by employeeId
+    const company_id = req.user?.company_id;
+    const allUsers = readUsers();
+    const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
+
     const byEmp = {};
     for (const r of arr) {
       const k = r.employeeId || 'unknown';
+      if (!companyUserEmails.has(k)) continue;
       if (!byEmp[k]) byEmp[k] = [];
       byEmp[k].push(r);
     }
@@ -862,6 +975,7 @@ io.use((socket, next) => {
     socket.data.userId = payload?.email || payload?.userId; // email identifier (employees/managers)
     socket.data.uid = payload?.uid || null; // numeric/uuid id (managers)
     socket.data.role = payload?.role || 'employee';
+    socket.data.company_id = payload?.company_id || null;
     next();
   } catch (err) {
     console.warn('[socket] auth failed:', err.message);
@@ -876,6 +990,12 @@ io.on('connection', (socket) => {
   // Production: role must come from verified token. Ignore query role.
   const role = socket.data.role || 'employee';
   const managerUid = socket.data.uid || qpUid || null;
+  const company_id = socket.data.company_id;
+  
+  // Join company room for scoped broadcasts
+  if (company_id) {
+    socket.join(`company:${company_id}`);
+  }
 
   if (userId) {
     socket.join(userRoom(userId));
@@ -884,12 +1004,28 @@ io.on('connection', (socket) => {
   // Track presence: employees
   if (role === 'employee' && userId) {
     onlineEmployees.add(userId);
-    io.emit('presence:online', { userId });
+    // Broadcast only to company room
+    if (company_id) {
+      io.to(`company:${company_id}`).emit('presence:online', { userId });
+    } else {
+      // Legacy fallback
+      io.emit('presence:online', { userId });
+    }
   }
 
-  // On manager connection, send current online employees list (scoped to team)
+  // On manager connection, send current online employees list (scoped to team AND company)
   if (role === 'manager' || role === 'super_admin') {
     let users = Array.from(onlineEmployees);
+    
+    // Filter users by company (needs lookup if we don't store company_id in onlineEmployees)
+    // Optimization: onlineEmployees could be Set<string> of emails. 
+    // We can filter by checking against allUsers (memory cache)
+    const allUsers = readUsers();
+    users = users.filter(email => {
+      const u = allUsers.find(au => au.email === email);
+      return u && u.company_id == company_id;
+    });
+
     if (role === 'manager') {
       const teamEmails = getTeamEmailsForManager(managerUid || socket.data.uid || socket.data.userId || userId);
       users = users.filter(u => teamEmails.includes(u));
@@ -940,7 +1076,13 @@ socket.on('live_view:frame', ({ employeeId, frameBase64, ts }) => {
     // If an employee disconnects, proactively terminate any viewer sessions
     if (role === 'employee' && userId) {
       onlineEmployees.delete(userId);
-      io.emit('presence:offline', { userId });
+      // Broadcast offline to company room
+      const cid = socket.data.company_id;
+      if (cid) {
+        io.to(`company:${cid}`).emit('presence:offline', { userId });
+      } else {
+        io.emit('presence:offline', { userId });
+      }
       liveStreamOn.set(userId, false);
       io.to(viewersRoom(userId)).emit('live_view:terminate', { by: userId, reason: 'offline' });
     }
