@@ -1,161 +1,180 @@
 # Time Tracker System
 
-## Overview
+A full-featured, enterprise-grade time tracking and productivity monitoring solution. This system consists of a robust backend, a responsive web dashboard for management, and a secure desktop client for automated time and activity tracking.
 
-- Full‑stack time tracking platform with web UI, backend API and optional desktop client.
-- Backend: Node.js/Express with Socket.IO; primary storage is SQLite (`better-sqlite3`) with a JSON fallback for environments without native build tools.
-- Frontend: React + Vite; built assets served by the backend or any static host.
-- Auth: JWT‑based login with role gating (`super_admin`, `manager`, `employee`).
+## 🚀 Key Features
 
-## Features
+### 🖥️ Web Dashboard (Manager/Admin)
+- **Real-Time Live View**: Monitor active employee sessions in real-time via WebSockets.
+- **Comprehensive Reporting**: Generate detailed reports filtered by employee and date ranges.
+- **Activity Monitoring**: View work sessions, productivity metrics, and captured screenshots.
+- **Work Hours Management**: Configure and track expected work schedules.
+- **Role-Based Access Control**:
+  - **Super Admin**: Full system control, user management, and global settings.
+  - **Manager**: Team oversight, report generation, and activity monitoring.
+  - **Employee**: View own stats (if permitted).
+- **Responsive Design**: Fully optimized for desktop, tablet, and mobile devices.
+- **Downloads Section**: Easy access to the desktop client installer.
 
-- Email/password login with JWT issuance and role enforcement.
-- Organization setup and manager/employee management.
-- Real‑time live view via WebSockets.
-- Screenshot uploads and static serving of uploaded images.
-- Reports, activity, work hours and audit logging.
+### ⏱️ Desktop Client (Employee)
+- **Automated Tracking**: Simple "Start/Stop" interface for employees.
+- **Activity Logging**: Tracks active application usage and idle time.
+- **Screenshot Capture**: Securely captures periodic screenshots for proof of work.
+- **Offline Capable**: Queues data when offline and syncs when connection is restored.
+- **Professional Installer**: Easy-to-use Windows installer (`.exe`) for quick deployment.
+- **Secure Authentication**: JWT-based login directly from the client.
 
-## Architecture
+### ⚙️ Backend API
+- **RESTful API**: Node.js/Express architecture serving data to web and desktop clients.
+- **Real-Time Engine**: Socket.IO integration for live status updates.
+- **Dual Storage Engine**:
+  - **SQLite**: Primary, high-performance local database (using `better-sqlite3`).
+  - **JSON Fallback**: Zero-dependency fallback for development environments.
+  - **MongoDB**: Optional support for scalable cloud deployment.
+- **Secure File Handling**: Managed storage for screenshot uploads and evidence.
 
-- Backend API and websockets: `backend/src/server.js`.
-- Storage layer: `backend/src/sqlite.js` (SQLite or JSON fallback) and optional Mongo (`backend/src/db.js`).
-- Web UI: `web/` with routes protected by the presence of a JWT token.
-- Static assets served at `/uploads` and desktop source distribution at `/downloads`.
+---
 
-## Directory Layout
+## 🛠️ Technology Stack
 
-- `backend/` — Express server, database adapters, uploads.
-- `web/` — React/Vite application.
-- `desktop/` — Optional desktop client source distributed via `/downloads`.
-- `data/` — Runtime data: SQLite DB or JSON fallback files and metadata.
+- **Frontend**: React 18, Vite, Tailwind CSS, React Router v6.
+- **Backend**: Node.js, Express, Socket.IO, Better-SQLite3.
+- **Desktop Client**: Python (packaged as EXE), Native Windows APIs.
+- **Database**: SQLite (default) or MongoDB.
 
-## Requirements
+---
 
-- Node.js 18+.
-- For SQLite performance in production: native module `better-sqlite3`.
-- Optional: MongoDB if you enable `MONGO_URI` (login/auth uses SQLite/JSON by default).
+## 📦 Installation & Setup
 
-## Environment Variables
+### Prerequisites
+- Node.js 18+
+- npm (Node Package Manager)
 
-- Backend (`backend/.env`):
-  - `PORT` — API port (default `4000`).
-  - `HOST` — bind host (default `127.0.0.1`).
-  - `JWT_SECRET` — strong secret for token signing (required in production).
-  - `ALLOWED_ORIGINS` — comma‑separated origins for CORS (include your web domain).
-  - `UPLOAD_DIR` — directory for uploaded files (default `uploads`).
-  - `DATA_DIR` — directory for data files (default `data`).
-  - `MONGO_URI` — optional Mongo connection string; if empty, Mongo is skipped.
-  - `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` — optional initial super admin credentials.
-- Frontend (`web/.env` or `web/.env.local`):
-  - `VITE_API_URL` — base URL of the backend (e.g., `https://api.example.com` or `http://127.0.0.1:4000`).
+### 1. Backend Setup
+The backend handles API requests, authentication, and data storage.
 
-## Installation
+```bash
+cd backend
+npm install
+# For production performance, ensure native modules are built:
+npm install better-sqlite3
+```
 
-- Backend:
-  - `cd backend`
-  - `npm install`
-  - For production SQLite: `npm install better-sqlite3`
-- Frontend:
-  - `cd web`
-  - `npm install`
+**Environment Variables** (`backend/.env`):
+Create a `.env` file in the `backend` directory:
+```env
+PORT=4000
+HOST=127.0.0.1
+JWT_SECRET=your_super_secure_secret_key
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+UPLOAD_DIR=uploads
+DATA_DIR=data
+# Optional:
+# MONGO_URI=mongodb://localhost:27017/timetracker
+# SUPERADMIN_EMAIL=admin@example.com
+# SUPERADMIN_PASSWORD=admin123
+```
 
-## Development
+Start the backend:
+```bash
+npm start
+```
 
-- Backend:
-  - `cd backend && npm start`
-  - Health check: `GET /health` returns `{ ok: true }` (`backend/src/server.js:120–123`).
-- Frontend:
-  - `cd web && npm run dev`
-  - Dev server runs at `http://localhost:5173`.
-  - Set `VITE_API_URL` to your backend base or rely on auto base resolution.
+### 2. Web Frontend Setup
+The web interface for managers and admins.
 
-## Build Frontend
+```bash
+cd web
+npm install
+```
 
-- `cd web`
-- `npm run build`
-- The backend serves `web/dist` automatically (`backend/src/server.js:115–118`).
+**Environment Variables** (`web/.env`):
+Create a `.env` file in the `web` directory:
+```env
+VITE_API_URL=http://localhost:4000
+```
 
-## Production Deployment
+Start the development server:
+```bash
+npm run dev
+```
+Access the dashboard at `http://localhost:5173`.
 
-- Prepare environment:
-  - Set a strong `JWT_SECRET` and restrictive `ALLOWED_ORIGINS`.
-  - Install `better-sqlite3` for robust SQLite performance.
-- Build and run:
-  - `cd web && npm run build`
-  - `cd backend && npm ci`
-  - `node src/server.js`
-- Process manager (example PM2):
-  - `pm2 start src/server.js --name time-tracker-backend`
-  - `pm2 save`
-- Reverse proxy (example NGINX):
-  - Proxy `https://your-domain` to backend `http://127.0.0.1:4000`.
-  - Serve TLS certificates and enable gzip.
-- Static hosting option:
-  - Host `web/dist` on a CDN or static site and point it at the backend via `VITE_API_URL`.
+### 3. Desktop Client
+The client application is located in `desktop/`. Users can download the compiled installer directly from the Web Dashboard's "Downloads" section.
 
-## Database and Storage
+To compile the installer manually (if modifying client source):
+1. Install [Inno Setup](https://jrsoftware.org/isdl.php).
+2. Navigate to `backend/public/downloads`.
+3. Open `TimeTrackerSetup.iss` and compile.
 
-- SQLite (recommended): `data/time_tracker.db` created automatically when `better-sqlite3` is installed (`backend/src/sqlite.js:16–45`).
-- JSON fallback files (dev/no native build):
-  - `data/users.sqlite.json`, `data/organizations.sqlite.json` (`backend/src/sqlite.js:40–45`).
-- Additional JSON stores:
-  - `data/users.json`, `data/organization.json`, `data/work_sessions.json`, `data/audit_logs.json` managed by `backend/src/server.js:33–45`.
-- Uploads:
-  - Saved under `UPLOAD_DIR` and served at `/uploads` (`backend/src/server.js:81–90`, `114`).
-- Optional Mongo:
-  - If `MONGO_URI` is set, backend attempts a connection (`backend/src/db.js`).
+---
 
-## Authentication and Roles
+## 📖 Usage Guide
 
-- Login route: `POST /api/auth/login` returns `{ token }` (`backend/src/server.js:136–153`).
-- JWT payload includes `email`, `role`, `uid` and is signed with `JWT_SECRET`.
-- Role middleware: `requireRole([...])` protects endpoints (`backend/src/server.js:155–172`).
-- Default super admin is seeded if missing (`backend/src/sqlite.js:88–94`).
+### For Administrators
+1. Log in with Super Admin credentials.
+2. Navigate to **Setup** to configure organization details.
+3. Use **Admin** panel to create Manager and Employee accounts.
+4. Distribute credentials to your team.
 
-## API Endpoints
+### For Managers
+1. Log in to the Web Dashboard.
+2. Use **Live View** to see who is currently working.
+3. Check **Reports** for weekly/monthly productivity summaries.
+4. Review **Activity** for detailed timelines and screenshots.
 
-- `GET /health` — service health (`backend/src/server.js:120–123`).
-- `POST /api/auth/login` — obtain JWT (`backend/src/server.js:136–153`).
-- Organization:
-  - `POST /api/org` — create (`backend/src/server.js:175–181`).
-  - `GET /api/org` — fetch (`backend/src/server.js:183–190`).
-- Employees:
-  - `POST /api/employees` — create (`backend/src/server.js:193–200` and following).
-  - `GET /api/employees` — list (`backend/src/server.js:313–326`).
-  - `DELETE /api/employees/:email` — delete (`backend/src/server.js:329–356`).
-- Managers:
-  - `POST /api/admin/managers` — create (`backend/src/server.js:234–250`).
-  - `GET /api/admin/managers` — list (`backend/src/server.js:253–267`).
-  - `DELETE /api/admin/managers/:id` — delete (`backend/src/server.js:269–296`).
-- Password management:
-  - `POST /api/admin/employees/password` — upsert employee password (`backend/src/server.js:359–377`).
+### For Employees
+1. Download the **Time Tracker Client** from the provided link.
+2. Install and run the application.
+3. Log in with your email and password.
+4. Click **Start** to begin your work session.
 
-## Real‑Time
+---
 
-- Socket.IO server uses JWT for auth and allows all origins at the socket layer (`backend/src/server.js:92–101`).
-- Frontend socket connects with `auth: { token }` and query parsed from JWT (`web/src/socket.js`).
+## 🏗️ Production Deployment
 
-## Security Hardening
+1. **Build the Frontend**:
+   ```bash
+   cd web
+   npm run build
+   ```
+   The backend is configured to serve the static files from `web/dist` automatically.
 
-- Set a long, random `JWT_SECRET` and rotate periodically.
-- Restrict `ALLOWED_ORIGINS` to your exact domains.
-- Serve over HTTPS behind a reverse proxy.
-- Limit upload file sizes via `express.json` and multer configurations.
-- Regularly back up `data/` and audit logs.
+2. **Run Backend**:
+   Use a process manager like PM2 for stability.
+   ```bash
+   cd backend
+   pm2 start src/server.js --name "time-tracker"
+   pm2 save
+   ```
 
-## Monitoring and Health
+3. **Reverse Proxy (Nginx/Apache)**:
+   Set up a reverse proxy to forward traffic from port 80/443 to `http://localhost:4000`.
 
-- Use `/health` for uptime checks and load balancer health.
-- Enable process monitoring via PM2, systemd or your orchestrator.
-- Aggregate logs and configure alerts on failures.
+---
 
-## Troubleshooting
+## 📂 Directory Structure
 
-- Login delays or freeze:
-  - Ensure `VITE_API_URL` points to the correct backend base.
-  - Verify backend is reachable and `/health` returns `{ ok: true }`.
-- `[sqlite] better-sqlite3 not available`:
-  - Install `better-sqlite3` in `backend` for production performance.
-- Mongo warnings:
-  - If `MONGO_URI` is unset, the server skips Mongo. This does not affect login.
+```
+├── backend/            # Express Server & API
+│   ├── src/            # Source code (models, routes, db)
+│   ├── uploads/        # Stored screenshots
+│   └── public/         # Public assets & downloads
+├── web/                # React Frontend
+│   ├── src/            # Components, Pages, Hooks
+│   └── dist/           # Compiled production assets
+├── desktop/            # Python Client Source
+└── data/               # SQLite Database & JSON fallbacks
+```
 
+## 🤝 Contributing
+
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes.
+4. Push to the branch.
+5. Open a Pull Request.
+
+---
+© 2026 Time Tracker System. All rights reserved.
