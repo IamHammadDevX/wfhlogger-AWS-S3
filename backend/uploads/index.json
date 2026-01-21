@@ -510,5 +510,47 @@
     "employeeId": "alex@spacex.com",
     "company_id": null,
     "ts": "2026-01-21T18:38:48.668Z"
+  },
+  {
+    "file": "uploads/2026-01-21T18-39-49-028Z-screenshot.jpg",
+    "employeeId": "alex@spacex.com",
+    "company_id": null,
+    "ts": "2026-01-21T18:39:49.031Z"
+  },
+  {
+    "file": "uploads/2026-01-21T18-40-49-313Z-screenshot.jpg",
+    "employeeId": "alex@spacex.com",
+    "company_id": null,
+    "ts": "2026-01-21T18:40:49.315Z"
+  },
+  {
+    "file": "uploads/2026-01-21T18-41-49-412Z-screenshot.jpg",
+    "employeeId": "alex@spacex.com",
+    "company_id": null,
+    "ts": "2026-01-21T18:41:49.415Z"
+  },
+  {
+    "file": "uploads/2026-01-21T18-42-49-689Z-screenshot.jpg",
+    "employeeId": "alex@spacex.com",
+    "company_id": null,
+    "ts": "2026-01-21T18:42:49.696Z"
+  },
+  {
+    "file": "uploads/2026-01-21T18-43-49-933Z-screenshot.jpg",
+    "employeeId": "alex@spacex.com",
+    "company_id": null,
+    "ts": "2026-01-21T18:43:49.934Z"
+  },
+  {
+    "file": "uploads/2026-01-21T18-44-50-250Z-screenshot.jpg",
+    "employeeId": "alex@spacex.com",
+    "company_id": null,
+    "ts": "2026-01-21T18:44:50.251Z"
+  },
+  {
+    "file": "uploads/2026-01-21T18-45-50-548Z-screenshot.jpg",
+    "employeeId": "alex@spacex.com",
+    "company_id": null,
+    "ts": "2026-01-21T18:45:50.550Z"
   }
 ]

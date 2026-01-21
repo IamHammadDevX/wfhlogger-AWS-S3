@@ -243,9 +243,57 @@ function requireRole(roles = []) {
 app.post('/api/org', requireRole(['manager', 'super_admin']), (req, res) => {
   const { name } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
-  const record = { name: name.trim(), createdAt: new Date().toISOString() };
-  fs.writeFileSync(orgFile, JSON.stringify(record, null, 2));
-  res.json({ ok: true, organization: record });
+  const role = req.user?.role;
+  const company_id = req.user?.company_id;
+
+  try {
+    if (role === 'super_admin') {
+      // Super Admin: Update Company Name in SQLite
+      if (db) {
+        db.prepare('UPDATE companies SET name = ? WHERE id = ?').run(name.trim(), company_id);
+      } else {
+        // Fallback JSON update
+        const comps = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json'), 'utf-8'));
+        const idx = comps.findIndex(c => c.id == company_id);
+        if (idx >= 0) {
+          comps[idx].name = name.trim();
+          fs.writeFileSync(path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json'), JSON.stringify(comps, null, 2));
+        }
+      }
+      return res.json({ ok: true, organization: { name: name.trim() } });
+    }
+
+    if (role === 'manager') {
+      // Manager: Update their Team (Organization) Name
+      // Find the org managed by this user
+      const mgrId = req.user?.uid;
+      let org = getOrganizationByManagerId(mgrId);
+      
+      if (!org) {
+        // Create if missing? Or error?
+        // Usually managers have an org created on assignment.
+        return res.status(404).json({ error: 'Organization not found for manager' });
+      }
+
+      // Ensure org belongs to company
+      if (org.company_id != company_id) return res.status(403).json({ error: 'Forbidden' });
+
+      if (db) {
+        db.prepare('UPDATE organizations SET name = ? WHERE id = ?').run(name.trim(), org.id);
+      } else {
+        const orgs = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), DATA_DIR, 'organizations.sqlite.json'), 'utf-8'));
+        const idx = orgs.findIndex(o => o.id == org.id);
+        if (idx >= 0) {
+          orgs[idx].name = name.trim();
+          fs.writeFileSync(path.resolve(process.cwd(), DATA_DIR, 'organizations.sqlite.json'), JSON.stringify(orgs, null, 2));
+        }
+      }
+      return res.json({ ok: true, organization: { name: name.trim() } });
+    }
+  } catch (e) {
+    console.error('[org:update] error:', e);
+    res.status(500).json({ error: 'Failed to update organization' });
+  }
 });
 
 app.get('/api/org', requireRole(['manager', 'super_admin']), (req, res) => {
@@ -428,7 +476,17 @@ app.get('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =>
       const teamUsers = users.filter(u => u.role === 'employee' && teamEmails.includes(u.email));
       return res.json({ users: teamUsers });
     }
-    res.json({ users });
+    // Super Admin: return ALL employees in company
+    // Currently, `users` contains all users in company. We should return all employees for stats?
+    // Or return managers too?
+    // Dashboard expects `filteredEmployees` which are usually just 'employees'.
+    // If we return all users, dashboard filters `role === 'employee'`? No, it trusts backend.
+    // Let's return all users in company so dashboard can filter or display.
+    // BUT frontend expects `users` array of employee objects.
+    
+    // Fix: Return all employees of the company for super_admin
+    const companyEmployees = users.filter(u => u.role === 'employee');
+    res.json({ users: companyEmployees });
   } catch {
     res.json({ users: [] });
   }
@@ -821,6 +879,8 @@ app.get('/api/uploads/list', requireRole(['manager', 'super_admin']), async (req
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
       items = items.filter(it => it.employeeId && teamEmails.includes(it.employeeId));
     }
+    // Super Admin: sees all company items (no extra filter needed)
+    
     res.json({ files: items });
   } catch (err) {
     console.error('[upload:list] error:', err);
@@ -846,6 +906,9 @@ app.get('/api/uploads/query', requireRole(['manager', 'super_admin']), async (re
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
       meta = meta.filter(m => m.employeeId && teamEmails.includes(m.employeeId));
     }
+    
+    // Super Admin: Sees ALL by default (already scoped to company above).
+    
     // Filter by employee
     if (employeeId) {
       meta = meta.filter(m => String(m.employeeId).toLowerCase() === String(employeeId).toLowerCase());
@@ -939,6 +1002,8 @@ app.get('/api/activity/recent', requireRole(['manager', 'super_admin']), (req, r
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
       entries = entries.filter(([employeeId]) => teamEmails.includes(employeeId));
     }
+    // Super Admin: sees all company employees (no extra filter needed)
+    
     const result = entries.map(([employeeId, records]) => {
       const sorted = records.sort((a, b) => (a.ts < b.ts ? 1 : -1));
       return {
