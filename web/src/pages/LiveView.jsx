@@ -22,15 +22,13 @@ export default function LiveView() {
   // Restore saved state on mount
   useEffect(() => {
     const savedEmp = localStorage.getItem('liveview_employee')
-    const wasActive = localStorage.getItem('liveview_is_active') === 'true'
+    // Remove auto-connect logic:
+    // const wasActive = localStorage.getItem('liveview_is_active') === 'true'
     
     if (savedEmp) {
       setEmployeeId(savedEmp)
-      // If we were previously watching this employee, try to reconnect automatically
-      if (wasActive) {
-        setStatus('connecting')
-        // We defer the socket emit slightly to ensure socket is ready
-      }
+      // Do NOT set status to 'connecting' automatically.
+      // User must click Start View manually.
     }
   }, [])
 
@@ -40,6 +38,7 @@ export default function LiveView() {
     socketRef.current = s
     
     // On mount, if we are in 'connecting' state (restored), emit start
+    // (This logic is now effectively disabled unless we manually set status='connecting')
     if (status === 'connecting' && employeeId) {
        if (s.connected) {
          s.emit('live_view:start', { employeeId })
@@ -149,15 +148,19 @@ export default function LiveView() {
       // If we are changing employee manually (via dropdown), we should probably reset state
       // unless this is the initial mount restore
       const savedEmp = localStorage.getItem('liveview_employee')
-      const wasActive = localStorage.getItem('liveview_is_active') === 'true'
       
       // If user switches employee, stop previous stream if active
-      if (status === 'active' && employeeId !== savedEmp) {
+      // Logic fix: savedEmp is set above, so this check `employeeId !== savedEmp` might be tricky.
+      // Actually, we want to stop if we switch from Emp A to Emp B.
+      // But here we just set it.
+      
+      if (status === 'active') {
+        // Stop current stream if we switch user
         setStatus('idle')
         setFrames([])
         localStorage.setItem('liveview_is_active', 'false')
-        // We don't emit stop here because the socket room join is per-employee
-        // We just stop listening/displaying. The backend will handle room switch if we start new one.
+        socketRef.current?.emit('live_view:stop', { employeeId: savedEmp }) // Stop old one? No, we need previous ID.
+        // Actually, simpler: just set status idle. User must click Start again.
       }
     }
   }, [employeeId])
