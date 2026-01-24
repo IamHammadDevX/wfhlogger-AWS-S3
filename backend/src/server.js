@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById } from './sqlite.js';
 import bcrypt from 'bcryptjs';
 
 dotenv.config();
@@ -302,7 +302,6 @@ app.get('/api/org', requireRole(['manager', 'super_admin']), (req, res) => {
     const role = req.user?.role;
 
     if (role === 'super_admin') {
-      const { getCompanyById } = require('./sqlite.js');
       const company = getCompanyById(company_id);
       if (company) return res.json({ organization: { name: company.name, createdAt: company.created_at } });
     }
@@ -328,14 +327,12 @@ app.get('/api/team', requireRole(['manager', 'super_admin']), (req, res) => {
     const company_id = req.user?.company_id;
     // For super_admin owner, we return the company info as the "team"
     if (req.user?.role === 'super_admin') {
-      const { getCompanyById } = require('./sqlite.js');
       const company = getCompanyById(company_id);
       if (company) {
         return res.json({ team: { id: company.id, name: company.name } });
       }
       // If company not found (should not happen), fallback to finding the default org
       // This ensures we display something instead of "Not configured"
-      const { getOrganizationByManagerId } = require('./sqlite.js');
       const org = getOrganizationByManagerId(req.user?.uid);
       if (org) {
         return res.json({ team: { id: org.id, name: org.name } });

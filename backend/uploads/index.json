@@ -744,5 +744,59 @@
     "employeeId": "alex@spacex.com",
     "company_id": null,
     "ts": "2026-01-24T10:50:53.938Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-14-21-843Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:14:21.893Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-15-21-783Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:15:21.788Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-16-22-062Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:16:22.070Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-17-22-307Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:17:22.314Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-18-22-593Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:18:22.619Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-19-22-882Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:19:22.887Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-20-23-158Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:20:23.161Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-24-23-416Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:24:23.439Z"
+  },
+  {
+    "file": "uploads/2026-01-24T11-28-23-797Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T11:28:23.829Z"
   }
 ]

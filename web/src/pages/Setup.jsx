@@ -27,7 +27,8 @@ export default function Setup() {
     setLoading(true)
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      await axios.post(`${API}/api/team`, { name: teamName }, { headers })
+      // Use /api/org to update organization/company details
+      await axios.post(`${API}/api/org`, { name: teamName }, { headers })
       setMsg('Team name updated!')
     } catch (e) {
       setMsg('Error saving team.')

@@ -5,6 +5,7 @@
 # Node dependencies
 node_modules/
 jspm_packages/
+uploads/
 
 # Package managers
 npm-debug.log*
