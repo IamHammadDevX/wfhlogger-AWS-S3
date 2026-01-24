@@ -1,7 +1,16 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { resolveApiBase } from '../api.js'
 
 export default function Home() {
+  const [apiBase, setApiBase] = useState('http://localhost:4000')
+
+  useEffect(() => {
+    resolveApiBase().then(setApiBase)
+  }, [])
+
+  const downloadUrl = `${apiBase}/downloads/TimeTrackerSetup.exe`
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col">
       <header className="px-6 py-6 flex items-center justify-between max-w-7xl mx-auto w-full">
@@ -36,9 +45,9 @@ export default function Home() {
             <Link to="/login" className="px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/25 hover:-translate-y-1">
               Start Tracking Now
             </Link>
-            <Link to="/downloads" className="px-8 py-4 bg-white text-slate-700 text-lg font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all hover:-translate-y-1">
+            <a href={downloadUrl} className="px-8 py-4 bg-white text-slate-700 text-lg font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all hover:-translate-y-1">
               Download Client
-            </Link>
+            </a>
           </div>
         </div>
 

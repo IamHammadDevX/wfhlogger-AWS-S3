@@ -332,11 +332,22 @@ class TimeTrackerApp:
 
         try:
             resp = requests.post(f'{self.backend_url}/api/auth/login', json={'email': email, 'password': password}, timeout=10)
+            
+            if resp.status_code == 401:
+                messagebox.showerror('Login Failed', 'Incorrect email or password.')
+                return
+            elif resp.status_code == 403:
+                messagebox.showerror('Login Failed', 'Access denied. Role mismatch.')
+                return
+                
             resp.raise_for_status()
             data = resp.json()
             self.token = data.get('token')
+        except requests.exceptions.ConnectionError:
+            messagebox.showerror('Connection Error', 'Could not connect to the server. Please check your internet connection or server URL.')
+            return
         except Exception as e:
-            messagebox.showerror('Login Failed', str(e))
+            messagebox.showerror('Login Failed', f'An error occurred: {str(e)}')
             return
 
         # Check Role

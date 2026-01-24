@@ -115,11 +115,12 @@ export function createCompany({ name }) {
 }
 
 export function getCompanyById(id) {
+  if (!id) return null
   if (db) {
     return db.prepare('SELECT * FROM companies WHERE id = ?').get(id)
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
-  return arr.find(c => c.id == id)
+  return arr.find(c => String(c.id) === String(id))
 }
 
 export function createUser({ email, password, role, company_id }) {

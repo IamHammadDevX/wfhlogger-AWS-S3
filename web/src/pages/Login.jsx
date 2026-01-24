@@ -19,8 +19,14 @@ export default function Login() {
       localStorage.setItem('token', resp.data.token)
       location.href = '/dashboard'
     } catch (err) {
-      const msg = err?.response?.data?.error || err.message || 'Network error'
-      setError(`Login failed: ${msg}. Please verify the backend is reachable.`)
+      if (err.response && err.response.status === 401) {
+        setError('Incorrect email or password. Please try again.')
+      } else if (err.response && err.response.status === 403) {
+        setError('Access denied. You do not have permission to login with this role.')
+      } else {
+        const msg = err?.response?.data?.error || err.message || 'Network error'
+        setError(`Login failed: ${msg}.`)
+      }
     } finally {
       setLoading(false)
     }
