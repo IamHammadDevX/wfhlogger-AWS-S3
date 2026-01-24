@@ -138,156 +138,156 @@ export default function Admin() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Admin Console</h1>
-        <p className="mt-1 text-slate-500">System-wide configuration and user management.</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Admin Console</h1>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">System-wide configuration and user management.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Create Manager */}
-        <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-xl font-bold text-slate-900 mb-4">Create Manager</h2>
+        <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Create Manager</h2>
           <form className="space-y-4" onSubmit={submit}>
-            {error && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">{error}</div>}
-            {msg && <div className="text-blue-700 text-sm bg-blue-50 p-3 rounded-lg">{msg}</div>}
+            {error && <div className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">{error}</div>}
+            {msg && <div className="text-blue-700 dark:text-blue-400 text-sm bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">{msg}</div>}
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Email</label>
-                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="manager@example.com" value={email} onChange={e=>setEmail(e.target.value)} />
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Email</label>
+                <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" placeholder="manager@example.com" value={email} onChange={e=>setEmail(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Password</label>
-                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" type="password" placeholder="Secret" value={password} onChange={e=>setPassword(e.target.value)} />
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Password</label>
+                <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" type="password" placeholder="Secret" value={password} onChange={e=>setPassword(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Team Name</label>
-                <input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" placeholder="Engineering" value={orgName} onChange={e=>setOrgName(e.target.value)} />
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Team Name</label>
+                <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" placeholder="Engineering" value={orgName} onChange={e=>setOrgName(e.target.value)} />
               </div>
             </div>
-            <button className="w-full px-4 py-2.5 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm" type="submit">Create Account</button>
+            <button className="w-full px-4 py-2.5 bg-slate-900 dark:bg-slate-700 text-white font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-600 transition-colors shadow-sm" type="submit">Create Account</button>
           </form>
         </section>
 
         {/* Storage Cleanup */}
-        <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Storage Cleanup</h2>
-          <p className="text-sm text-slate-500 mb-4">Delete old screenshots to free up space. This action cannot be undone.</p>
+        <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Storage Cleanup</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Delete old screenshots to free up space. This action cannot be undone.</p>
           
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">From Date</label>
-                <input type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={cleanupFrom} onChange={e=>setCleanupFrom(e.target.value)} />
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">From Date</label>
+                <input type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors" value={cleanupFrom} onChange={e=>setCleanupFrom(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">To Date</label>
-                <input type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" value={cleanupTo} onChange={e=>setCleanupTo(e.target.value)} />
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">To Date</label>
+                <input type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors" value={cleanupTo} onChange={e=>setCleanupTo(e.target.value)} />
               </div>
             </div>
             <button className="w-full px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm" onClick={cleanupScreenshots}>
               Delete Screenshots
             </button>
-            {cleanupErr && <div className="text-red-600 text-sm mt-2">{cleanupErr}</div>}
-            {cleanupMsg && <div className="text-green-700 text-sm mt-2">{cleanupMsg}</div>}
+            {cleanupErr && <div className="text-red-600 dark:text-red-400 text-sm mt-2">{cleanupErr}</div>}
+            {cleanupMsg && <div className="text-green-700 dark:text-green-400 text-sm mt-2">{cleanupMsg}</div>}
           </div>
         </section>
       </div>
 
       {/* Managers List */}
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="font-bold text-slate-900">Managers ({managers.length})</h3>
+      <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+          <h3 className="font-bold text-slate-900 dark:text-white">Managers ({managers.length})</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+            <thead className="bg-slate-50 dark:bg-slate-700/50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Manager</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Team</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Employees</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Manager</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Team</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Employees</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
+            <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
               {managers.map(m => (
-                <tr key={m.id} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{m.email}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{m.organization?.name || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{m.employeeCount}</td>
+                <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{m.email}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{m.organization?.name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{m.employeeCount}</td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-red-600 hover:text-red-800 text-sm font-medium" onClick={()=>removeManager(m.id)}>Remove</button>
+                    <button className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium" onClick={()=>removeManager(m.id)}>Remove</button>
                   </td>
                 </tr>
               ))}
-              {managers.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500">No managers found.</td></tr>}
+              {managers.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No managers found.</td></tr>}
             </tbody>
           </table>
         </div>
       </section>
 
       {/* Employees List */}
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="font-bold text-slate-900">All Employees ({employees.length})</h3>
+      <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+          <h3 className="font-bold text-slate-900 dark:text-white">All Employees ({employees.length})</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+            <thead className="bg-slate-50 dark:bg-slate-700/50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Manager ID</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Manager ID</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
+            <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
               {employees.map((u, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{u.email}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{u.name || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500 font-mono">{u.managerId || '-'}</td>
+                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{u.email}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{u.name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 font-mono">{u.managerId || '-'}</td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-red-600 hover:text-red-800 text-sm font-medium" onClick={()=>removeEmployee(u.email)}>Remove</button>
+                    <button className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium" onClick={()=>removeEmployee(u.email)}>Remove</button>
                   </td>
                 </tr>
               ))}
-              {employees.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500">No employees found.</td></tr>}
+              {employees.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No employees found.</td></tr>}
             </tbody>
           </table>
         </div>
       </section>
 
       {/* Audit Logs */}
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-900">Audit Logs</h3>
-          <button className="text-sm text-blue-600 hover:text-blue-800 font-medium" onClick={loadLogs}>Refresh</button>
+      <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900 dark:text-white">Audit Logs</h3>
+          <button className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium" onClick={loadLogs}>Refresh</button>
         </div>
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex gap-4">
-          <input className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Filter by Manager ID..." value={filterManagerId} onChange={e=>setFilterManagerId(e.target.value)} />
-          <input className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Filter by Employee Email..." value={filterEmployeeId} onChange={e=>setFilterEmployeeId(e.target.value)} />
+        <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 flex gap-4">
+          <input className="flex-1 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors" placeholder="Filter by Manager ID..." value={filterManagerId} onChange={e=>setFilterManagerId(e.target.value)} />
+          <input className="flex-1 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors" placeholder="Filter by Employee Email..." value={filterEmployeeId} onChange={e=>setFilterEmployeeId(e.target.value)} />
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+            <thead className="bg-slate-50 dark:bg-slate-700/50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Time</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actor</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Event</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Target</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Details</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Time</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actor</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Event</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Target</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Details</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
+            <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
               {logs.map((l, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{new Date(l.ts || l.time || Date.now()).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{l.details?.actorId || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700"><span className="px-2 py-1 rounded bg-slate-100 text-xs font-medium border border-slate-200">{l.type}</span></td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{l.details?.employeeId || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500 truncate max-w-xs" title={JSON.stringify(l.details)}>{l.details?.intervalMinutes ? `${l.details.intervalMinutes}m` : '-'}</td>
+                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{new Date(l.ts || l.time || Date.now()).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{l.details?.actorId || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300"><span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-xs font-medium border border-slate-200 dark:border-slate-600">{l.type}</span></td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{l.details?.employeeId || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 truncate max-w-xs" title={JSON.stringify(l.details)}>{l.details?.intervalMinutes ? `${l.details.intervalMinutes}m` : '-'}</td>
                 </tr>
               ))}
-              {logs.length === 0 && <tr><td colSpan="5" className="px-6 py-8 text-center text-sm text-slate-500">No logs found.</td></tr>}
+              {logs.length === 0 && <tr><td colSpan="5" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No logs found.</td></tr>}
             </tbody>
           </table>
         </div>

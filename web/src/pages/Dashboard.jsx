@@ -76,21 +76,21 @@ export default function Dashboard() {
   const filteredFiles = selectedManager ? recentFiles.filter(f => filteredEmployees.map(e=>e.email).includes(f.employeeId)) : recentFiles
 
   const Stat = ({label, value}) => (
-    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-      <div className="text-sm font-medium text-slate-500">{label}</div>
-      <div className="mt-2 text-3xl font-bold text-slate-900">{value}</div>
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
+      <div className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{value}</div>
     </div>
   )
 
   const Quick = ({to, title, desc, icon}) => (
-    <Link to={to} className="group flex flex-col p-6 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all">
+    <Link to={to} className="group flex flex-col p-6 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all">
       <div className="flex items-center gap-4 mb-4">
-        <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+        <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white dark:bg-blue-900/30 dark:text-blue-400 transition-colors">
           {icon}
         </span>
-        <div className="font-bold text-lg text-slate-900">{title}</div>
+        <div className="font-bold text-lg text-slate-900 dark:text-white">{title}</div>
       </div>
-      <div className="text-sm text-slate-600 leading-relaxed">{desc}</div>
+      <div className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{desc}</div>
     </Link>
   )
 
@@ -98,21 +98,21 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-slate-500">Overview of your team and recent activity.</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">Overview of your team and recent activity.</p>
         </div>
         {role === 'super_admin' && (
-          <Link to="/setup" className="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
+          <Link to="/setup" className="inline-flex items-center px-4 py-2 bg-slate-900 dark:bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-600 transition-colors shadow-sm">
             Configure Team
           </Link>
         )}
       </div>
 
       {managers.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm inline-block">
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Team Context</label>
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm inline-block">
+          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Team Context</label>
           <select 
-            className="block w-full md:w-64 rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500"
+            className="block w-full md:w-64 rounded-lg border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
             value={selectedManager} 
             onChange={e=>setSelectedManager(e.target.value)}
           >
@@ -134,7 +134,7 @@ export default function Dashboard() {
 
       {/* Quick actions */}
       <section>
-        <h2 className="text-xl font-bold text-slate-900 mb-4">Quick Actions</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Quick to="/live" title="Live View" desc="Monitor active employee screens in real-time." icon={<SvgLive/>} />
           <Quick to="/report" title="Reports" desc="Generate productivity reports and analyze work sessions." icon={<SvgCamera/>} />
@@ -145,21 +145,21 @@ export default function Dashboard() {
       </section>
 
       {/* Recent screenshots */}
-      <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="font-bold text-slate-900">Latest Screenshots</h2>
-          <Link to="/activity" className="text-sm font-medium text-blue-600 hover:text-blue-700">View All</Link>
+      <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+          <h2 className="font-bold text-slate-900 dark:text-white">Latest Screenshots</h2>
+          <Link to="/activity" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">View All</Link>
         </div>
         
         <div className="p-6">
           {recentFiles.length === 0 ? (
-            <div className="text-center py-12 text-slate-500">
+            <div className="text-center py-12 text-slate-500 dark:text-slate-400">
               No screenshots captured recently.
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {filteredFiles.map((f, i) => (
-                <div key={i} className="group relative aspect-video bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                <div key={i} className="group relative aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
                   <img 
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
                     src={`${API}/${f.file}`} 

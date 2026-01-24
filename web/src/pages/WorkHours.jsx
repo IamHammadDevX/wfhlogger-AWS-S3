@@ -85,15 +85,15 @@ export default function WorkHours() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Work Hours & Config</h1>
-        <p className="mt-1 text-slate-500">Manage tracking parameters and schedule settings.</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Work Hours & Config</h1>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">Manage tracking parameters and schedule settings.</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 max-w-2xl">
-        <h2 className="text-xl font-bold text-slate-900 mb-6">Capture Settings</h2>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 max-w-2xl">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Capture Settings</h2>
         
         {msg && (
-          <div className={`mb-6 p-4 rounded-lg text-sm flex items-center ${msg.startsWith('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+          <div className={`mb-6 p-4 rounded-lg text-sm flex items-center ${msg.startsWith('Error') ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
             <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {msg.startsWith('Error') ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -108,9 +108,9 @@ export default function WorkHours() {
         <form onSubmit={save} className="space-y-6">
           {/* Employee Selector */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Select Employee</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select Employee</label>
             <select
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white transition-colors"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors"
               value={selectedEmployee}
               onChange={e => setSelectedEmployee(e.target.value)}
               disabled={employees.length === 0}
@@ -124,10 +124,10 @@ export default function WorkHours() {
 
           {/* Interval Selector */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Screenshot Interval</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Screenshot Interval</label>
             <div className="flex items-center gap-4">
               <select
-                className="w-full md:w-48 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white transition-colors"
+                className="w-full md:w-48 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors"
                 value={intervalMinutes}
                 onChange={e => setIntervalMinutes(Number(e.target.value))}
               >
@@ -136,15 +136,15 @@ export default function WorkHours() {
                 ))}
               </select>
             </div>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
               How often the desktop client captures a screenshot for this employee.
             </p>
           </div>
 
-          <div className="pt-4 border-t border-slate-100">
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
             <button 
               disabled={loading || !selectedEmployee} 
-              className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-70"
+              className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors shadow-sm disabled:opacity-70"
             >
               {loading ? 'Saving...' : 'Update Configuration'}
             </button>

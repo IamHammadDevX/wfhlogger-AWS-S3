@@ -87,17 +87,17 @@ export default function Report() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Reports</h1>
-        <p className="mt-1 text-slate-500">Analyze work sessions and evidence.</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Reports</h1>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">Analyze work sessions and evidence.</p>
       </div>
 
       {/* Filters Card */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
         <div className="flex flex-col md:flex-row gap-4 items-end">
           <div className="w-full md:w-1/3">
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Employee</label>
+            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Employee</label>
             <select 
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors bg-white" 
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" 
               value={selectedEmployee} 
               onChange={e=>setSelectedEmployee(e.target.value)}
             >
@@ -109,20 +109,20 @@ export default function Report() {
           </div>
           
           <div className="w-full md:w-1/4">
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">From Date</label>
+            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">From Date</label>
             <input 
               type="date" 
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" 
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" 
               value={fromDate} 
               onChange={e=>setFromDate(e.target.value)} 
             />
           </div>
           
           <div className="w-full md:w-1/4">
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">To Date</label>
+            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">To Date</label>
             <input 
               type="date" 
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" 
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" 
               value={toDate} 
               onChange={e=>setToDate(e.target.value)} 
             />
@@ -131,7 +131,7 @@ export default function Report() {
           <button 
             onClick={search}
             disabled={loading}
-            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-70"
+            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors shadow-sm disabled:opacity-70"
           >
             {loading ? 'Searching...' : 'Generate Report'}
           </button>
@@ -141,23 +141,23 @@ export default function Report() {
       {/* Results */}
       <div className="space-y-8">
         {/* Sessions Table */}
-        <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-900">Work Sessions ({sessions.length})</h3>
+        <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+            <h3 className="font-bold text-slate-900 dark:text-white">Work Sessions ({sessions.length})</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
+            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+              <thead className="bg-slate-50 dark:bg-slate-700/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Start</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">End</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Duration</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">User</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Start</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">End</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Duration</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
+              <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                 {sessions.length === 0 ? (
-                  <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500">No sessions found for this criteria.</td></tr>
+                  <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No sessions found for this criteria.</td></tr>
                 ) : (
                   sessions.map((s, i) => {
                     // Fix: Backend uses startedAt/endedAt, NOT startTime/endTime
@@ -174,15 +174,15 @@ export default function Report() {
                       : 0
                     
                     return (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="px-6 py-4 text-sm font-medium text-slate-900">{s.employee || selectedEmployee}</td>
-                        <td className="px-6 py-4 text-sm text-slate-500">
+                      <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{s.employee || selectedEmployee}</td>
+                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
                           {st ? st.toLocaleString() : 'Unknown'}
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">
-                          {en ? en.toLocaleString() : <span className="text-green-600 font-medium">Active (Ongoing)</span>}
+                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                          {en ? en.toLocaleString() : <span className="text-green-600 dark:text-green-400 font-medium">Active (Ongoing)</span>}
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-500">
+                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
                           {st ? `${Math.floor(durMinutes/60)}h ${durMinutes%60}m` : '-'}
                         </td>
                       </tr>
@@ -195,14 +195,14 @@ export default function Report() {
         </section>
 
         {/* Screenshots Grid */}
-        <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h3 className="font-bold text-slate-900 mb-6">Screenshots ({files.length})</h3>
+        <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+          <h3 className="font-bold text-slate-900 dark:text-white mb-6">Screenshots ({files.length})</h3>
           {files.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">No screenshots found.</div>
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">No screenshots found.</div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {files.map((f, i) => (
-                <div key={i} className="group relative aspect-video bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                <div key={i} className="group relative aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
                   <a href={`${API}/${f.file}`} target="_blank" rel="noopener noreferrer">
                     <img 
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
