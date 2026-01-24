@@ -10,7 +10,8 @@ const dbPath = path.resolve(process.cwd(), DATA_DIR, 'time_tracker.db')
 const fallbacks = {
   users: path.resolve(process.cwd(), DATA_DIR, 'users.sqlite.json'),
   orgs: path.resolve(process.cwd(), DATA_DIR, 'organizations.sqlite.json'),
-  companies: path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json')
+  companies: path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json'),
+  transactions: path.resolve(process.cwd(), DATA_DIR, 'transactions.sqlite.json')
 }
 fs.mkdirSync(path.dirname(dbPath), { recursive: true })
 
@@ -46,6 +47,19 @@ try {
     manager_id INTEGER,
     created_at TEXT NOT NULL,
     FOREIGN KEY(manager_id) REFERENCES users(id),
+    FOREIGN KEY(company_id) REFERENCES companies(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER,
+    amount INTEGER NOT NULL,
+    credits INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('credit', 'debit')),
+    description TEXT,
+    reference_id TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT NOT NULL,
     FOREIGN KEY(company_id) REFERENCES companies(id)
   );
   `)
@@ -292,4 +306,43 @@ export function deleteOrganizationByManagerId(managerId) {
   const changed = next.length !== arr.length
   if (changed) fs.writeFileSync(fallbacks.orgs, JSON.stringify(next, null, 2))
   return changed
+}
+
+export function createTransaction({ company_id, amount, credits, type, description, reference_id, status }) {
+  const now = new Date().toISOString()
+  if (db) {
+    const stmt = db.prepare('INSERT INTO transactions (company_id, amount, credits, type, description, reference_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    const info = stmt.run(company_id, amount, credits, type, description || '', reference_id || '', status || 'success', now)
+    return { id: info.lastInsertRowid, company_id, amount, credits, type, description, reference_id, status, created_at: now }
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.transactions, 'utf-8'))
+  const id = (arr[arr.length - 1]?.id || 0) + 1
+  const record = { id, company_id, amount, credits, type, description, reference_id, status: status || 'success', created_at: now }
+  arr.push(record)
+  fs.writeFileSync(fallbacks.transactions, JSON.stringify(arr, null, 2))
+  return record
+}
+
+export function getTransactions(company_id) {
+  if (db) {
+    return db.prepare('SELECT * FROM transactions WHERE company_id = ? ORDER BY created_at DESC').all(company_id)
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.transactions, 'utf-8'))
+  return arr.filter(t => t.company_id == company_id).sort((a, b) => b.created_at.localeCompare(a.created_at))
+}
+
+export function updateCompanyCredits(company_id, delta) {
+  if (db) {
+    const stmt = db.prepare('UPDATE companies SET credits = credits + ? WHERE id = ?')
+    stmt.run(delta, company_id)
+    return db.prepare('SELECT credits FROM companies WHERE id = ?').get(company_id)?.credits || 0
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
+  const idx = arr.findIndex(c => c.id == company_id)
+  if (idx >= 0) {
+    arr[idx].credits = (arr[idx].credits || 0) + delta
+    fs.writeFileSync(fallbacks.companies, JSON.stringify(arr, null, 2))
+    return arr[idx].credits
+  }
+  return 0
 }

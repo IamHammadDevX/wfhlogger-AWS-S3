@@ -15,13 +15,26 @@ import Setup from './pages/Setup.jsx'
 import Downloads from './pages/Downloads.jsx'
 import Home from './pages/Home.jsx'
 import Admin from './pages/Admin.jsx'
+import Billing from './pages/Billing.jsx'
 import Layout from './components/Layout.jsx'
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, allowedRoles }) {
   const token = localStorage.getItem('token')
   if (!token) {
     return <Navigate to="/login" replace />
   }
+
+  if (allowedRoles) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+      if (!allowedRoles.includes(payload.role)) {
+        return <Navigate to="/dashboard" replace />
+      }
+    } catch (e) {
+      return <Navigate to="/login" replace />
+    }
+  }
+
   return <Layout>{children}</Layout>
 }
 
@@ -38,9 +51,10 @@ function AppRoutes() {
       <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
       <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
       <Route path="/work-hours" element={<ProtectedRoute><WorkHours /></ProtectedRoute>} />
-      <Route path="/setup" element={<ProtectedRoute><Setup /></ProtectedRoute>} />
+      <Route path="/setup" element={<ProtectedRoute allowedRoles={['manager', 'super_admin']}><Setup /></ProtectedRoute>} />
       <Route path="/downloads" element={<ProtectedRoute><Downloads /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['super_admin']}><Admin /></ProtectedRoute>} />
+      <Route path="/billing" element={<ProtectedRoute allowedRoles={['super_admin']}><Billing /></ProtectedRoute>} />
     </Routes>
   )
 }

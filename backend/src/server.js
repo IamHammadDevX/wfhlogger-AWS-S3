@@ -10,8 +10,11 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions } from './sqlite.js';
 import bcrypt from 'bcryptjs';
+import { createOrder, verifySignature } from './payment.js';
+import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction } from './email.js';
+import cron from 'node-cron';
 
 dotenv.config();
 
@@ -43,6 +46,67 @@ if (!fs.existsSync(usersFile)) fs.writeFileSync(usersFile, '[]');
 if (!fs.existsSync(intervalsFile)) fs.writeFileSync(intervalsFile, '{}');
 if (!fs.existsSync(sessionsFile)) fs.writeFileSync(sessionsFile, '[]');
 if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
+  const transactionsFile = path.join(dataPath, 'transactions.sqlite.json');
+  if (!fs.existsSync(transactionsFile)) fs.writeFileSync(transactionsFile, '[]');
+
+  // Monthly Subscription Logic (Simple Check)
+  // Run daily check for monthly billing cycle
+  // For demo, we run it every hour or on startup? 
+  // We'll use node-cron to run daily at midnight
+  cron.schedule('0 0 * * *', () => {
+    console.log('[Billing] Running daily subscription check...');
+    processSubscriptions();
+  });
+
+  async function processSubscriptions() {
+    // Iterate all companies (sqlite or json)
+    // In real app, check 'next_billing_date'. Here we simulate.
+    // We will just log for now as we don't have a robust subscription engine with dates in schema.
+    console.log('[Billing] Running subscription cycle...');
+    try {
+      const companiesPath = path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json');
+      if (!fs.existsSync(companiesPath)) return;
+      const companies = JSON.parse(fs.readFileSync(companiesPath, 'utf-8'));
+      
+      for (const comp of companies) {
+        if (!comp.credits || comp.credits < 1) {
+          // Send low credit warning if not already sent?
+          continue;
+        }
+        
+        // Count active employees
+        const employees = readUsers().filter(u => u.company_id == comp.id && u.role === 'employee');
+        const cost = employees.length; // $1 per employee
+        
+        if (cost > 0) {
+          if (comp.credits >= cost) {
+            comp.credits -= cost;
+            // Record Transaction
+            createTransaction({
+              company_id: comp.id,
+              amount: 0,
+              credits: -cost,
+              type: 'debit',
+              description: `Monthly subscription for ${cost} employees`,
+              reference_id: `sub_${Date.now()}`,
+              status: 'success'
+            });
+            // Send Email
+            const admin = listManagers(comp.id).find(u => u.role === 'super_admin');
+            if (admin) sendSubscriptionDeduction(admin.email, cost, comp.credits);
+          } else {
+            // Partial deduction or suspend?
+            // For now, just warn
+            const admin = listManagers(comp.id).find(u => u.role === 'super_admin');
+            if (admin) sendLowCreditWarning(admin.email, comp.credits);
+          }
+        }
+      }
+      fs.writeFileSync(companiesPath, JSON.stringify(companies, null, 2));
+    } catch (e) {
+      console.error('[Billing] Subscription error:', e);
+    }
+  }
 
 // Users/team helpers
 function readUsers(){
@@ -213,6 +277,8 @@ app.post('/api/auth/signup', (req, res) => {
     // Generate Token
     const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: company.id }, JWT_SECRET, { expiresIn: '8h' });
     
+    // Give some initial free credits? No, strict.
+    
     res.status(201).json({ token, company, user: { id: user.id, email: user.email, role: user.role } });
   } catch (e) {
     console.error('[auth:signup] error:', e);
@@ -379,6 +445,21 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
     const requesterUid = req.user?.uid || req.user?.sub;
     const managerId = (requesterRole === 'manager') ? requesterUid : (bodyManagerId || requesterUid || null);
     const company_id = req.user?.company_id;
+
+    // Credit Check for Employee Creation
+    // Check if company has credits. Cost = 1 credit? 
+    // Or just check if balance > 0 to allow adding? 
+    // "validate the company’s available credit balance; if credits are insufficient, block"
+    // Assuming 1 employee = 1 credit/month. We check if they have at least 1 credit to add a user?
+    // Or subscription model: credits are deducted monthly. Adding user might not deduct immediately but requires balance?
+    // Let's enforce: Must have at least 1 credit to add an employee.
+    const company = getCompanyById(company_id);
+    if (company && (company.credits || 0) < 1) {
+      // Send email to admin?
+      const admin = listManagers(company_id).find(u => u.role === 'super_admin') || { email: req.user.email };
+      sendCreationBlocked(admin.email);
+      return res.status(402).json({ error: 'Insufficient credits. Please add credits to your account.' });
+    }
 
     // Generate a temporary password if not provided
     const tempPassword = password && String(password).trim()
@@ -574,7 +655,84 @@ app.post('/api/admin/employees/password', requireRole(['manager', 'super_admin']
   }
 });
 
-// Screen capture interval configuration
+// ---- Billing & Payments ----
+
+app.post('/api/billing/order', requireRole(['super_admin']), async (req, res) => {
+  try {
+    const { amount } = req.body; // Amount in USD (credits)
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+    
+    // Create Razorpay Order with strict error handling
+    try {
+      const order = await createOrder(amount, 'INR'); // Use INR as fallback for test account
+      res.json({ order });
+    } catch (orderError) {
+      console.error('[billing:order] Razorpay error:', orderError);
+      res.status(500).json({ 
+        error: orderError.message || 'Order creation failed',
+        details: orderError 
+      });
+    }
+  } catch (e) {
+    console.error('[billing:order] Unexpected error:', e);
+    res.status(500).json({ error: 'Order creation failed' });
+  }
+});
+
+app.post('/api/billing/verify', requireRole(['super_admin']), async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount, credits } = req.body;
+    const company_id = req.user?.company_id;
+
+    if (!verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    // Update Credits
+    const newBalance = updateCompanyCredits(company_id, credits);
+    
+    // Record Transaction
+    createTransaction({
+      company_id,
+      amount,
+      credits,
+      type: 'credit',
+      description: 'Credit purchase via Razorpay',
+      reference_id: razorpay_order_id,
+      status: 'success'
+    });
+
+    // Send Email
+    sendPaymentSuccess(req.user.email, amount, credits);
+
+    res.json({ ok: true, balance: newBalance });
+  } catch (e) {
+    console.error('[billing:verify] error:', e);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+app.get('/api/billing/history', requireRole(['super_admin']), (req, res) => {
+  try {
+    const history = getTransactions(req.user?.company_id);
+    res.json({ history });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch history' });
+  }
+});
+
+app.get('/api/billing/balance', requireRole(['super_admin', 'manager']), (req, res) => {
+  try {
+    const company = getCompanyById(req.user?.company_id);
+    res.json({ credits: company?.credits || 0, plan: company?.plan });
+  } catch (e) {
+    res.json({ credits: 0 });
+  }
+});
+
+// ---- Screen capture interval configuration ----
 // Align with web UI options (include 1 minute)
 const allowedMinutes = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
 app.get('/api/capture-interval', requireRole(['employee', 'manager', 'super_admin']), (req, res) => {

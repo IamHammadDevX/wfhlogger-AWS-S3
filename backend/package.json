@@ -17,9 +17,11 @@
     "mongoose": "^7.6.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.12",
+    "razorpay": "^2.9.6",
     "socket.io": "^4.7.2"
-  }
-  ,
+  },
   "optionalDependencies": {
     "better-sqlite3": "^9.4.0"
   }
