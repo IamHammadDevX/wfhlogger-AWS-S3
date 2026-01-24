@@ -69,3 +69,9 @@ export function sendSubscriptionDeduction(to, deducted, remaining) {
   const text = `We have deducted ${deducted} credits for your active employees. Remaining balance: ${remaining}.`;
   return sendEmail(to, subject, text);
 }
+
+export function sendRequestStatus(to, status, date, reason) {
+  const subject = `Time Adjustment Request ${status === 'approved' ? 'Approved' : 'Rejected'}`;
+  const text = `Your request for manual time adjustment on ${date} has been ${status}.\n\nReason provided: ${reason}`;
+  return sendEmail(to, subject, text);
+}

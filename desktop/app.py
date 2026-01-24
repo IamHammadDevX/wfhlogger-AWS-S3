@@ -6,14 +6,15 @@ import threading
 import requests
 import socketio
 from urllib.parse import urlencode
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 try:
     import tkinter as tk
     from tkinter import ttk, messagebox
     from tkinter import font as tkfont
+    from tkcalendar import DateEntry
 except Exception:
-    raise RuntimeError('Tkinter is required to run the desktop client.')
+    raise RuntimeError('Tkinter and tkcalendar are required to run the desktop client.')
 
 try:
     import mss
@@ -239,6 +240,9 @@ class TimeTrackerApp:
         self.capture_status_var = tk.StringVar(value="Ready to start")
         ttk.Label(hero, textvariable=self.capture_status_var, style='Muted.TLabel', justify='center').pack(pady=15)
 
+        # Request Missed Time
+        ttk.Button(hero, text="Request Missed Time", style='Ghost.TButton', command=self.request_time).pack(pady=(0, 5))
+
         # 3. Footer Stats
         footer = ttk.Frame(self.current_frame, style='Surface.TFrame', padding=15)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
@@ -369,6 +373,105 @@ class TimeTrackerApp:
         # Auto-start live view - REMOVED for on-demand only
         # self.live_view_active = True
         # self._start_live_loop()
+
+    def request_time(self):
+        if not self.token:
+            messagebox.showerror('Error', 'Please login first')
+            return
+            
+        win = tk.Toplevel(self.root)
+        win.title("Request Missed Time")
+        win.geometry("400x520")
+        win.configure(bg=self.color_bg)
+        win.resizable(False, False)
+        
+        # Header
+        header = ttk.Frame(win, style='Surface.TFrame', padding=(20, 15))
+        header.pack(fill='x')
+        ttk.Label(header, text="Missed Time Request", style='Heading.TLabel', font=('Segoe UI', 14, 'bold')).pack(anchor='w')
+        ttk.Label(header, text="Submit a request for manual approval", style='Muted.TLabel').pack(anchor='w')
+        
+        # Body
+        body = ttk.Frame(win, padding=20)
+        body.pack(fill='both', expand=True)
+        
+        # Styles
+        style = ttk.Style()
+        style.configure('Form.TLabel', background=self.color_bg, font=('Segoe UI', 9, 'bold'), foreground=self.color_text)
+        
+        # Date Picker
+        ttk.Label(body, text="Date", style='Form.TLabel').pack(anchor='w', pady=(0, 5))
+        date_entry = DateEntry(body, width=12, background=self.color_primary, foreground='white', borderwidth=0, font=('Segoe UI', 10))
+        date_entry.pack(fill='x', pady=(0, 15), ipady=4)
+        
+        # Time Spinners
+        time_frame = ttk.Frame(body)
+        time_frame.pack(fill='x', pady=(0, 15))
+        
+        # Start Time
+        start_col = ttk.Frame(time_frame)
+        start_col.pack(side='left', fill='x', expand=True, padx=(0, 10))
+        ttk.Label(start_col, text="Start Time", style='Form.TLabel').pack(anchor='w', pady=(0, 5))
+        
+        s_spin = ttk.Frame(start_col, style='Surface.TFrame')
+        s_spin.pack(fill='x')
+        
+        start_h = tk.Spinbox(s_spin, from_=0, to=23, width=3, format="%02.0f", wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        start_h.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
+        ttk.Label(s_spin, text=":", background='white', font=('Segoe UI', 11, 'bold')).pack(side='left')
+        start_m = tk.Spinbox(s_spin, from_=0, to=59, width=3, format="%02.0f", wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        start_m.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
+
+        # End Time
+        end_col = ttk.Frame(time_frame)
+        end_col.pack(side='right', fill='x', expand=True)
+        ttk.Label(end_col, text="End Time", style='Form.TLabel').pack(anchor='w', pady=(0, 5))
+        
+        e_spin = ttk.Frame(end_col, style='Surface.TFrame')
+        e_spin.pack(fill='x')
+        
+        end_h = tk.Spinbox(e_spin, from_=0, to=23, width=3, format="%02.0f", wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        end_h.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
+        ttk.Label(e_spin, text=":", background='white', font=('Segoe UI', 11, 'bold')).pack(side='left')
+        end_m = tk.Spinbox(e_spin, from_=0, to=59, width=3, format="%02.0f", wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        end_m.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
+        
+        # Reason
+        ttk.Label(body, text="Reason", style='Form.TLabel').pack(anchor='w', pady=(0, 5))
+        reason_entry = tk.Text(body, height=4, font=('Segoe UI', 10), bd=0, relief='flat', bg='white', highlightthickness=1, highlightbackground=self.color_border)
+        reason_entry.pack(fill='x', pady=(0, 20), ipady=5)
+        
+        # Actions
+        def submit():
+            d = date_entry.get_date().strftime('%Y-%m-%d')
+            s = f"{int(start_h.get()):02d}:{int(start_m.get()):02d}"
+            e = f"{int(end_h.get()):02d}:{int(end_m.get()):02d}"
+            r = reason_entry.get("1.0", "end-1c")
+            
+            if not r.strip():
+                messagebox.showerror('Error', 'Reason is required')
+                return
+                
+            try:
+                headers = {'Authorization': f'Bearer {self.token}'}
+                resp = requests.post(f'{self.backend_url}/api/requests', json={
+                    'date': d,
+                    'start_time': s,
+                    'end_time': e,
+                    'reason': r
+                }, headers=headers)
+                if resp.status_code == 200:
+                    messagebox.showinfo('Success', 'Request submitted successfully')
+                    win.destroy()
+                else:
+                    messagebox.showerror('Error', resp.json().get('error', 'Failed'))
+            except Exception as ex:
+                messagebox.showerror('Error', str(ex))
+        
+        btn_frame = ttk.Frame(body)
+        btn_frame.pack(fill='x', side='bottom')
+        ttk.Button(btn_frame, text="Cancel", style='Ghost.TButton', command=win.destroy).pack(side='left', expand=True, fill='x', padx=(0, 5))
+        ttk.Button(btn_frame, text="Submit Request", style='Primary.TButton', command=submit).pack(side='right', expand=True, fill='x', padx=(5, 0))
 
     def logout(self):
         if self.tracking:

@@ -798,5 +798,17 @@
     "employeeId": "sam@openai.com",
     "company_id": 3,
     "ts": "2026-01-24T11:28:23.829Z"
+  },
+  {
+    "file": "uploads/2026-01-24T22-41-51-146Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T22:41:51.156Z"
+  },
+  {
+    "file": "uploads/2026-01-24T22-49-33-961Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-24T22:49:34.035Z"
   }
 ]

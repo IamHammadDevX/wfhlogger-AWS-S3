@@ -11,7 +11,8 @@ const fallbacks = {
   users: path.resolve(process.cwd(), DATA_DIR, 'users.sqlite.json'),
   orgs: path.resolve(process.cwd(), DATA_DIR, 'organizations.sqlite.json'),
   companies: path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json'),
-  transactions: path.resolve(process.cwd(), DATA_DIR, 'transactions.sqlite.json')
+  transactions: path.resolve(process.cwd(), DATA_DIR, 'transactions.sqlite.json'),
+  requests: path.resolve(process.cwd(), DATA_DIR, 'time_requests.sqlite.json')
 }
 fs.mkdirSync(path.dirname(dbPath), { recursive: true })
 
@@ -61,6 +62,22 @@ try {
     status TEXT DEFAULT 'pending',
     created_at TEXT NOT NULL,
     FOREIGN KEY(company_id) REFERENCES companies(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS time_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER,
+    employee_id INTEGER,
+    date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    reason TEXT,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
+    created_at TEXT NOT NULL,
+    action_by INTEGER,
+    action_at TEXT,
+    FOREIGN KEY(company_id) REFERENCES companies(id),
+    FOREIGN KEY(employee_id) REFERENCES users(id)
   );
   `)
   
@@ -345,4 +362,72 @@ export function updateCompanyCredits(company_id, delta) {
     return arr[idx].credits
   }
   return 0
+}
+
+// ---- Time Requests ----
+
+export function createTimeRequest(data) {
+  const { company_id, employee_id, date, start_time, end_time, reason } = data;
+  const now = new Date().toISOString();
+  if (db) {
+    const stmt = db.prepare('INSERT INTO time_requests (company_id, employee_id, date, start_time, end_time, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    const info = stmt.run(company_id, employee_id, date, start_time, end_time, reason, now);
+    return { id: info.lastInsertRowid, ...data, status: 'pending', created_at: now };
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.requests, 'utf-8'));
+  const id = (arr[arr.length - 1]?.id || 0) + 1;
+  const record = { id, ...data, status: 'pending', created_at: now };
+  arr.push(record);
+  fs.writeFileSync(fallbacks.requests, JSON.stringify(arr, null, 2));
+  return record;
+}
+
+export function getTimeRequests(company_id, employee_id = null) {
+  if (db) {
+    let sql = 'SELECT * FROM time_requests WHERE company_id = ?';
+    const params = [company_id];
+    if (employee_id) {
+      sql += ' AND employee_id = ?';
+      params.push(employee_id);
+    }
+    sql += ' ORDER BY created_at DESC';
+    return db.prepare(sql).all(...params);
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.requests, 'utf-8'));
+  return arr.filter(r => r.company_id == company_id && (!employee_id || r.employee_id == employee_id))
+            .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function updateTimeRequestStatus(id, status, action_by) {
+  const now = new Date().toISOString();
+  if (db) {
+    const stmt = db.prepare('UPDATE time_requests SET status = ?, action_by = ?, action_at = ? WHERE id = ?');
+    stmt.run(status, action_by, now, id);
+    return db.prepare('SELECT * FROM time_requests WHERE id = ?').get(id);
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.requests, 'utf-8'));
+  const idx = arr.findIndex(r => r.id == id);
+  if (idx >= 0) {
+    arr[idx].status = status;
+    arr[idx].action_by = action_by;
+    arr[idx].action_at = now;
+    fs.writeFileSync(fallbacks.requests, JSON.stringify(arr, null, 2));
+    return arr[idx];
+  }
+  return null;
+}
+
+export function getTimeRequestById(id) {
+  if (db) {
+    return db.prepare('SELECT * FROM time_requests WHERE id = ?').get(id);
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.requests, 'utf-8'));
+  return arr.find(r => r.id == id);
+}
+
+// Helper to get work sessions (currently reads from JSON directly in server.js but good to have here)
+// For now, we return null as the server.js logic for work sessions is file-based and complex
+export function getWorkSessions(userId, date) {
+  // Placeholder implementation to satisfy export
+  return [];
 }
