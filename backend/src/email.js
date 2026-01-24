@@ -5,16 +5,18 @@ import nodemailer from 'nodemailer';
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER || 'test@example.com',
-    pass: process.env.EMAIL_PASS || 'testpassword'
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
 });
 
 export async function sendEmail(to, subject, text, html) {
-  if (!process.env.EMAIL_USER) {
-    console.log('[Email] Mock send:', { to, subject, text });
+  // If no credentials, log and return
+  if (!process.env.EMAIL_USER || process.env.EMAIL_USER.includes('example.com')) {
+    console.log('[Email] Mock send (No credentials):', { to, subject });
     return true;
   }
+
   try {
     const info = await transporter.sendMail({
       from: process.env.EMAIL_FROM || '"Time Tracker" <noreply@timetracker.com>',
@@ -26,6 +28,19 @@ export async function sendEmail(to, subject, text, html) {
     console.log('[Email] Sent:', info.messageId);
     return true;
   } catch (error) {
+    // Graceful fallback for Auth errors (Common in Dev)
+    if (error.code === 'EAUTH' || error.responseCode === 535) {
+      console.warn('⚠️ [Email] Authentication Failed. Please check EMAIL_USER and EMAIL_PASS in .env');
+      console.warn('   For Gmail, ensure you are using an App Password, not your login password.');
+      console.log('   (Falling back to console log so the app flow continues)');
+      console.log('   -------------------------------------------------------');
+      console.log(`   To: ${to}`);
+      console.log(`   Subject: ${subject}`);
+      console.log(`   Body: ${text}`);
+      console.log('   -------------------------------------------------------');
+      return true; // Return success to not block the calling function
+    }
+    
     console.error('[Email] Error:', error);
     return false;
   }
