@@ -661,6 +661,30 @@ app.delete('/api/employees/:email', requireRole(['manager', 'super_admin']), (re
       liveStreamOn.set(email, false);
       io.to(viewersRoom(email)).emit('live_view:terminate', { by: email, reason: 'deleted' });
     } catch {}
+
+    // Cleanup screenshots/files and metadata for this employee for consistency
+    try {
+      let meta = [];
+      try { meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8')); } catch {}
+      const targets = meta.filter(m => String(m.employeeId).toLowerCase() === String(email).toLowerCase());
+      let removed = 0;
+      let bytesFreed = 0;
+      for (const m of targets) {
+        try {
+          const fname = path.basename(String(m.file || ''));
+          const abs = path.join(uploadPath, fname);
+          try { bytesFreed += fs.statSync(abs).size; } catch {}
+          if (fs.existsSync(abs)) fs.unlinkSync(abs);
+          removed += 1;
+        } catch {}
+      }
+      const keep = meta.filter(m => String(m.employeeId).toLowerCase() !== String(email).toLowerCase());
+      try { fs.writeFileSync(metaFile, JSON.stringify(keep, null, 2)); } catch {}
+      try { io.emit('uploads:cleanup_done', { removed, bytesFreed, employeeId: email }); } catch {}
+    } catch (cleanupErr) {
+      console.warn('[employees:delete] screenshot cleanup failed:', cleanupErr?.message || cleanupErr);
+    }
+
     res.json({ ok: true });
   } catch (e) {
     console.error('[employees:delete] error:', e);
