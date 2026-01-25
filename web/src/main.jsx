@@ -17,6 +17,10 @@ import Home from './pages/Home.jsx'
 import Admin from './pages/Admin.jsx'
 import Billing from './pages/Billing.jsx'
 import Requests from './pages/Requests.jsx'
+import Privacy from './pages/Privacy.jsx'
+import Terms from './pages/Terms.jsx'
+import Support from './pages/Support.jsx'
+import Docs from './pages/Docs.jsx'
 import Layout from './components/Layout.jsx'
 
 function ProtectedRoute({ children, allowedRoles }) {
@@ -45,6 +49,10 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/" element={<Home />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/support" element={<Support />} />
+      <Route path="/docs" element={<Docs />} />
       
       {/* Protected Routes wrapped in Layout */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

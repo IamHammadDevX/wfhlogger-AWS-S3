@@ -121,9 +121,9 @@ export default function Home() {
             © 2026 Time Tracker System. Built for enterprise.
           </div>
           <div className="flex gap-6 text-sm font-medium text-slate-600">
-            <a href="#" className="hover:text-slate-900">Privacy</a>
-            <a href="#" className="hover:text-slate-900">Terms</a>
-            <a href="#" className="hover:text-slate-900">Support</a>
+            <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">Privacy</Link>
+            <Link to="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">Terms</Link>
+            <Link to="/support" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">Support</Link>
           </div>
         </div>
       </footer>
