@@ -17,7 +17,16 @@ export default function Login() {
     try {
       const resp = await axios.post('/api/auth/login', { email, password, role })
       localStorage.setItem('token', resp.data.token)
-      location.href = '/dashboard'
+      try {
+        const payload = JSON.parse(atob(resp.data.token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+        if (payload.role === 'employee') {
+          location.href = '/employee/dashboard'
+        } else {
+          location.href = '/dashboard'
+        }
+      } catch {
+        location.href = '/dashboard'
+      }
     } catch (err) {
       if (err.response && err.response.status === 401) {
         setError('Incorrect email or password. Please try again.')
@@ -88,6 +97,7 @@ export default function Login() {
               >
                 <option value="super_admin">Super Admin</option>
                 <option value="manager">Manager</option>
+                <option value="employee">Employee</option>
               </select>
             </div>
           </div>

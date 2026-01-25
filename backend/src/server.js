@@ -232,6 +232,10 @@ app.use('/downloads', (req, res, next) => {
   next();
 });
 app.use('/downloads', express.static(publicDownloadsPath));
+// Serve generated personal reports
+const publicReportsPath = path.join(process.cwd(), 'public', 'reports');
+fs.mkdirSync(publicReportsPath, { recursive: true });
+app.use('/reports', express.static(publicReportsPath));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -275,6 +279,11 @@ app.post('/api/auth/login', (req, res) => {
     const ok = verifyPassword(user, password);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: user.company_id }, JWT_SECRET, { expiresIn: '8h' });
+    try {
+      if (user.role === 'employee') {
+        appendAudit('employee_web_login', { email, ip: req.ip, ua: req.headers['user-agent'] }, user.company_id);
+      }
+    } catch {}
     res.json({ token });
   } catch (e) {
     console.error('[auth:login] error:', e);
@@ -981,6 +990,217 @@ function writeSessions(arr){
   fs.writeFileSync(sessionsFile, JSON.stringify(arr, null, 2));
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+// ---- Employee Self-Service APIs ----
+// Personal dashboard summary
+app.get('/api/employee/dashboard-summary', requireRole(['employee']), (req, res) => {
+  try {
+    const email = req.user?.sub;
+    const company_id = req.user?.company_id;
+    const sessions = readSessions().filter(s => s.employeeId === email && s.company_id == company_id);
+    const approvedManual = getTimeRequests(company_id, req.user?.uid).filter(r => r.status === 'approved' && r.employee_id == req.user?.uid);
+    const userTimezone = (() => {
+      try {
+        const all = readUsers();
+        const u = all.find(x => x.email === email);
+        return u?.timezone || 'UTC';
+      } catch { return 'UTC'; }
+    })();
+
+    const now = new Date();
+    const dayStr = todayStr();
+    const weekStartMs = new Date(now.getTime() - 7*24*60*60*1000).getTime();
+    const monthStartMs = new Date(now.getTime() - 30*24*60*60*1000).getTime();
+
+    const calcSeconds = (arr) => arr.reduce((sum, s) => {
+      const startMs = new Date(s.startedAt).getTime();
+      const endMs = s.endedAt ? new Date(s.endedAt).getTime() : now.getTime();
+      const active = Math.max(0, Math.floor((endMs - startMs)/1000));
+      const idle = s.idleSeconds || 0;
+      return sum + Math.max(0, active - idle);
+    }, 0);
+
+    const daySeconds = calcSeconds(sessions.filter(s => s.date === dayStr));
+    const weekSeconds = calcSeconds(sessions.filter(s => new Date(s.startedAt).getTime() >= weekStartMs));
+    const monthSeconds = calcSeconds(sessions.filter(s => new Date(s.startedAt).getTime() >= monthStartMs));
+
+    const manualSeconds = approvedManual.reduce((sum, r) => {
+      try {
+        const start = new Date(`${r.date}T${r.start_time}`);
+        const end = new Date(`${r.date}T${r.end_time}`);
+        const dur = Math.max(0, Math.floor((end.getTime() - start.getTime())/1000));
+        return sum + dur;
+      } catch { return sum; }
+    }, 0);
+
+    const toHours = (secs) => Number((secs/3600).toFixed(1));
+    const daily_hours = toHours(daySeconds);
+    const weekly_hours = toHours(weekSeconds + manualSeconds);
+    const monthly_hours = toHours(monthSeconds + manualSeconds);
+
+    const recent_sessions = sessions.slice().sort((a,b)=> (a.startedAt < b.startedAt?1:-1)).slice(0,5).map(s => {
+      const startMs = new Date(s.startedAt).getTime();
+      const endMs = s.endedAt ? new Date(s.endedAt).getTime() : now.getTime();
+      const active = Math.max(0, Math.floor((endMs - startMs)/1000));
+      const idle = s.idleSeconds || 0;
+      const ratio = active ? (1 - Math.min(idle/active, 1)) : 0;
+      const status = ratio >= 0.8 ? 'productive' : ratio >= 0.6 ? 'neutral' : 'unproductive';
+      return { start_time: s.startedAt, end_time: s.endedAt, duration: active, idle_time: idle, productivity_status: status };
+    });
+
+    res.json({ daily_hours, weekly_hours, monthly_hours, productivity_score: Math.round(Math.min(100, Math.max(0, (daily_hours/8)*100))), recent_sessions, timezone: userTimezone });
+  } catch (e) {
+    console.error('[employee:summary] error:', e);
+    res.status(500).json({ error: 'Failed to load summary' });
+  }
+});
+
+// Activity timeline
+app.get('/api/employee/activity-timeline', requireRole(['employee']), (req, res) => {
+  try {
+    const email = req.user?.sub;
+    const company_id = req.user?.company_id;
+    const { start_date, end_date, type } = req.query || {};
+    const sessions = readSessions().filter(s => s.employeeId === email && s.company_id == company_id);
+    const startMs = start_date ? new Date(`${start_date}T00:00:00Z`).getTime() : null;
+    const endMs = end_date ? new Date(`${end_date}T23:59:59Z`).getTime() : null;
+    const inRange = sessions.filter(s => {
+      const t = new Date(s.startedAt).getTime();
+      if (startMs && t < startMs) return false;
+      if (endMs && t > endMs) return false;
+      return true;
+    });
+    let activities = inRange.map(s => {
+      const st = new Date(s.startedAt).getTime();
+      const en = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
+      const active = Math.max(0, Math.floor((en - st)/1000));
+      const idle = s.idleSeconds || 0;
+      const ratio = active ? (1 - Math.min(idle/active, 1)) : 0;
+      const status = ratio >= 0.8 ? 'productive' : ratio >= 0.6 ? 'neutral' : 'unproductive';
+      return { id: s.id, type: 'tracked_session', start_time: s.startedAt, end_time: s.endedAt, duration: active, idle_time: idle, productivity_status: status, applications: [], screenshots: 0, manual_entry: null };
+    });
+
+    const requests = getTimeRequests(company_id, req.user?.uid);
+    const manualAct = requests.map(r => ({
+      id: `manual_${r.id}`,
+      type: 'manual_entry',
+      start_time: `${r.date}T${r.start_time}`,
+      end_time: `${r.date}T${r.end_time}`,
+      duration: Math.max(0, Math.floor((new Date(`${r.date}T${r.end_time}`).getTime() - new Date(`${r.date}T${r.start_time}`).getTime())/1000)),
+      idle_time: 0,
+      productivity_status: r.status === 'approved' ? 'productive' : (r.status === 'rejected' ? 'unproductive' : 'neutral'),
+      manual_entry: { description: r.reason || '', status: r.status },
+      applications: [],
+      screenshots: 0
+    }));
+
+    activities = activities.concat(manualAct).sort((a,b)=> (a.start_time < b.start_time ? 1 : -1));
+    if (type && type !== 'all') activities = activities.filter(a => a.type === type);
+    res.json({ activities, timezone: 'UTC' });
+  } catch (e) {
+    console.error('[employee:activity] error:', e);
+    res.status(500).json({ error: 'Failed to load activity' });
+  }
+});
+
+// Profile read/update (timezone)
+app.get('/api/employee/profile', requireRole(['employee']), (req, res) => {
+  try {
+    const email = req.user?.sub;
+    const allUsers = readUsers();
+    const u = allUsers.find(x => x.email === email) || {};
+    const company = getCompanyById(req.user?.company_id);
+    res.json({ id: u?.id || req.user?.uid, email, role: 'employee', timezone: u?.timezone || 'UTC', company_name: company?.name || '' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+app.put('/api/employee/profile', requireRole(['employee']), (req, res) => {
+  try {
+    const email = req.user?.sub;
+    const { timezone } = req.body || {};
+    if (!timezone) return res.status(400).json({ error: 'timezone is required' });
+    // Update JSON users file inplace
+    const users = readUsers();
+    const idx = users.findIndex(u => u.email === email);
+    if (idx >= 0) {
+      users[idx].timezone = timezone;
+      writeUsers(users);
+    }
+    const company = getCompanyById(req.user?.company_id);
+    res.json({ id: users[idx]?.id || req.user?.uid, email, role: 'employee', timezone, company_name: company?.name || '' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Reports listing
+app.get('/api/employee/reports', requireRole(['employee']), (req, res) => {
+  try {
+    const email = req.user?.sub;
+    const idxFile = path.join(dataPath, 'reports.index.json');
+    let index = [];
+    try { index = JSON.parse(fs.readFileSync(idxFile, 'utf-8')); } catch { index = []; }
+    const mine = index.filter(r => r.email === email).sort((a,b)=> (a.created_at < b.created_at ? 1 : -1));
+    res.json({ reports: mine });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load reports' });
+  }
+});
+
+// Report generation (CSV)
+app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) => {
+  try {
+    const { report_type, start_date, end_date, format } = req.body || {};
+    const email = req.user?.sub;
+    const company_id = req.user?.company_id;
+    const sessions = readSessions().filter(s => s.employeeId === email && s.company_id == company_id);
+    const startMs = start_date ? new Date(`${start_date}T00:00:00Z`).getTime() : null;
+    const endMs = end_date ? new Date(`${end_date}T23:59:59Z`).getTime() : null;
+    const inRange = sessions.filter(s => {
+      const t = new Date(s.startedAt).getTime();
+      if (startMs && t < startMs) return false;
+      if (endMs && t > endMs) return false;
+      return true;
+    });
+
+    const rows = [['Start','End','DurationSeconds','IdleSeconds','NetActiveSeconds']];
+    for (const s of inRange) {
+      const st = new Date(s.startedAt).getTime();
+      const en = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
+      const active = Math.max(0, Math.floor((en - st)/1000));
+      const idle = s.idleSeconds || 0;
+      const net = Math.max(0, active - idle);
+      rows.push([s.startedAt, s.endedAt || '', String(active), String(idle), String(net)]);
+    }
+
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const fname = `employee_${email.replace(/[^a-zA-Z0-9]/g,'_')}_${Date.now()}.csv`;
+    fs.writeFileSync(path.join(publicReportsPath, fname), csv);
+    const file_size = fs.statSync(path.join(publicReportsPath, fname)).size;
+
+    const idxFile = path.join(dataPath, 'reports.index.json');
+    let index = [];
+    try { index = JSON.parse(fs.readFileSync(idxFile, 'utf-8')); } catch { index = []; }
+    const record = {
+      report_type: report_type || 'detailed_activity',
+      start_date: start_date || '',
+      end_date: end_date || '',
+      format: (format || 'csv'),
+      download_url: `${req.protocol}://${req.get('host')}/reports/${fname}`,
+      created_at: new Date().toISOString(),
+      file_size,
+      email
+    };
+    index.push(record);
+    fs.writeFileSync(idxFile, JSON.stringify(index, null, 2));
+    res.json(record);
+  } catch (e) {
+    console.error('[employee:generate_report] error:', e);
+    res.status(500).json({ error: 'Failed to generate report' });
+  }
+});
 
 // Employee starts a work session
 app.post('/api/work/start', requireRole(['employee']), (req, res) => {

@@ -22,6 +22,11 @@ import Terms from './pages/Terms.jsx'
 import Support from './pages/Support.jsx'
 import Docs from './pages/Docs.jsx'
 import Layout from './components/Layout.jsx'
+import EmployeeDashboard from './pages/employee/Dashboard.jsx'
+import EmployeeActivity from './pages/employee/Activity.jsx'
+import EmployeeReports from './pages/employee/Reports.jsx'
+import EmployeeProfile from './pages/employee/Profile.jsx'
+import EmployeeLayout from './components/EmployeeLayout.jsx'
 
 function ProtectedRoute({ children, allowedRoles }) {
   const token = localStorage.getItem('token')
@@ -29,15 +34,21 @@ function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/login" replace />
   }
 
-  if (allowedRoles) {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    
+    if (allowedRoles) {
       if (!allowedRoles.includes(payload.role)) {
         return <Navigate to="/dashboard" replace />
       }
-    } catch (e) {
-      return <Navigate to="/login" replace />
     }
+
+    // Use EmployeeLayout for employee role, regular Layout for others
+    if (payload.role === 'employee') {
+      return <EmployeeLayout>{children}</EmployeeLayout>
+    }
+  } catch (e) {
+    return <Navigate to="/login" replace />
   }
 
   return <Layout>{children}</Layout>
@@ -65,6 +76,12 @@ function AppRoutes() {
       <Route path="/downloads" element={<ProtectedRoute><Downloads /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['super_admin']}><Admin /></ProtectedRoute>} />
       <Route path="/billing" element={<ProtectedRoute allowedRoles={['super_admin']}><Billing /></ProtectedRoute>} />
+      
+      {/* Employee Routes */}
+      <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={['employee']}><EmployeeDashboard /></ProtectedRoute>} />
+      <Route path="/employee/activity" element={<ProtectedRoute allowedRoles={['employee']}><EmployeeActivity /></ProtectedRoute>} />
+      <Route path="/employee/reports" element={<ProtectedRoute allowedRoles={['employee']}><EmployeeReports /></ProtectedRoute>} />
+      <Route path="/employee/profile" element={<ProtectedRoute allowedRoles={['employee']}><EmployeeProfile /></ProtectedRoute>} />
     </Routes>
   )
 }

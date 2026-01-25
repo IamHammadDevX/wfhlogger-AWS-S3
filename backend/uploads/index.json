@@ -834,5 +834,29 @@
     "employeeId": "sam@openai.com",
     "company_id": 3,
     "ts": "2026-01-25T19:04:39.654Z"
+  },
+  {
+    "file": "uploads/2026-01-25T21-30-34-127Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-25T21:30:34.171Z"
+  },
+  {
+    "file": "uploads/2026-01-25T21-34-33-914Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-25T21:34:33.927Z"
+  },
+  {
+    "file": "uploads/2026-01-25T21-38-33-759Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-25T21:38:33.861Z"
+  },
+  {
+    "file": "uploads/2026-01-25T21-45-13-664Z-screenshot.jpg",
+    "employeeId": "sam@openai.com",
+    "company_id": 3,
+    "ts": "2026-01-25T21:45:13.708Z"
   }
 ]

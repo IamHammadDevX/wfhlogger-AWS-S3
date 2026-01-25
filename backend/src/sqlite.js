@@ -37,6 +37,7 @@ try {
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('super_admin','manager','employee')),
+    timezone TEXT DEFAULT 'UTC',
     created_at TEXT NOT NULL,
     FOREIGN KEY(company_id) REFERENCES companies(id)
   );
@@ -87,6 +88,10 @@ try {
     if (!tableInfo.find(c => c.name === 'company_id')) {
       db.exec("ALTER TABLE users ADD COLUMN company_id INTEGER REFERENCES companies(id)")
       console.log('[sqlite] Migrated users table: added company_id')
+    }
+    if (!tableInfo.find(c => c.name === 'timezone')) {
+      db.exec("ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'UTC'")
+      console.log('[sqlite] Migrated users table: added timezone')
     }
     const orgInfo = db.prepare("PRAGMA table_info(organizations)").all()
     if (!orgInfo.find(c => c.name === 'company_id')) {
@@ -158,16 +163,16 @@ export function createUser({ email, password, role, company_id }) {
   const hash = bcrypt.hashSync(password, 10)
   const now = new Date().toISOString()
   if (db) {
-    const stmt = db.prepare('INSERT INTO users (email, password_hash, role, created_at, company_id) VALUES (?, ?, ?, ?, ?)')
-    const info = stmt.run(email, hash, role, now, company_id || null)
-    return { id: info.lastInsertRowid, email, role, created_at: now, company_id: company_id || null }
+    const stmt = db.prepare('INSERT INTO users (email, password_hash, role, created_at, company_id, timezone) VALUES (?, ?, ?, ?, ?, ?)')
+    const info = stmt.run(email, hash, role, now, company_id || null, 'UTC')
+    return { id: info.lastInsertRowid, email, role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
   const id = (arr[arr.length - 1]?.id || 0) + 1
-  const record = { id, email, password_hash: hash, role, created_at: now, company_id: company_id || null }
+  const record = { id, email, password_hash: hash, role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
   arr.push(record)
   fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
-  return { id, email, role, created_at: now, company_id: company_id || null }
+  return { id, email, role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
 }
 
 export function verifyPassword(user, password) {
@@ -261,11 +266,11 @@ export function upsertEmployeePassword(email, password, company_id) {
       }
       const upd = db.prepare('UPDATE users SET password_hash = ? WHERE email = ?')
       upd.run(hash, email)
-      return { id: existing.id, email, company_id: existing.company_id }
+      return { id: existing.id, email, company_id: existing.company_id, timezone: existing.timezone || 'UTC' }
     }
-    const ins = db.prepare('INSERT INTO users (email, password_hash, role, created_at, company_id) VALUES (?, ?, ?, ?, ?)')
-    const info = ins.run(email, hash, 'employee', now, company_id || null)
-    return { id: info.lastInsertRowid, email, company_id: company_id || null }
+    const ins = db.prepare('INSERT INTO users (email, password_hash, role, created_at, company_id, timezone) VALUES (?, ?, ?, ?, ?, ?)')
+    const info = ins.run(email, hash, 'employee', now, company_id || null, 'UTC')
+    return { id: info.lastInsertRowid, email, company_id: company_id || null, timezone: 'UTC' }
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
   const idx = arr.findIndex(u => u.email === email)
@@ -276,13 +281,13 @@ export function upsertEmployeePassword(email, password, company_id) {
     }
     arr[idx].password_hash = hash
     fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
-    return { id: arr[idx].id, email, company_id: existing.company_id }
+    return { id: arr[idx].id, email, company_id: existing.company_id, timezone: existing.timezone || 'UTC' }
   }
   const id = (arr[arr.length - 1]?.id || 0) + 1
-  const record = { id, email, password_hash: hash, role: 'employee', created_at: now, company_id: company_id || null }
+  const record = { id, email, password_hash: hash, role: 'employee', created_at: now, company_id: company_id || null, timezone: 'UTC' }
   arr.push(record)
   fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
-  return { id, email, company_id: company_id || null }
+  return { id, email, company_id: company_id || null, timezone: 'UTC' }
 }
 
 // Delete helpers
@@ -396,6 +401,23 @@ export function getTimeRequests(company_id, employee_id = null) {
   const arr = JSON.parse(fs.readFileSync(fallbacks.requests, 'utf-8'));
   return arr.filter(r => r.company_id == company_id && (!employee_id || r.employee_id == employee_id))
             .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+export function updateUserTimezone(email, timezone) {
+  if (db) {
+    const stmt = db.prepare('UPDATE users SET timezone = ? WHERE email = ?')
+    stmt.run(timezone, email)
+    return db.prepare('SELECT id, email, role, company_id, timezone, created_at FROM users WHERE email = ?').get(email)
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
+  const idx = arr.findIndex(u => String(u.email).toLowerCase() === String(email).toLowerCase())
+  if (idx >= 0) {
+    arr[idx].timezone = timezone
+    fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
+    const u = arr[idx]
+    return { id: u.id, email: u.email, role: u.role, company_id: u.company_id, timezone: u.timezone, created_at: u.created_at }
+  }
+  return null
 }
 
 export function updateTimeRequestStatus(id, status, action_by) {
