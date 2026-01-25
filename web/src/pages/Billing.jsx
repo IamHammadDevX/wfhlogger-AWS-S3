@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
+import AddCreditsModal from '../components/AddCreditsModal'
 
 export default function Billing() {
   const [balance, setBalance] = useState(0)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
   const [apiBase, setApiBase] = useState('')
 
@@ -33,14 +36,12 @@ export default function Billing() {
     }
   }
 
-  const handleAddCredits = async () => {
-    const amount = prompt('Enter amount to add (₹1 = 1 Credit):', '10')
-    if (!amount || isNaN(amount) || amount <= 0) return
-
+  const handleAddCredits = async (amount) => {
+    setProcessing(true)
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
       // 1. Create Order
-      const orderReq = await axios.post(`${apiBase}/api/billing/order`, { amount: parseInt(amount) }, { headers })
+      const orderReq = await axios.post(`${apiBase}/api/billing/order`, { amount }, { headers })
       const { order } = orderReq.data
 
       // 2. Open Razorpay
@@ -58,13 +59,21 @@ export default function Billing() {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              amount: parseInt(amount),
-              credits: parseInt(amount) // 1:1 ratio
+              amount: amount,
+              credits: amount // 1:1 ratio
             }, { headers })
+            setModalOpen(false)
             alert('Payment Successful! Credits added.')
             fetchData(apiBase)
           } catch (e) {
             alert('Payment Verification Failed')
+          } finally {
+            setProcessing(false)
+          }
+        },
+        modal: {
+          ondismiss: function() {
+            setProcessing(false)
           }
         },
         prefill: {
@@ -80,6 +89,7 @@ export default function Billing() {
       rzp1.open()
     } catch (e) {
       alert('Failed to initiate payment')
+      setProcessing(false)
     }
   }
 
@@ -97,12 +107,19 @@ export default function Billing() {
           <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">₹1.00 / active employee / month</p>
         </div>
         <button 
-          onClick={handleAddCredits}
+          onClick={() => setModalOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-blue-500/30 transition-all"
         >
           Add Credits
         </button>
       </div>
+
+      <AddCreditsModal 
+        isOpen={modalOpen} 
+        onClose={() => !processing && setModalOpen(false)} 
+        onConfirm={handleAddCredits}
+        loading={processing}
+      />
 
       {/* Transaction History */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
