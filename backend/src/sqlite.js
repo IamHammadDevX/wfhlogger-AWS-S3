@@ -70,6 +70,29 @@ try {
     FOREIGN KEY(company_id) REFERENCES companies(id)
   );
 
+  CREATE TABLE IF NOT EXISTS invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL,
+    invoice_no INTEGER NOT NULL,
+    invoice_id TEXT NOT NULL,
+    company_name TEXT,
+    company_logo_url TEXT,
+    billing_email TEXT,
+    invoice_date TEXT NOT NULL,
+    billing_period TEXT,
+    line_items TEXT,
+    subtotal_amount INTEGER,
+    tax_amount INTEGER,
+    total_amount INTEGER,
+    currency TEXT,
+    payment_provider TEXT,
+    payment_reference_id TEXT,
+    payment_status TEXT,
+    pdf_path TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(id)
+  );
+
   CREATE TABLE IF NOT EXISTS time_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company_id INTEGER,
@@ -169,6 +192,52 @@ export function getCompanyById(id) {
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
   return arr.find(c => String(c.id) === String(id))
+}
+
+export function getNextInvoiceNo(company_id) {
+  if (db) {
+    const row = db.prepare('SELECT MAX(invoice_no) as max_no FROM invoices WHERE company_id = ?').get(company_id)
+    return (row?.max_no || 0) + 1
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.transactions, 'utf-8'))
+  return (arr.filter(t=>t.company_id==company_id).length || 0) + 1
+}
+
+export function createInvoice(record) {
+  const now = new Date().toISOString()
+  if (db) {
+    const stmt = db.prepare('INSERT INTO invoices (company_id, invoice_no, invoice_id, company_name, company_logo_url, billing_email, invoice_date, billing_period, line_items, subtotal_amount, tax_amount, total_amount, currency, payment_provider, payment_reference_id, payment_status, pdf_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    const info = stmt.run(record.company_id, record.invoice_no, record.invoice_id, record.company_name || '', record.company_logo_url || '', record.billing_email || '', record.invoice_date, record.billing_period || '', JSON.stringify(record.line_items || []), record.subtotal_amount || 0, record.tax_amount || 0, record.total_amount || 0, record.currency || 'USD', record.payment_provider || '', record.payment_reference_id || '', record.payment_status || 'paid', record.pdf_path || '', now)
+    return { id: info.lastInsertRowid, ...record, created_at: now }
+  }
+  const invFile = path.resolve(process.cwd(), DATA_DIR, 'invoices.sqlite.json')
+  if (!fs.existsSync(invFile)) fs.writeFileSync(invFile, '[]')
+  const arr = JSON.parse(fs.readFileSync(invFile, 'utf-8'))
+  const id = (arr[arr.length - 1]?.id || 0) + 1
+  const rec = { id, ...record, created_at: now }
+  arr.push(rec)
+  fs.writeFileSync(invFile, JSON.stringify(arr, null, 2))
+  return rec
+}
+
+export function listInvoices(company_id) {
+  if (db) {
+    return db.prepare('SELECT invoice_id, invoice_date, total_amount, payment_status FROM invoices WHERE company_id = ? ORDER BY created_at DESC').all(company_id)
+  }
+  const invFile = path.resolve(process.cwd(), DATA_DIR, 'invoices.sqlite.json')
+  if (!fs.existsSync(invFile)) return []
+  const arr = JSON.parse(fs.readFileSync(invFile, 'utf-8'))
+  return arr.filter(i => i.company_id == company_id).map(i => ({ invoice_id: i.invoice_id, invoice_date: i.invoice_date, total_amount: i.total_amount, payment_status: i.payment_status }))
+}
+
+export function getInvoiceByCompany(company_id, invoice_id) {
+  if (db) {
+    return db.prepare('SELECT * FROM invoices WHERE company_id = ? AND invoice_id = ? LIMIT 1').get(company_id, invoice_id)
+  }
+  const invFile = path.resolve(process.cwd(), DATA_DIR, 'invoices.sqlite.json')
+  if (!fs.existsSync(invFile)) return null
+  const arr = JSON.parse(fs.readFileSync(invFile, 'utf-8'))
+  return arr.find(i => i.company_id == company_id && i.invoice_id === invoice_id) || null
 }
 
 export function updateCompanyProfile(company_id, { name, logo_url, billing_email, admin_contact_email }) {

@@ -10,7 +10,8 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany } from './sqlite.js';
+import { generateInvoicePdf } from './invoices/pdf.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
@@ -528,6 +529,7 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
       });
       const admin = listManagers(company_id).find(u => u.role === 'super_admin');
       if (admin) sendSubscriptionDeduction(admin.email, 1, newBalance);
+      try { io.emit('company:credits_updated', { company_id, balance: newBalance }) } catch {}
     } catch (e) {
       console.warn('[employees:debit_on_create] failed:', e?.message || e);
     }
@@ -924,6 +926,35 @@ app.get('/api/billing/summary', requireRole(['super_admin']), (req, res) => {
   }
 });
 
+app.get('/api/billing/invoices', requireRole(['super_admin']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const list = listInvoices(company_id)
+    res.json({ invoices: list })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch invoices' })
+  }
+})
+
+app.get('/api/billing/invoices/:invoice_id/download', requireRole(['super_admin']), async (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const invoice_id = req.params.invoice_id
+    const inv = getInvoiceByCompany(company_id, invoice_id)
+    if (!inv) return res.status(404).json({ error: 'Invoice not found' })
+    let pdfPath = inv.pdf_path
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
+      pdfPath = await generateInvoicePdf(inv)
+    }
+    appendAudit('invoice_downloaded', { company_id, invoice_id }, company_id)
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${invoice_id}.pdf"`)
+    fs.createReadStream(pdfPath).pipe(res)
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to download invoice' })
+  }
+})
+
 // ---- Company Profile (Admin only) ----
 app.get('/api/company/profile', requireRole(['super_admin']), (req, res) => {
   try {
@@ -1022,9 +1053,38 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
           reference_id: ref
         });
         console.log('[stripe:webhook] credits added', { company_id, added: credits, balance: newBalance });
+        const company = getCompanyById(company_id)
+        const nextNo = getNextInvoiceNo(company_id)
+        const invId = `INV-${company_id}-${String(nextNo).padStart(5, '0')}`
+        const invoice = createInvoice({
+          company_id,
+          invoice_no: nextNo,
+          invoice_id: invId,
+          company_name: company?.name || '',
+          company_logo_url: company?.logo_url || '',
+          billing_email: company?.billing_email || '',
+          invoice_date: new Date().toISOString(),
+          billing_period: 'one-time credit purchase',
+          line_items: [{ description: `Credit Purchase – ${credits} Credits`, quantity: credits, unit_price: 1, subtotal: credits }],
+          subtotal_amount: credits,
+          tax_amount: 0,
+          total_amount: credits,
+          currency: 'USD',
+          payment_provider: 'Stripe',
+          payment_reference_id: ref,
+          payment_status: 'paid'
+        })
+        try {
+          const pdfPath = await generateInvoicePdf(invoice)
+          createInvoice({ ...invoice, pdf_path: pdfPath })
+          appendAudit('invoice_generated', { company_id, invoice_id: invId }, company_id)
+        } catch {}
         try {
           const admin = listManagers(company_id).find(u => u.role === 'super_admin');
           if (admin) sendPaymentSuccess(admin.email, credit_amount_usd, credits);
+        } catch {}
+        try {
+          io.emit('company:credits_updated', { company_id, balance: newBalance })
         } catch {}
       }
     }
