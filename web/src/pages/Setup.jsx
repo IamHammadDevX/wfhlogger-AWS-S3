@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
+import { useCredits } from '../CreditsContext.jsx'
 import { resolveApiBase } from '../api.js'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 export default function Setup() {
+  const { refreshCredits } = useCredits()
   const [teamName, setTeamName] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
@@ -48,6 +50,7 @@ export default function Setup() {
       const login = r.data?.login
       setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}`)
       setInviteEmail('')
+      try { refreshCredits() } catch {}
     } catch (e) {
       if (e?.response?.status === 402) {
         setInviteMsg('Insufficient credits. Please ask your Admin to add credits.')

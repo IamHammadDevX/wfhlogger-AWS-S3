@@ -514,6 +514,24 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
     users.push(record);
     writeUsers(users);
 
+    // Immediate debit: $1 (1 credit) for employee activation
+    try {
+      const newBalance = updateCompanyCredits(company_id, -1);
+      createTransaction({
+        company_id,
+        amount: 1,
+        credits: -1,
+        type: 'debit',
+        description: 'Employee creation initial month',
+        reference_id: `emp_${loginUser.id}`,
+        status: 'success'
+      });
+      const admin = listManagers(company_id).find(u => u.role === 'super_admin');
+      if (admin) sendSubscriptionDeduction(admin.email, 1, newBalance);
+    } catch (e) {
+      console.warn('[employees:debit_on_create] failed:', e?.message || e);
+    }
+
     res.status(201).json({
       user: record,
       login: { id: loginUser.id, email: loginUser.email, tempPassword }
