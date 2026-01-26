@@ -13,6 +13,7 @@ export default function Setup() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('employee')
   const [inviteMsg, setInviteMsg] = useState('')
+  const [credits, setCredits] = useState(0)
 
   useEffect(() => {
     resolveApiBase().then((BASE) => {
@@ -21,6 +22,9 @@ export default function Setup() {
       axios.get(`${BASE}/api/team`, { headers })
         .then(r => { if(r.data.team) setTeamName(r.data.team.name) })
         .catch(() => axios.get(`${BASE}/api/org`, { headers }).then(r => { if(r.data.organization) setTeamName(r.data.organization.name) }))
+      axios.get(`${BASE}/api/billing/balance`, { headers })
+        .then(r => setCredits(r.data?.credits || 0))
+        .catch(()=>{})
     })
   }, [])
 
@@ -50,7 +54,12 @@ export default function Setup() {
       const login = r.data?.login
       setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}`)
       setInviteEmail('')
-      try { refreshCredits() } catch {}
+      try { 
+        refreshCredits()
+        const BASE = await resolveApiBase()
+        const bal = await axios.get(`${BASE}/api/billing/balance`, { headers })
+        setCredits(bal.data?.credits || 0)
+      } catch {}
     } catch (e) {
       if (e?.response?.status === 402) {
         setInviteMsg('Insufficient credits. Please ask your Admin to add credits.')
@@ -93,7 +102,10 @@ export default function Setup() {
 
         {/* Add Employee (Direct) */}
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Add Employee</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Add Employee</h2>
+            <div className="text-sm text-slate-600 dark:text-slate-300">Available Credits: <span className="font-semibold">{credits}</span></div>
+          </div>
           {inviteMsg && <div className={`mb-4 p-3 text-sm rounded-lg ${inviteMsg.startsWith('Error') ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>{inviteMsg}</div>}
           <form onSubmit={invite} className="space-y-4">
             <div>

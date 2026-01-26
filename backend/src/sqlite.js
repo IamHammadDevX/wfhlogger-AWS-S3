@@ -240,6 +240,24 @@ export function getInvoiceByCompany(company_id, invoice_id) {
   return arr.find(i => i.company_id == company_id && i.invoice_id === invoice_id) || null
 }
 
+export function setInvoicePdfPath(company_id, invoice_id, pdf_path) {
+  if (db) {
+    const stmt = db.prepare('UPDATE invoices SET pdf_path = ? WHERE company_id = ? AND invoice_id = ?')
+    stmt.run(pdf_path || '', company_id, invoice_id)
+    return db.prepare('SELECT * FROM invoices WHERE company_id = ? AND invoice_id = ?').get(company_id, invoice_id)
+  }
+  const invFile = path.resolve(process.cwd(), DATA_DIR, 'invoices.sqlite.json')
+  if (!fs.existsSync(invFile)) return null
+  const arr = JSON.parse(fs.readFileSync(invFile, 'utf-8'))
+  const idx = arr.findIndex(i => i.company_id == company_id && i.invoice_id === invoice_id)
+  if (idx >= 0) {
+    arr[idx].pdf_path = pdf_path || ''
+    fs.writeFileSync(invFile, JSON.stringify(arr, null, 2))
+    return arr[idx]
+  }
+  return null
+}
+
 export function updateCompanyProfile(company_id, { name, logo_url, billing_email, admin_contact_email }) {
   const now = new Date().toISOString()
   if (db) {

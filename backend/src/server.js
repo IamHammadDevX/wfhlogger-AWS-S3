@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
@@ -945,6 +945,7 @@ app.get('/api/billing/invoices/:invoice_id/download', requireRole(['super_admin'
     let pdfPath = inv.pdf_path
     if (!pdfPath || !fs.existsSync(pdfPath)) {
       pdfPath = await generateInvoicePdf(inv)
+      setInvoicePdfPath(company_id, invoice_id, pdfPath)
     }
     appendAudit('invoice_downloaded', { company_id, invoice_id }, company_id)
     res.setHeader('Content-Type', 'application/pdf')
@@ -1076,9 +1077,11 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         })
         try {
           const pdfPath = await generateInvoicePdf(invoice)
-          createInvoice({ ...invoice, pdf_path: pdfPath })
+          setInvoicePdfPath(company_id, invId, pdfPath)
           appendAudit('invoice_generated', { company_id, invoice_id: invId }, company_id)
-        } catch {}
+        } catch (e) {
+          console.warn('[invoice] pdf generate failed:', e?.message || e)
+        }
         try {
           const admin = listManagers(company_id).find(u => u.role === 'super_admin');
           if (admin) sendPaymentSuccess(admin.email, credit_amount_usd, credits);
