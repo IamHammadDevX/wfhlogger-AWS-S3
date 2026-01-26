@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile } from './sqlite.js';
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
@@ -923,6 +923,62 @@ app.get('/api/billing/summary', requireRole(['super_admin']), (req, res) => {
     res.status(500).json({ error: 'Failed to fetch summary' });
   }
 });
+
+// ---- Company Profile (Admin only) ----
+app.get('/api/company/profile', requireRole(['super_admin']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const c = getCompanyById(company_id)
+    if (!c) return res.status(404).json({ error: 'Company not found' })
+    res.json({
+      id: c.id,
+      name: c.name,
+      logo_url: c.logo_url || '',
+      billing_email: c.billing_email || '',
+      billing_address: c.billing_address || '',
+      subscription_plan: c.plan || 'free',
+      credit_balance: c.credits || 0,
+      admin_contact_email: c.admin_contact_email || '',
+      created_at: c.created_at,
+      updated_at: c.updated_at || c.created_at
+    })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load company profile' })
+  }
+})
+
+// Accept multipart for logo; and JSON fields for name/emails
+const logoUpload = upload.single('logo')
+app.put('/api/company/profile', requireRole(['super_admin']), (req, res, next) => logoUpload(req, res, next), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const { name, billing_email, admin_contact_email } = req.body || {}
+    let logo_url = null
+    if (req.file) {
+      const mime = req.file.mimetype || ''
+      const ok = ['image/png','image/jpeg','image/webp'].includes(mime)
+      if (!ok) return res.status(400).json({ error: 'Invalid logo file type' })
+      logo_url = `/uploads/${req.file.filename}`
+    }
+    const updated = updateCompanyProfile(company_id, { name, logo_url, billing_email, admin_contact_email })
+    appendAudit('company_profile_updated', { actorId: req.user?.uid || req.user?.sub, company_id, changes: { name, billing_email, admin_contact_email, logo: !!logo_url } }, company_id)
+    res.json({ ok: true, company: updated })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update company profile' })
+  }
+})
+
+// Company brand (name/logo) for all roles, scoped by company_id
+app.get('/api/company/brand', requireRole(['super_admin','manager','employee']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const c = getCompanyById(company_id)
+    if (!c) return res.status(404).json({ error: 'Company not found' })
+    res.json({ name: c.name, logo_url: c.logo_url || '' })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load brand' })
+  }
+})
 // Stripe: Create Checkout Session
 app.post('/api/billing/stripe/checkout-session', requireRole(['super_admin']), async (req, res) => {
   try {

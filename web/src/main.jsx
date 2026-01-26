@@ -17,6 +17,7 @@ import Downloads from './pages/Downloads.jsx'
 import Home from './pages/Home.jsx'
 import Admin from './pages/Admin.jsx'
 import Billing from './pages/Billing.jsx'
+import CompanyProfile from './pages/CompanyProfile.jsx'
 import Requests from './pages/Requests.jsx'
 import Privacy from './pages/Privacy.jsx'
 import Terms from './pages/Terms.jsx'
@@ -77,6 +78,7 @@ function AppRoutes() {
       <Route path="/downloads" element={<ProtectedRoute><Downloads /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['super_admin']}><Admin /></ProtectedRoute>} />
       <Route path="/billing" element={<ProtectedRoute allowedRoles={['super_admin']}><Billing /></ProtectedRoute>} />
+      <Route path="/company" element={<ProtectedRoute allowedRoles={['super_admin']}><CompanyProfile /></ProtectedRoute>} />
       
       {/* Employee Routes */}
       <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={['employee']}><EmployeeDashboard /></ProtectedRoute>} />

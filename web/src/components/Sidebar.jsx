@@ -71,14 +71,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-700">
-            <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white tracking-tight">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span>TimeTracker</span>
-            </div>
+            <BrandHeader />
           </div>
 
           {/* Navigation */}
@@ -101,6 +94,9 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               System
             </div>
             <NavItem to="/setup" icon={Icons.Setup} label={role === 'super_admin' ? 'Company' : 'Organization'} />
+            {role === 'super_admin' && (
+              <NavItem to="/company" icon={Icons.Admin} label="Company Profile" />
+            )}
             {role === 'super_admin' && (
               <NavItem to="/billing" icon={Icons.Billing} label="Billing" />
             )}
@@ -133,5 +129,35 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         </div>
       </aside>
     </>
+  )
+}
+
+function BrandHeader(){
+  const [brand, setBrand] = React.useState({ name: 'TimeTracker', logo_url: '' })
+  React.useEffect(() => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      import('../api.js').then(({ resolveApiBase }) => resolveApiBase().then(base => {
+        const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        fetch(`${base}/api/company/brand`, { headers }).then(r=>r.json()).then(d=>{
+          if (d?.name) setBrand({ name: d.name, logo_url: d.logo_url || '' })
+        }).catch(()=>{})
+      }))
+    } catch {}
+  }, [])
+  return (
+    <div className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-white tracking-tight">
+      {brand.logo_url ? (
+        <img src={brand.logo_url} alt="Logo" className="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
+      ) : (
+        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+      )}
+      <span>{brand.name}</span>
+    </div>
   )
 }

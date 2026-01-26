@@ -28,6 +28,11 @@ try {
     name TEXT NOT NULL,
     plan TEXT DEFAULT 'free',
     credits INTEGER DEFAULT 0,
+    logo_url TEXT,
+    billing_email TEXT,
+    billing_address TEXT,
+    admin_contact_email TEXT,
+    updated_at TEXT,
     created_at TEXT NOT NULL
   );
 
@@ -98,6 +103,13 @@ try {
       db.exec("ALTER TABLE organizations ADD COLUMN company_id INTEGER REFERENCES companies(id)")
       console.log('[sqlite] Migrated organizations table: added company_id')
     }
+    const compInfo = db.prepare("PRAGMA table_info(companies)").all()
+    const ensureCol = (name, sql) => { if (!compInfo.find(c => c.name === name)) { db.exec(sql); console.log('[sqlite] Migrated companies: added', name) } }
+    ensureCol('logo_url', "ALTER TABLE companies ADD COLUMN logo_url TEXT")
+    ensureCol('billing_email', "ALTER TABLE companies ADD COLUMN billing_email TEXT")
+    ensureCol('billing_address', "ALTER TABLE companies ADD COLUMN billing_address TEXT")
+    ensureCol('admin_contact_email', "ALTER TABLE companies ADD COLUMN admin_contact_email TEXT")
+    ensureCol('updated_at', "ALTER TABLE companies ADD COLUMN updated_at TEXT")
   } catch (e) {
     console.error('[sqlite] Migration check failed:', e)
   }
@@ -138,13 +150,13 @@ export function getUserByEmail(email) {
 export function createCompany({ name }) {
   const now = new Date().toISOString()
   if (db) {
-    const stmt = db.prepare('INSERT INTO companies (name, created_at, plan, credits) VALUES (?, ?, ?, ?)')
-    const info = stmt.run(name, now, 'free', 0)
-    return { id: info.lastInsertRowid, name, created_at: now, plan: 'free', credits: 0 }
+    const stmt = db.prepare('INSERT INTO companies (name, created_at, plan, credits, updated_at) VALUES (?, ?, ?, ?, ?)')
+    const info = stmt.run(name, now, 'free', 0, now)
+    return { id: info.lastInsertRowid, name, created_at: now, plan: 'free', credits: 0, updated_at: now }
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
   const id = (arr[arr.length - 1]?.id || 0) + 1
-  const record = { id, name, created_at: now, plan: 'free', credits: 0 }
+  const record = { id, name, created_at: now, plan: 'free', credits: 0, updated_at: now }
   arr.push(record)
   fs.writeFileSync(fallbacks.companies, JSON.stringify(arr, null, 2))
   return record
@@ -157,6 +169,27 @@ export function getCompanyById(id) {
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
   return arr.find(c => String(c.id) === String(id))
+}
+
+export function updateCompanyProfile(company_id, { name, logo_url, billing_email, admin_contact_email }) {
+  const now = new Date().toISOString()
+  if (db) {
+    const stmt = db.prepare('UPDATE companies SET name = COALESCE(?, name), logo_url = COALESCE(?, logo_url), billing_email = COALESCE(?, billing_email), admin_contact_email = COALESCE(?, admin_contact_email), updated_at = ? WHERE id = ?')
+    stmt.run(name || null, logo_url || null, billing_email || null, admin_contact_email || null, now, company_id)
+    return db.prepare('SELECT * FROM companies WHERE id = ?').get(company_id)
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
+  const idx = arr.findIndex(c => c.id == company_id)
+  if (idx >= 0) {
+    if (name) arr[idx].name = name
+    if (logo_url) arr[idx].logo_url = logo_url
+    if (billing_email) arr[idx].billing_email = billing_email
+    if (admin_contact_email) arr[idx].admin_contact_email = admin_contact_email
+    arr[idx].updated_at = now
+    fs.writeFileSync(fallbacks.companies, JSON.stringify(arr, null, 2))
+    return arr[idx]
+  }
+  return null
 }
 
 export function createUser({ email, password, role, company_id }) {
@@ -377,8 +410,8 @@ export function creditCompanyWithTransaction({ company_id, amount_usd, credits, 
   const now = new Date().toISOString()
   if (db) {
     const tx = db.transaction(() => {
-      const upd = db.prepare('UPDATE companies SET credits = credits + ? WHERE id = ?')
-      upd.run(credits, company_id)
+      const upd = db.prepare('UPDATE companies SET credits = credits + ?, plan = CASE WHEN ? > 0 THEN "pro" ELSE plan END, updated_at = ? WHERE id = ?')
+      upd.run(credits, credits, now, company_id)
       const ins = db.prepare('INSERT INTO transactions (company_id, amount, credits, type, description, reference_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       ins.run(company_id, amount_usd, credits, 'credit', description || '', reference_id || '', 'success', now)
       const row = db.prepare('SELECT credits FROM companies WHERE id = ?').get(company_id)
@@ -391,6 +424,8 @@ export function creditCompanyWithTransaction({ company_id, amount_usd, credits, 
   const cidx = companies.findIndex(c => c.id == company_id)
   if (cidx >= 0) {
     companies[cidx].credits = (companies[cidx].credits || 0) + credits
+    if (credits > 0) companies[cidx].plan = 'pro'
+    companies[cidx].updated_at = now
     fs.writeFileSync(fallbacks.companies, JSON.stringify(companies, null, 2))
   }
   const txs = JSON.parse(fs.readFileSync(fallbacks.transactions, 'utf-8'))
