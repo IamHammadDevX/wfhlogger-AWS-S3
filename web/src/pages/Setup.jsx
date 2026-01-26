@@ -13,6 +13,7 @@ export default function Setup() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('employee')
   const [inviteMsg, setInviteMsg] = useState('')
+  const [creds, setCreds] = useState([])
   const [credits, setCredits] = useState(0)
 
   useEffect(() => {
@@ -24,6 +25,9 @@ export default function Setup() {
         .catch(() => axios.get(`${BASE}/api/org`, { headers }).then(r => { if(r.data.organization) setTeamName(r.data.organization.name) }))
       axios.get(`${BASE}/api/billing/balance`, { headers })
         .then(r => setCredits(r.data?.credits || 0))
+        .catch(()=>{})
+      axios.get(`${BASE}/api/employees/initial-creds`, { headers })
+        .then(r => setCreds(r.data?.creds || []))
         .catch(()=>{})
     })
   }, [])
@@ -59,6 +63,8 @@ export default function Setup() {
         const BASE = await resolveApiBase()
         const bal = await axios.get(`${BASE}/api/billing/balance`, { headers })
         setCredits(bal.data?.credits || 0)
+        const cr = await axios.get(`${BASE}/api/employees/initial-creds`, { headers })
+        setCreds(cr.data?.creds || [])
       } catch {}
     } catch (e) {
       if (e?.response?.status === 402) {
@@ -128,6 +134,37 @@ export default function Setup() {
               A temporary password will be generated automatically.
             </p>
           </form>
+        </div>
+
+        {/* Initial Credentials */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Employee Initial Credentials</h2>
+            <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Visible to Managers</span>
+          </div>
+          <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
+              <tr>
+                <th className="px-4 py-2">Email</th>
+                <th className="px-4 py-2">Initial Password</th>
+                <th className="px-4 py-2">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {creds.length === 0 ? (
+                <tr><td colSpan="3" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No initial credentials yet</td></tr>
+              ) : (
+                creds.map(c => (
+                  <tr key={`${c.employee_email}-${c.created_at}`} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <td className="px-4 py-2">{c.employee_email}</td>
+                    <td className="px-4 py-2 font-mono">{c.temp_password}</td>
+                    <td className="px-4 py-2">{new Date(c.created_at).toLocaleString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Use these passwords only for first login; advise employees to change their password after login.</p>
         </div>
       </div>
     </div>

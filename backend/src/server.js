@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
@@ -515,6 +515,8 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
     users.push(record);
     writeUsers(users);
 
+    try { recordEmployeeTempPassword(company_id, loginUser.email, tempPassword) } catch {}
+
     // Immediate debit: $1 (1 credit) for employee activation
     try {
       const newBalance = updateCompanyCredits(company_id, -1);
@@ -562,6 +564,17 @@ app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
     res.status(500).json({ error: 'Failed to create manager' });
   }
 });
+
+// Manager/Admin: List employee initial credentials (tenant-scoped)
+app.get('/api/employees/initial-creds', requireRole(['manager','super_admin']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const rows = listEmployeeTempPasswords(company_id)
+    res.json({ creds: rows })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load credentials' })
+  }
+})
 
 // ---- Super Admin: Managers list with employee counts ----
 app.get('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
@@ -1216,6 +1229,22 @@ app.post('/api/capture-interval', requireRole(['manager', 'super_admin']), (req,
     res.status(500).json({ error: 'Failed to save interval' });
   }
 });
+
+app.get('/api/capture-intervals', requireRole(['manager','super_admin']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const intervals = JSON.parse(fs.readFileSync(intervalsFile, 'utf-8'))
+    const allUsers = readUsers().filter(u => u.company_id == company_id && u.role === 'employee')
+    let list = allUsers.map(u => ({ email: u.email, name: u.name || '', intervalSeconds: intervals[u.email] || null }))
+    if (req.user?.role === 'manager') {
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id)
+      list = list.filter(r => teamEmails.includes(r.email))
+    }
+    res.json({ intervals: list })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load intervals' })
+  }
+})
 
 // ---- Work Hours Tracking ----
 function readSessions(){

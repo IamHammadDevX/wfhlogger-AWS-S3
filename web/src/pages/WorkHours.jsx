@@ -13,6 +13,7 @@ export default function WorkHours() {
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [role, setRole] = useState('')
+  const [rows, setRows] = useState([])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -33,6 +34,9 @@ export default function WorkHours() {
           setEmployees(list)
           if (list.length > 0) setSelectedEmployee(list[0].email)
         })
+        .catch(()=>{})
+      axios.get(`${BASE}/api/capture-intervals`, { headers })
+        .then(r => setRows(r.data?.intervals || []))
         .catch(()=>{})
     })
   }, [])
@@ -79,6 +83,18 @@ export default function WorkHours() {
       setMsg('Error saving configuration: ' + (e.response?.data?.error || e.message))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const updateRowInterval = async (email, mins) => {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = { Authorization: `Bearer ${token}` }
+      await axios.post(`${API}/api/capture-interval`, { employeeId: email, intervalMinutes: Number(mins) }, { headers })
+      setRows(prev => prev.map(r => r.email === email ? { ...r, intervalSeconds: Number(mins) * 60 } : r))
+      setMsg('Configuration saved successfully.')
+    } catch (e) {
+      setMsg('Error saving configuration: ' + (e.response?.data?.error || e.message))
     }
   }
 
@@ -150,6 +166,44 @@ export default function WorkHours() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Employee Intervals</h2>
+          <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Company-scoped</span>
+        </div>
+        <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+          <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
+            <tr>
+              <th className="px-4 py-2">Email</th>
+              <th className="px-4 py-2">Assigned Interval</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+            {rows.length === 0 ? (
+              <tr><td colSpan="2" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No employees</td></tr>
+            ) : (
+              rows.map(r => (
+                <tr key={r.email} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                  <td className="px-4 py-2">{r.email}</td>
+                  <td className="px-4 py-2">
+                    <select
+                      className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      value={(() => { const mins = Math.round((r.intervalSeconds || 0)/60); return ALLOWED_MINUTES.includes(mins) ? mins : '' })()}
+                      onChange={e => updateRowInterval(r.email, e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      {ALLOWED_MINUTES.map(m => (
+                        <option key={m} value={m}>{m} minutes</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )

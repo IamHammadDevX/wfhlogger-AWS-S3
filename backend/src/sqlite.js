@@ -93,6 +93,15 @@ try {
     FOREIGN KEY(company_id) REFERENCES companies(id)
   );
 
+  CREATE TABLE IF NOT EXISTS employee_creds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL,
+    employee_email TEXT NOT NULL,
+    temp_password TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(id)
+  );
+
   CREATE TABLE IF NOT EXISTS time_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company_id INTEGER,
@@ -238,6 +247,33 @@ export function getInvoiceByCompany(company_id, invoice_id) {
   if (!fs.existsSync(invFile)) return null
   const arr = JSON.parse(fs.readFileSync(invFile, 'utf-8'))
   return arr.find(i => i.company_id == company_id && i.invoice_id === invoice_id) || null
+}
+
+export function recordEmployeeTempPassword(company_id, employee_email, temp_password) {
+  const now = new Date().toISOString()
+  if (db) {
+    const stmt = db.prepare('INSERT INTO employee_creds (company_id, employee_email, temp_password, created_at) VALUES (?, ?, ?, ?)')
+    const info = stmt.run(company_id, employee_email, temp_password, now)
+    return { id: info.lastInsertRowid, company_id, employee_email, temp_password, created_at: now }
+  }
+  const file = path.resolve(process.cwd(), DATA_DIR, 'employee_creds.sqlite.json')
+  if (!fs.existsSync(file)) fs.writeFileSync(file, '[]')
+  const arr = JSON.parse(fs.readFileSync(file, 'utf-8'))
+  const id = (arr[arr.length - 1]?.id || 0) + 1
+  const rec = { id, company_id, employee_email, temp_password, created_at: now }
+  arr.push(rec)
+  fs.writeFileSync(file, JSON.stringify(arr, null, 2))
+  return rec
+}
+
+export function listEmployeeTempPasswords(company_id) {
+  if (db) {
+    return db.prepare('SELECT employee_email, temp_password, created_at FROM employee_creds WHERE company_id = ? ORDER BY created_at DESC').all(company_id)
+  }
+  const file = path.resolve(process.cwd(), DATA_DIR, 'employee_creds.sqlite.json')
+  if (!fs.existsSync(file)) return []
+  const arr = JSON.parse(fs.readFileSync(file, 'utf-8'))
+  return arr.filter(r => r.company_id == company_id).map(r => ({ employee_email: r.employee_email, temp_password: r.temp_password, created_at: r.created_at }))
 }
 
 export function setInvoicePdfPath(company_id, invoice_id, pdf_path) {
