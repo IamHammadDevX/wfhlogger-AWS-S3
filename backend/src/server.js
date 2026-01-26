@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
@@ -120,45 +120,13 @@ function writeUsers(arr){ fs.writeFileSync(usersFile, JSON.stringify(arr, null, 
 function getTeamEmailsForManager(managerKey, companyId){
   const users = readUsers();
   // Accept either manager numeric id or email; resolve both forms
-  const keys = new Set();
   const keyStr = String(managerKey || '').trim();
-  if (keyStr) keys.add(keyStr);
-  try {
-    const managers = listManagers(companyId);
-    const m = managers.find(x => String(x.id) === keyStr || String(x.email).toLowerCase() === keyStr.toLowerCase());
-    if (m) {
-      keys.add(String(m.id));
-      keys.add(String(m.email));
-    }
-  } catch {}
-  
-  // Need to handle logic:
-  // Employees are linked to organization via manager_id?
-  // In `createOrganization`, manager_id is stored.
-  // In `users.sqlite.json`, do employees have `managerId`?
-  // The `createUser` logic does NOT set `managerId`.
-  // Wait, if employees don't have `managerId` field, then `keys.has(String(u.managerId))` fails!
-  
-  // How are employees assigned to a manager?
-  // They are created BY a manager.
-  // When a manager creates an employee, `createUser` is called.
-  // Does it store who created it?
-  // `app.post('/api/employees')` logic:
-  // It doesn't seem to store `managerId` in `users` table/file.
-  // Let's check `/api/employees` route.
-  
-  // If we can't link employee to manager, `getTeamEmailsForManager` returns empty.
-  // This is likely the bug.
-  
-  // Fallback: If `company_id` matches, and role is 'employee', and the manager is the ONLY manager?
-  // Or if we check `organizations` table?
-  // Organization has `manager_id`.
-  // But employees need to belong to that organization.
-  
-  // FIX: Return all employees of the company for now if explicit linking is missing.
-  // Since strict team assignment might not be fully implemented in data model yet.
+  const matchManager = (u) => {
+    const mid = String(u.managerId || '').trim();
+    return mid === keyStr || mid.toLowerCase() === keyStr.toLowerCase();
+  };
   return users
-    .filter(u => u.role === 'employee' && (companyId ? u.company_id == companyId : true))
+    .filter(u => u.role === 'employee' && matchManager(u) && (companyId ? u.company_id == companyId : true))
     .map(u => u.email);
 }
 function appendAudit(type, details, company_id){
@@ -511,7 +479,7 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
     const loginUser = createUser({ email, password: tempPassword, role: 'employee', company_id });
 
     // Store team mapping and display name in simple JSON store
-    const record = { email, name: name || '', role: 'employee', managerId, company_id, createdAt: new Date().toISOString() };
+    const record = { id: loginUser.id, email, name: name || '', role: 'employee', managerId, company_id, createdAt: new Date().toISOString() };
     users.push(record);
     writeUsers(users);
 
@@ -557,6 +525,7 @@ app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
     
     const company_id = req.user?.company_id;
     const manager = createUser({ email, password, role: 'manager', company_id });
+    try { recordManagerTempPassword(company_id, manager.email, password) } catch {}
     const org = createOrganization({ name: orgName.trim(), managerId: manager.id, company_id });
     res.status(201).json({ ok: true, manager: { id: manager.id, email: manager.email, role: manager.role }, organization: org });
   } catch (e) {
@@ -564,6 +533,17 @@ app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
     res.status(500).json({ error: 'Failed to create manager' });
   }
 });
+
+// Admin: List manager initial credentials
+app.get('/api/admin/managers/creds', requireRole(['super_admin']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const rows = listManagerTempPasswords(company_id)
+    res.json({ creds: rows })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load manager credentials' })
+  }
+})
 
 // Manager/Admin: List employee initial credentials (tenant-scoped)
 app.get('/api/employees/initial-creds', requireRole(['manager','super_admin']), (req, res) => {
@@ -806,22 +786,12 @@ app.get('/api/requests', requireRole(['manager', 'super_admin', 'employee']), (r
     // For simplicity, super_admin sees all company requests
     // Manager sees only their team? Need to filter by team.
     let requests = getTimeRequests(company_id);
-    
     if (role === 'manager') {
-       // Get all requests for the company, as strict team mapping is causing issues.
-       // This ensures the manager sees ALL requests within their company scope.
-       // The previous filter was:
-       // const teamEmails = getTeamEmailsForManager(uid, company_id);
-       // const allUsers = readUsers();
-       // const teamIds = allUsers.filter(u => teamEmails.includes(u.email)).map(u => u.id);
-       // requests = requests.filter(r => teamIds.includes(r.employee_id));
-       
-       // New logic: Just filter by company_id which is already done by getTimeRequests(company_id)
-       // So we don't need to filter further if we want managers to see all company requests.
-       // If we want to be strict, we need to ensure users have correct IDs.
-       
-       // Let's log for debugging
-       // console.log(`[Requests] Manager ${uid} Company ${company_id} Requests:`, requests.length);
+      const teamEmails = getTeamEmailsForManager(uid, company_id);
+      const teamIds = new Set(teamEmails.map(em => {
+        try { const u = getUserByEmail(em); return u?.id || null } catch { return null }
+      }).filter(Boolean));
+      requests = requests.filter(r => teamIds.has(r.employee_id));
     }
     
     // Filter pending only? Or all? Let's return all sorted.
@@ -842,6 +812,16 @@ app.post('/api/requests/:id/:action', requireRole(['manager', 'super_admin']), (
     }
     if (request.status !== 'pending') {
       return res.status(400).json({ error: 'Request already processed' });
+    }
+    // Managers can only act on their team
+    if (req.user?.role === 'manager') {
+      const teamEmails = getTeamEmailsForManager(uid, company_id);
+      const teamIds = new Set(teamEmails.map(em => {
+        try { const u = getUserByEmail(em); return u?.id || null } catch { return null }
+      }).filter(Boolean));
+      if (!teamIds.has(request.employee_id)) {
+        return res.status(403).json({ error: 'Forbidden: not your team' });
+      }
     }
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
@@ -1181,7 +1161,7 @@ app.get('/api/capture-interval', requireRole(['employee', 'manager', 'super_admi
     }
 
     if (requesterRole === 'manager' && targetId) {
-      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id);
       if (!teamEmails.includes(targetId)) return res.status(403).json({ error: 'Forbidden: not your team' });
     }
     const secs = intervals[targetId];
@@ -1547,7 +1527,7 @@ app.get('/api/work/summary/today', requireRole(['manager', 'super_admin']), (req
     }
     let entries = Object.entries(byEmp);
     if (req.user?.role === 'manager') {
-      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, req.user?.company_id);
       entries = entries.filter(([employeeId]) => teamEmails.includes(employeeId));
     }
     const result = entries.map(([employeeId, arr]) => {

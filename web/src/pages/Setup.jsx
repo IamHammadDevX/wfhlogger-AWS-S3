@@ -14,6 +14,7 @@ export default function Setup() {
   const [inviteRole, setInviteRole] = useState('employee')
   const [inviteMsg, setInviteMsg] = useState('')
   const [creds, setCreds] = useState([])
+  const [teamEmployees, setTeamEmployees] = useState([])
   const [credits, setCredits] = useState(0)
 
   useEffect(() => {
@@ -28,6 +29,9 @@ export default function Setup() {
         .catch(()=>{})
       axios.get(`${BASE}/api/employees/initial-creds`, { headers })
         .then(r => setCreds(r.data?.creds || []))
+        .catch(()=>{})
+      axios.get(`${BASE}/api/employees`, { headers })
+        .then(r => setTeamEmployees(r.data?.users || []))
         .catch(()=>{})
     })
   }, [])
@@ -65,6 +69,8 @@ export default function Setup() {
         setCredits(bal.data?.credits || 0)
         const cr = await axios.get(`${BASE}/api/employees/initial-creds`, { headers })
         setCreds(cr.data?.creds || [])
+        const team = await axios.get(`${BASE}/api/employees`, { headers })
+        setTeamEmployees(team.data?.users || [])
       } catch {}
     } catch (e) {
       if (e?.response?.status === 402) {
@@ -165,6 +171,41 @@ export default function Setup() {
             </tbody>
           </table>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Use these passwords only for first login; advise employees to change their password after login.</p>
+        </div>
+
+        {/* My Team Employees */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">My Team Employees</h2>
+            <button className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium" onClick={async()=>{
+              const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+              const base = await resolveApiBase()
+              const r = await axios.get(`${base}/api/employees`, { headers })
+              setTeamEmployees(r.data?.users || [])
+            }}>Refresh</button>
+          </div>
+          <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
+              <tr>
+                <th className="px-4 py-2">Email</th>
+                <th className="px-4 py-2">Name</th>
+                <th className="px-4 py-2">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {teamEmployees.length === 0 ? (
+                <tr><td colSpan="3" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No employees yet</td></tr>
+              ) : (
+                teamEmployees.map(u => (
+                  <tr key={u.email} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <td className="px-4 py-2">{u.email}</td>
+                    <td className="px-4 py-2">{u.name || '-'}</td>
+                    <td className="px-4 py-2">{new Date(u.createdAt || Date.now()).toLocaleString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

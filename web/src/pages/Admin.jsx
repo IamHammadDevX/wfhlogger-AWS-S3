@@ -13,6 +13,7 @@ export default function Admin() {
   const [filterManagerId, setFilterManagerId] = useState('')
   const [filterEmployeeId, setFilterEmployeeId] = useState('')
   const [employees, setEmployees] = useState([])
+  const [managerCreds, setManagerCreds] = useState([])
   const [cleanupFrom, setCleanupFrom] = useState('')
   const [cleanupTo, setCleanupTo] = useState('')
   const [cleanupMsg, setCleanupMsg] = useState('')
@@ -30,6 +31,7 @@ export default function Admin() {
       setMsg(`Manager ${r.data?.manager?.email} created${r.data?.organization ? ' with team '+r.data.organization.name : ''}.`)
       setEmail(''); setPassword(''); setOrgName('')
       loadManagers()
+      loadManagerCreds()
     } catch (e) {
       setError(e?.response?.data?.error || e.message)
     }
@@ -74,6 +76,16 @@ export default function Admin() {
     } catch {}
   }
 
+  const loadManagerCreds = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = { Authorization: `Bearer ${token}` }
+      const BASE = await resolveApiBase()
+      const r = await axios.get(`${BASE}/api/admin/managers/creds`, { headers })
+      setManagerCreds(r.data?.creds || [])
+    } catch {}
+  }
+
   const loadEmployees = async () => {
     try {
       const token = localStorage.getItem('token')
@@ -101,6 +113,7 @@ export default function Admin() {
     loadManagers()
     loadLogs()
     loadEmployees()
+    loadManagerCreds()
   }, [])
 
   useEffect(() => {
@@ -222,6 +235,36 @@ export default function Admin() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      {/* Manager Initial Credentials */}
+      <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900 dark:text-white">Manager Initial Credentials</h3>
+          <button className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium" onClick={loadManagerCreds}>Refresh</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+            <thead className="bg-slate-50 dark:bg-slate-700/50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Initial Password</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+              {managerCreds.map((c, i) => (
+                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{c.manager_email}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 font-mono">{c.temp_password}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{new Date(c.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+              {managerCreds.length === 0 && <tr><td colSpan="3" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No manager credentials found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-6 py-3 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700">For security, advise managers to change their password after first login.</div>
       </section>
 
       {/* Employees List */}
