@@ -942,15 +942,64 @@ app.get('/api/billing/invoices/:invoice_id/download', requireRole(['super_admin'
     const invoice_id = req.params.invoice_id
     const inv = getInvoiceByCompany(company_id, invoice_id)
     if (!inv) return res.status(404).json({ error: 'Invoice not found' })
-    let pdfPath = inv.pdf_path
-    if (!pdfPath || !fs.existsSync(pdfPath)) {
-      pdfPath = await generateInvoicePdf(inv)
-      setInvoicePdfPath(company_id, invoice_id, pdfPath)
-    }
-    appendAudit('invoice_downloaded', { company_id, invoice_id }, company_id)
+    const parsedItems = Array.isArray(inv.line_items)
+      ? inv.line_items
+      : (typeof inv.line_items === 'string' ? (JSON.parse(inv.line_items || '[]')) : [])
+
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${invoice_id}.pdf"`)
-    fs.createReadStream(pdfPath).pipe(res)
+
+    const PDFDocument = (await import('pdfkit')).default
+    const doc = new PDFDocument({ size: 'A4', margin: 50 })
+    doc.pipe(res)
+
+    if (inv.company_logo_url) {
+      try { doc.image(path.resolve(process.cwd(), String(inv.company_logo_url).replace(/^\//,'')), 50, 45, { width: 50 }) } catch {}
+    }
+    doc.fontSize(20).text(inv.company_name || 'Company', 110, 50)
+    doc.fontSize(10).fillColor('#666').text('Time Tracker SaaS', 110, 72)
+
+    doc.moveDown()
+    doc.fillColor('#000').fontSize(14).text('Invoice')
+    doc.moveDown(0.5)
+    doc.fontSize(10).text(`Invoice Number: ${inv.invoice_id}`)
+    doc.text(`Invoice Date: ${inv.invoice_date}`)
+    doc.text(`Billing Period: ${inv.billing_period || 'One-time'}`)
+    doc.text(`Billing Email: ${inv.billing_email || ''}`)
+
+    doc.moveDown()
+    doc.fontSize(12).text('Items')
+    doc.moveDown(0.5)
+    const startY = doc.y
+    doc.fontSize(10)
+    doc.text('Description', 50, startY)
+    doc.text('Qty', 300, startY)
+    doc.text('Unit', 350, startY)
+    doc.text('Subtotal', 420, startY)
+    let y = startY + 18
+    parsedItems.forEach(it => {
+      doc.text(String(it.description || ''), 50, y)
+      doc.text(String(it.quantity || 0), 300, y)
+      doc.text(`$${Number(it.unit_price || 0).toFixed(2)}`, 350, y)
+      doc.text(`$${Number(it.subtotal || 0).toFixed(2)}`, 420, y)
+      y += 18
+    })
+
+    doc.moveDown()
+    doc.text(`Subtotal: $${Number(inv.subtotal_amount || 0).toFixed(2)}`, { align: 'right' })
+    doc.text(`Tax: $${Number(inv.tax_amount || 0).toFixed(2)}`, { align: 'right' })
+    doc.fontSize(12).text(`Total: $${Number(inv.total_amount || 0).toFixed(2)}`, { align: 'right' })
+
+    doc.moveDown()
+    doc.fontSize(10).text(`Payment Provider: ${inv.payment_provider || ''}`)
+    doc.text(`Transaction ID: ${inv.payment_reference_id || ''}`)
+    doc.text(`Payment Status: ${inv.payment_status || ''}`)
+
+    doc.moveDown()
+    doc.fontSize(9).fillColor('#666').text('This is a system-generated invoice.', { align: 'center' })
+
+    doc.end()
+    appendAudit('invoice_downloaded', { company_id, invoice_id }, company_id)
   } catch (e) {
     res.status(500).json({ error: 'Failed to download invoice' })
   }
