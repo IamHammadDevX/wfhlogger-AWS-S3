@@ -20,7 +20,8 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.12",
     "razorpay": "^2.9.6",
-    "socket.io": "^4.7.2"
+    "socket.io": "^4.7.2",
+    "stripe": "^13.11.0"
   },
   "optionalDependencies": {
     "better-sqlite3": "^9.4.0"

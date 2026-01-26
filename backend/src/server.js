@@ -10,9 +10,11 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction } from './sqlite.js';
 import bcrypt from 'bcryptjs';
-import { createOrder, verifySignature } from './payment.js';
+// Razorpay disabled (kept for future re-enable)
+// import { createOrder, verifySignature } from './payment.js';
+import { createStripeCheckoutSession, verifyStripeWebhookAndExtract } from './payments/stripe.js';
 import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus } from './email.js';
 import cron from 'node-cron';
 
@@ -24,6 +26,7 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || 'uploads';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
 const DATA_DIR = process.env.DATA_DIR || 'data';
+const PAYMENT_PROVIDER = (process.env.PAYMENT_PROVIDER || 'stripe').toLowerCase();
 
 // Ensure upload directory exists (relative to current working dir)
 const uploadPath = path.resolve(process.cwd(), UPLOAD_DIR);
@@ -197,6 +200,8 @@ app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
+// Stripe webhook must receive raw body BEFORE JSON parser
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
 // Allow all origins for dev and do not set credentials to avoid the invalid '*' + credentials combination
 app.use(cors({ origin: ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : '*', credentials: false }));
 app.use(express.json({ limit: '2mb' }));
@@ -860,61 +865,14 @@ app.post('/api/requests/:id/:action', requireRole(['manager', 'super_admin']), (
 
 // ---- Billing & Payments ----
 
+// Razorpay order endpoint deactivated
 app.post('/api/billing/order', requireRole(['super_admin']), async (req, res) => {
-  try {
-    const { amount } = req.body; // Amount in USD (credits)
-    if (!amount || isNaN(amount) || Number(amount) <= 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
-    }
-    
-    // Create Razorpay Order with strict error handling
-    try {
-      const order = await createOrder(amount, 'INR'); // Use INR as fallback for test account
-      res.json({ order });
-    } catch (orderError) {
-      console.error('[billing:order] Razorpay error:', orderError);
-      res.status(500).json({ 
-        error: orderError.message || 'Order creation failed',
-        details: orderError 
-      });
-    }
-  } catch (e) {
-    console.error('[billing:order] Unexpected error:', e);
-    res.status(500).json({ error: 'Order creation failed' });
-  }
+  return res.status(503).json({ error: 'Razorpay is temporarily disabled' });
 });
 
+// Razorpay verify endpoint deactivated
 app.post('/api/billing/verify', requireRole(['super_admin']), async (req, res) => {
-  try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount, credits } = req.body;
-    const company_id = req.user?.company_id;
-
-    if (!verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
-
-    // Update Credits
-    const newBalance = updateCompanyCredits(company_id, credits);
-    
-    // Record Transaction
-    createTransaction({
-      company_id,
-      amount,
-      credits,
-      type: 'credit',
-      description: 'Credit purchase via Razorpay',
-      reference_id: razorpay_order_id,
-      status: 'success'
-    });
-
-    // Send Email
-    sendPaymentSuccess(req.user.email, amount, credits);
-
-    res.json({ ok: true, balance: newBalance });
-  } catch (e) {
-    console.error('[billing:verify] error:', e);
-    res.status(500).json({ error: 'Verification failed' });
-  }
+  return res.status(503).json({ error: 'Razorpay is temporarily disabled' });
 });
 
 app.get('/api/billing/history', requireRole(['super_admin']), (req, res) => {
@@ -935,6 +893,73 @@ app.get('/api/billing/balance', requireRole(['super_admin', 'manager']), (req, r
   }
 });
 
+// Billing summary (admin)
+app.get('/api/billing/summary', requireRole(['super_admin']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id;
+    const company = getCompanyById(company_id);
+    const balance = company?.credits || 0;
+    const history = getTransactions(company_id);
+    res.json({ balance, history });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch summary' });
+  }
+});
+// Stripe: Create Checkout Session
+app.post('/api/billing/stripe/checkout-session', requireRole(['super_admin']), async (req, res) => {
+  try {
+    if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' });
+    const { amount_usd } = req.body || {};
+    const amount = Number(amount_usd);
+    if (!amount || isNaN(amount) || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+    const company_id = req.user?.company_id;
+    const admin_user_id = req.user?.uid;
+    const url = await createStripeCheckoutSession({ company_id, admin_user_id, credit_amount_usd: amount, origin: req.headers.origin });
+    return res.json({ url });
+  } catch (e) {
+    console.error('[stripe:checkout-session] error:', e);
+    return res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+// Stripe Webhook (raw body needed)
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).end();
+    const sig = req.headers['stripe-signature'];
+    const event = verifyStripeWebhookAndExtract(req.body, sig);
+    if (!event) return res.status(400).end();
+    console.log('[stripe:webhook] received', event?.type);
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const meta = session.metadata || {};
+      const company_id = Number(meta.company_id);
+      const admin_user_id = Number(meta.admin_user_id);
+      const credit_amount_usd = Number(meta.credit_amount_usd || 0);
+      const credits = Math.floor(credit_amount_usd); // 1 USD = 1 credit
+      if (company_id && credits > 0) {
+        console.log('[stripe:webhook] company_id resolved', company_id);
+        const ref = String(session.id || session.payment_intent || '');
+        const newBalance = creditCompanyWithTransaction({
+          company_id,
+          amount_usd: credit_amount_usd,
+          credits,
+          description: 'Credit purchase via Stripe',
+          reference_id: ref
+        });
+        console.log('[stripe:webhook] credits added', { company_id, added: credits, balance: newBalance });
+        try {
+          const admin = listManagers(company_id).find(u => u.role === 'super_admin');
+          if (admin) sendPaymentSuccess(admin.email, credit_amount_usd, credits);
+        } catch {}
+      }
+    }
+    res.status(200).end();
+  } catch (e) {
+    console.error('[stripe:webhook] error:', e);
+    res.status(400).end();
+  }
+});
 // ---- Screen capture interval configuration ----
 // Align with web UI options (include 1 minute)
 const allowedMinutes = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];

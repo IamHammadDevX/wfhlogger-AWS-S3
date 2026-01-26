@@ -8,7 +8,7 @@ export default function AddCreditsModal({ isOpen, onClose, onConfirm, loading })
 
   const handleSubmit = () => {
     if (!amount || isNaN(amount) || Number(amount) < 1) {
-      setError('Minimum amount is ₹1');
+      setError('Minimum amount is $1');
       return;
     }
     setError('');
@@ -32,10 +32,10 @@ export default function AddCreditsModal({ isOpen, onClose, onConfirm, loading })
         {/* Body */}
         <div className="p-6">
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Amount (INR)
+            Amount (USD)
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">₹</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">$</span>
             <input
               type="number"
               min="1"
@@ -51,7 +51,7 @@ export default function AddCreditsModal({ isOpen, onClose, onConfirm, loading })
           <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/30">
             <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">Usage Info</h4>
             <p className="text-sm text-blue-600 dark:text-blue-400">
-              1 Credit = ₹1.00
+              1 Credit = $1.00
               <br />
               Usage: 1 credit per active employee per month.
             </p>

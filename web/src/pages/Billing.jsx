@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
 import AddCreditsModal from '../components/AddCreditsModal'
+import { useCredits } from '../CreditsContext.jsx'
 
 export default function Billing() {
+  const { refreshCredits } = useCredits()
   const [balance, setBalance] = useState(0)
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
@@ -16,6 +18,13 @@ export default function Billing() {
     resolveApiBase().then(base => {
       setApiBase(base)
       fetchData(base)
+      try {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('status') === 'success') {
+          fetchData(base)
+          refreshCredits()
+        }
+      } catch {}
     })
   }, [])
 
@@ -23,12 +32,9 @@ export default function Billing() {
     setLoading(true)
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      const [balReq, histReq] = await Promise.all([
-        axios.get(`${base}/api/billing/balance`, { headers }).catch(e => ({ data: { credits: 0 } })),
-        axios.get(`${base}/api/billing/history`, { headers }).catch(e => ({ data: { history: [] } }))
-      ])
-      setBalance(balReq.data.credits)
-      setHistory(histReq.data.history)
+      const summary = await axios.get(`${base}/api/billing/summary`, { headers }).catch(e => ({ data: { balance: 0, history: [] } }))
+      setBalance(summary.data.balance)
+      setHistory(summary.data.history)
     } catch (e) {
       setError('Failed to load billing info')
     } finally {
@@ -40,53 +46,14 @@ export default function Billing() {
     setProcessing(true)
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      // 1. Create Order
-      const orderReq = await axios.post(`${apiBase}/api/billing/order`, { amount }, { headers })
-      const { order } = orderReq.data
-
-      // 2. Open Razorpay
-      const options = {
-        key: 'rzp_test_XoqwkndCGiWmVr', // Test Key ID
-        amount: order.amount,
-        currency: order.currency,
-        name: 'Time Tracker SaaS',
-        description: 'Add Credits',
-        order_id: order.id,
-        handler: async function (response) {
-          // 3. Verify Payment
-          try {
-            await axios.post(`${apiBase}/api/billing/verify`, {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              amount: amount,
-              credits: amount // 1:1 ratio
-            }, { headers })
-            setModalOpen(false)
-            alert('Payment Successful! Credits added.')
-            fetchData(apiBase)
-          } catch (e) {
-            alert('Payment Verification Failed')
-          } finally {
-            setProcessing(false)
-          }
-        },
-        modal: {
-          ondismiss: function() {
-            setProcessing(false)
-          }
-        },
-        prefill: {
-          name: 'Company Admin',
-          email: 'admin@company.com'
-        },
-        theme: {
-          color: '#2563EB'
-        }
+      // Stripe: create checkout session and redirect
+      const { data } = await axios.post(`${apiBase}/api/billing/stripe/checkout-session`, { amount_usd: amount }, { headers })
+      if (data?.url) {
+        setModalOpen(false)
+        window.location.href = data.url
+      } else {
+        throw new Error('No checkout URL')
       }
-
-      const rzp1 = new window.Razorpay(options)
-      rzp1.open()
     } catch (e) {
       alert('Failed to initiate payment')
       setProcessing(false)
@@ -104,7 +71,7 @@ export default function Billing() {
         <div>
           <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Available Credits</h2>
           <div className="text-4xl font-bold text-slate-900 dark:text-white">{balance}</div>
-          <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">₹1.00 / active employee / month</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">$1.00 / active employee / month</p>
         </div>
         <button 
           onClick={() => setModalOpen(true)}
@@ -150,7 +117,7 @@ export default function Billing() {
                       {t.type}
                     </span>
                   </td>
-                  <td className="px-6 py-3">₹{t.amount}</td>
+                  <td className="px-6 py-3">${Number(t.amount).toFixed(2)}</td>
                   <td className="px-6 py-3">{t.credits > 0 ? `+${t.credits}` : t.credits}</td>
                   <td className="px-6 py-3 capitalize">{t.status}</td>
                 </tr>

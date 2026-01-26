@@ -355,9 +355,13 @@ export function getTransactions(company_id) {
 
 export function updateCompanyCredits(company_id, delta) {
   if (db) {
-    const stmt = db.prepare('UPDATE companies SET credits = credits + ? WHERE id = ?')
-    stmt.run(delta, company_id)
-    return db.prepare('SELECT credits FROM companies WHERE id = ?').get(company_id)?.credits || 0
+    const tx = db.transaction((cid, d) => {
+      const upd = db.prepare('UPDATE companies SET credits = credits + ? WHERE id = ?')
+      upd.run(d, cid)
+      const row = db.prepare('SELECT credits FROM companies WHERE id = ?').get(cid)
+      return row?.credits || 0
+    })
+    return tx(company_id, delta)
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
   const idx = arr.findIndex(c => c.id == company_id)
@@ -367,6 +371,34 @@ export function updateCompanyCredits(company_id, delta) {
     return arr[idx].credits
   }
   return 0
+}
+
+export function creditCompanyWithTransaction({ company_id, amount_usd, credits, description, reference_id }) {
+  const now = new Date().toISOString()
+  if (db) {
+    const tx = db.transaction(() => {
+      const upd = db.prepare('UPDATE companies SET credits = credits + ? WHERE id = ?')
+      upd.run(credits, company_id)
+      const ins = db.prepare('INSERT INTO transactions (company_id, amount, credits, type, description, reference_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      ins.run(company_id, amount_usd, credits, 'credit', description || '', reference_id || '', 'success', now)
+      const row = db.prepare('SELECT credits FROM companies WHERE id = ?').get(company_id)
+      return row?.credits || 0
+    })
+    return tx()
+  }
+  // JSON fallback
+  const companies = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
+  const cidx = companies.findIndex(c => c.id == company_id)
+  if (cidx >= 0) {
+    companies[cidx].credits = (companies[cidx].credits || 0) + credits
+    fs.writeFileSync(fallbacks.companies, JSON.stringify(companies, null, 2))
+  }
+  const txs = JSON.parse(fs.readFileSync(fallbacks.transactions, 'utf-8'))
+  const id = (txs[txs.length - 1]?.id || 0) + 1
+  const record = { id, company_id, amount: amount_usd, credits, type: 'credit', description: description || '', reference_id: reference_id || '', status: 'success', created_at: now }
+  txs.push(record)
+  fs.writeFileSync(fallbacks.transactions, JSON.stringify(txs, null, 2))
+  return companies[cidx]?.credits || 0
 }
 
 // ---- Time Requests ----

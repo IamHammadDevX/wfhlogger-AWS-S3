@@ -49,7 +49,11 @@ export default function Setup() {
       setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}`)
       setInviteEmail('')
     } catch (e) {
-      setInviteMsg(e?.response?.data?.error || 'Error creating employee.')
+      if (e?.response?.status === 402) {
+        setInviteMsg('Insufficient credits. Please ask your Admin to add credits.')
+      } else {
+        setInviteMsg(e?.response?.data?.error || 'Error creating employee.')
+      }
     }
   }
 
