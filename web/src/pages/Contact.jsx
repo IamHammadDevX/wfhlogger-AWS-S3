@@ -202,8 +202,12 @@ export default function Contact() {
 
       <footer className="border-t border-slate-200 bg-white py-12">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-sm text-slate-500">
-            © 2026 Time Tracker System. All rights reserved.
+          <div className="text-sm text-slate-500 flex flex-col md:flex-row items-center gap-2">
+            <span>© 2026 Time Tracker System. All rights reserved.</span>
+            <span className="hidden md:inline text-slate-300">|</span>
+            <span>
+              Developed by <a href="https://github.com/IamHammadDevX/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 font-medium">Hammad</a>
+            </span>
           </div>
           <div className="flex gap-6 text-sm font-medium text-slate-600">
             <Link to="/privacy" className="hover:text-slate-900">Privacy</Link>
