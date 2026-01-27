@@ -46,6 +46,7 @@ vite-dist/
 *.gif
 *.svg
 *.sourcemap
+*.csv
 
 # =====================================================
 # 🐍 PYTHON DESKTOP APP
