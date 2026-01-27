@@ -32,7 +32,10 @@ export async function generateInvoicePdf(invoice) {
   doc.moveDown()
   doc.fontSize(12).text('Items')
   doc.moveDown(0.5)
-  const items = invoice.line_items || []
+  let items = invoice.line_items || []
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items) } catch { items = [] }
+  }
   const startY = doc.y
   doc.fontSize(10)
   doc.text('Description', 50, startY)
