@@ -123,6 +123,7 @@ export default function Home() {
           <div className="flex gap-6 text-sm font-medium text-slate-600">
             <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">Privacy</Link>
             <Link to="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">Terms</Link>
+            <Link to="/contact" className="hover:text-slate-900">Contact</Link>
             <Link to="/support" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900">Support</Link>
           </div>
         </div>

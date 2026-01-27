@@ -18,19 +18,27 @@ export function CreditsProvider({ children }) {
   }
 
   useEffect(() => {
+    // Only fetch if authenticated
+    const token = localStorage.getItem('token')
+    if (!token) return
+
     refreshCredits()
     const s = getSocket()
-    const token = localStorage.getItem('token') || ''
+    if (!s) return // Guard against null socket
+
     let companyId = null
     try {
       const p = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
       companyId = p?.company_id || null
     } catch {}
+    
     const handler = (p) => {
       if (p?.company_id && companyId && Number(p.company_id) === Number(companyId)) {
         setCredits(p.balance || 0)
       }
     }
+    
+    // Only attach listener if socket exists
     s.on('company:credits_updated', handler)
     return () => { try { s.off('company:credits_updated', handler) } catch {} }
   }, [])

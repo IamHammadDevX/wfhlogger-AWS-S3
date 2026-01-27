@@ -24,9 +24,9 @@ export default function Support() {
           <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
             <h2 className="text-xl font-bold text-slate-800 mb-4">Contact Support</h2>
             <p className="text-slate-600 mb-6">Need help with your account or have technical questions? Our support team is here to assist you.</p>
-            <a href="mailto:support@timetracker.com" className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-              Email Us
-            </a>
+            <Link to="/contact" className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+              Contact Us
+            </Link>
           </div>
           
           <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">

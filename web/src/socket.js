@@ -22,7 +22,18 @@ function parseToken(token) {
 }
 
 export function getSocket() {
-  const token = localStorage.getItem('token') || ''
+  const token = localStorage.getItem('token')
+  
+  // If no token, do not connect. Return null or a dummy object if strictly needed, 
+  // but usually we only need socket when authenticated.
+  if (!token) {
+    if (socket) {
+      socket.disconnect()
+      socket = null
+    }
+    return null
+  }
+
   const { userId, uid } = parseToken(token)
 
   if (!socket) {

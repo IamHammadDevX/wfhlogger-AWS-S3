@@ -2,11 +2,30 @@ import nodemailer from 'nodemailer';
 
 // Use environment variables for credentials
 // In development, you can use Ethereal (https://ethereal.email) if no Gmail credentials provided
-const transporter = nodemailer.createTransport({
+const config = process.env.EMAIL_HOST ? {
+  host: process.env.EMAIL_HOST,
+  port: Number(process.env.EMAIL_PORT) || 587,
+  secure: Number(process.env.EMAIL_PORT) === 465,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+} : {
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  }
+};
+
+const transporter = nodemailer.createTransport(config);
+
+// Verify connection configuration
+transporter.verify(function (error, success) {
+  if (error) {
+    console.warn('[Email] Connection warning:', error.message);
+  } else {
+    console.log('[Email] Server is ready to take our messages');
   }
 });
 
@@ -74,4 +93,76 @@ export function sendRequestStatus(to, status, date, reason) {
   const subject = `Time Adjustment Request ${status === 'approved' ? 'Approved' : 'Rejected'}`;
   const text = `Your request for manual time adjustment on ${date} has been ${status}.\n\nReason provided: ${reason}`;
   return sendEmail(to, subject, text);
+}
+
+export function sendNewUserCreated(to, { name, email, role, teamName, password, loginUrl }) {
+  const subject = `New User Created: ${name} (${role})`;
+  const text = `A new user has been created in the system.
+
+User Details:
+- Name: ${name}
+- Email: ${email}
+- Role: ${role}
+- Team: ${teamName || 'Unassigned'}
+
+Login Instructions:
+- URL: ${loginUrl}
+- Temporary Password: ${password}
+
+Please log in and change your password immediately.`;
+
+  const html = `
+    <h2>New User Created</h2>
+    <p>A new user has been created in the system.</p>
+    <h3>User Details</h3>
+    <ul>
+      <li><strong>Name:</strong> ${name}</li>
+      <li><strong>Email:</strong> ${email}</li>
+      <li><strong>Role:</strong> ${role}</li>
+      <li><strong>Team:</strong> ${teamName || 'Unassigned'}</li>
+    </ul>
+    <h3>Login Instructions</h3>
+    <p><strong>URL:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
+    <p><strong>Temporary Password:</strong> <code>${password}</code></p>
+    <p><em>Please log in and change your password immediately.</em></p>
+  `;
+  return sendEmail(to, subject, text, html);
+}
+
+export function sendMonthlyBillingSummary(to, { period, activeEmployees, deducted, remaining }) {
+  const subject = `Monthly Billing Summary - ${period}`;
+  const text = `Here is your monthly billing summary for ${period}.
+
+- Active Employees: ${activeEmployees}
+- Credits Deducted: ${deducted}
+- Remaining Balance: ${remaining}
+
+Thank you for using Time Tracker.`;
+  
+  return sendEmail(to, subject, text);
+}
+
+export function sendContactFormEmail(to, { name, email, subject, message }) {
+  const emailSubject = `Contact Form: ${subject}`;
+  const text = `New message from Contact Form:
+
+Name: ${name}
+Email: ${email}
+Subject: ${subject}
+
+Message:
+${message}`;
+
+  const html = `
+    <h2>New Contact Form Submission</h2>
+    <ul>
+      <li><strong>Name:</strong> ${name}</li>
+      <li><strong>Email:</strong> ${email}</li>
+      <li><strong>Subject:</strong> ${subject}</li>
+    </ul>
+    <h3>Message:</h3>
+    <p>${message.replace(/\n/g, '<br>')}</p>
+  `;
+
+  return sendEmail(to, emailSubject, text, html);
 }

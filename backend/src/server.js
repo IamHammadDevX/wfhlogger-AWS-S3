@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -16,10 +16,8 @@ import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
 import { createStripeCheckoutSession, verifyStripeWebhookAndExtract } from './payments/stripe.js';
-import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus } from './email.js';
+import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail } from './email.js';
 import cron from 'node-cron';
-
-dotenv.config();
 
 const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -97,7 +95,13 @@ if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
             });
             // Send Email
             const admin = listManagers(comp.id).find(u => u.role === 'super_admin');
-            if (admin) sendSubscriptionDeduction(admin.email, cost, comp.credits);
+            if (admin) {
+              // Legacy
+              // sendSubscriptionDeduction(admin.email, cost, comp.credits);
+              // New Summary
+              const period = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+              sendMonthlyBillingSummary(admin.email, { period, activeEmployees: employees.length, deducted: cost, remaining: comp.credits });
+            }
           } else {
             // Partial deduction or suspend?
             // For now, just warn
@@ -295,6 +299,31 @@ app.post('/api/auth/signup', (req, res) => {
   }
 });
 
+// Contact Us Form Submission
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body || {};
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Determine support email - defaulting to env var or a fallback
+    const supportEmail = process.env.SUPPORT_EMAIL || process.env.EMAIL_USER;
+    
+    if (supportEmail) {
+      await sendContactFormEmail(supportEmail, { name, email, subject, message });
+      // Send auto-reply to user? (Optional enhancement)
+    } else {
+      console.warn('[contact] No support email configured to receive messages.');
+    }
+
+    res.json({ ok: true, message: 'Message sent successfully' });
+  } catch (e) {
+    console.error('[contact] error:', e);
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
 // Simple auth middleware
 function requireRole(roles = []) {
   return (req, res, next) => {
@@ -485,6 +514,45 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
 
     try { recordEmployeeTempPassword(company_id, loginUser.email, tempPassword) } catch {}
 
+    // Send New User Created Emails
+    try {
+       const loginUrl = `${process.env.APP_URL || 'http://localhost:4000'}`;
+       // 1. To Company Admin
+       const admin = listManagers(company_id).find(u => u.role === 'super_admin');
+       // 2. To Assigned Manager (if any)
+       let manager = null;
+       if (managerId) {
+         // managerId can be ID or Email.
+         const allUsers = readUsers();
+         manager = allUsers.find(u => u.id == managerId || u.email === managerId);
+       }
+       
+       // Get Team Name
+       let teamName = 'Unassigned';
+       if (managerId) {
+         const org = getOrganizationByManagerId(managerId);
+         if (org) teamName = org.name;
+       }
+
+       const emailData = {
+         name: name || email,
+         email,
+         role: 'employee',
+         teamName,
+         password: tempPassword,
+         loginUrl
+       };
+
+       if (admin) {
+         sendNewUserCreated(admin.email, emailData);
+       }
+       if (manager && manager.email !== admin?.email) {
+         sendNewUserCreated(manager.email, emailData);
+       }
+    } catch (emailErr) {
+       console.warn('[employees:create] failed to send emails:', emailErr);
+    }
+
     // Immediate debit: $1 (1 credit) for employee activation
     try {
       const newBalance = updateCompanyCredits(company_id, -1);
@@ -527,6 +595,27 @@ app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
     const manager = createUser({ email, password, role: 'manager', company_id });
     try { recordManagerTempPassword(company_id, manager.email, password) } catch {}
     const org = createOrganization({ name: orgName.trim(), managerId: manager.id, company_id });
+    
+    // Send New User Created Emails (Manager)
+    try {
+       const loginUrl = `${process.env.APP_URL || 'http://localhost:4000'}`;
+       const admin = listManagers(company_id).find(u => u.role === 'super_admin');
+       const emailData = {
+         name: email, // Manager name not in body?
+         email,
+         role: 'manager',
+         teamName: orgName.trim(),
+         password: password,
+         loginUrl
+       };
+       // Send to Admin (copy)
+       if (admin) sendNewUserCreated(admin.email, emailData);
+       // Send to New Manager
+       sendNewUserCreated(email, emailData);
+    } catch (e) {
+      console.warn('[admin:create_manager] email send failed', e);
+    }
+
     res.status(201).json({ ok: true, manager: { id: manager.id, email: manager.email, role: manager.role }, organization: org });
   } catch (e) {
     console.error('[admin:create_manager] error:', e);
