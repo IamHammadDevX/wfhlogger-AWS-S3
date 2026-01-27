@@ -2093,8 +2093,17 @@ httpServer.listen(PORT, () => {
 app.get('/api/presence/online', requireRole(['manager', 'super_admin']), (req, res) => {
   try {
     let users = Array.from(onlineEmployees);
+    const company_id = req.user?.company_id;
+    const allUsers = readUsers();
+    
+    // Strict Company Filter for ALL roles
+    users = users.filter(email => {
+      const u = allUsers.find(au => au.email === email);
+      return u && u.company_id == company_id;
+    });
+
     if (req.user?.role === 'manager') {
-      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, req.user?.company_id);
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id);
       users = users.filter(u => teamEmails.includes(u));
     }
     res.json({ users });
