@@ -1,684 +1,5 @@
 [
   {
-    "file": "uploads/2026-01-07T05-10-38-600Z-screenshot.jpg",
-    "employeeId": "ali@mail.com",
-    "ts": "2026-01-07T05:10:38.608Z"
-  },
-  {
-    "file": "uploads/2026-01-07T05-13-38-156Z-screenshot.jpg",
-    "employeeId": "ali@mail.com",
-    "ts": "2026-01-07T05:13:38.165Z"
-  },
-  {
-    "file": "uploads/2026-01-07T05-38-49-357Z-screenshot.jpg",
-    "employeeId": "testb@mail.com",
-    "ts": "2026-01-07T05:38:49.363Z"
-  },
-  {
-    "file": "uploads/2026-01-07T05-47-41-099Z-screenshot.jpg",
-    "employeeId": "testb@mail.com",
-    "ts": "2026-01-07T05:47:41.103Z"
-  },
-  {
-    "file": "uploads/2026-01-07T05-50-41-025Z-screenshot.jpg",
-    "employeeId": "testb@mail.com",
-    "ts": "2026-01-07T05:50:41.047Z"
-  },
-  {
-    "file": "uploads/2026-01-07T06-04-21-358Z-screenshot.jpg",
-    "employeeId": "testc@mail.com",
-    "ts": "2026-01-07T06:04:21.381Z"
-  },
-  {
-    "file": "uploads/2026-01-07T06-07-21-299Z-screenshot.jpg",
-    "employeeId": "testc@mail.com",
-    "ts": "2026-01-07T06:07:21.321Z"
-  },
-  {
-    "file": "uploads/2026-01-07T06-10-21-628Z-screenshot.jpg",
-    "employeeId": "testc@mail.com",
-    "ts": "2026-01-07T06:10:21.641Z"
-  },
-  {
-    "file": "uploads/2026-01-07T06-13-21-800Z-screenshot.jpg",
-    "employeeId": "testc@mail.com",
-    "ts": "2026-01-07T06:13:21.811Z"
-  },
-  {
-    "file": "uploads/2026-01-07T06-16-21-934Z-screenshot.jpg",
-    "employeeId": "testc@mail.com",
-    "ts": "2026-01-07T06:16:21.943Z"
-  },
-  {
-    "file": "uploads/2026-01-07T06-19-21-925Z-screenshot.jpg",
-    "employeeId": "testc@mail.com",
-    "ts": "2026-01-07T06:19:21.971Z"
-  },
-  {
-    "file": "uploads/2026-01-07T06-22-21-937Z-screenshot.jpg",
-    "employeeId": "testc@mail.com",
-    "ts": "2026-01-07T06:22:21.941Z"
-  },
-  {
-    "file": "uploads/2026-01-07T06-25-22-441Z-screenshot.jpg",
-    "employeeId": "testc@mail.com",
-    "ts": "2026-01-07T06:25:22.453Z"
-  },
-  {
-    "file": "uploads/2026-01-08T14-27-27-134Z-screenshot.jpg",
-    "employeeId": "testz@mail.com",
-    "ts": "2026-01-08T14:27:27.142Z"
-  },
-  {
-    "file": "uploads/2026-01-08T14-30-27-161Z-screenshot.jpg",
-    "employeeId": "testz@mail.com",
-    "ts": "2026-01-08T14:30:27.165Z"
-  },
-  {
-    "file": "uploads/2026-01-08T14-33-27-600Z-screenshot.jpg",
-    "employeeId": "testz@mail.com",
-    "ts": "2026-01-08T14:33:27.602Z"
-  },
-  {
-    "file": "uploads/2026-01-08T14-36-27-700Z-screenshot.jpg",
-    "employeeId": "testz@mail.com",
-    "ts": "2026-01-08T14:36:27.704Z"
-  },
-  {
-    "file": "uploads/2026-01-08T14-39-28-098Z-screenshot.jpg",
-    "employeeId": "testz@mail.com",
-    "ts": "2026-01-08T14:39:28.100Z"
-  },
-  {
-    "file": "uploads/2026-01-08T14-42-28-302Z-screenshot.jpg",
-    "employeeId": "testz@mail.com",
-    "ts": "2026-01-08T14:42:28.319Z"
-  },
-  {
-    "file": "uploads/2026-01-08T14-45-28-569Z-screenshot.jpg",
-    "employeeId": "testz@mail.com",
-    "ts": "2026-01-08T14:45:28.579Z"
-  },
-  {
-    "file": "uploads/2026-01-08T14-48-28-583Z-screenshot.jpg",
-    "employeeId": "testz@mail.com",
-    "ts": "2026-01-08T14:48:28.598Z"
-  },
-  {
-    "file": "uploads/2026-01-09T10-10-01-626Z-screenshot.jpg",
-    "employeeId": "testdev@mail.com",
-    "ts": "2026-01-09T10:10:01.632Z"
-  },
-  {
-    "file": "uploads/2026-01-09T10-13-01-486Z-screenshot.jpg",
-    "employeeId": "testdev@mail.com",
-    "ts": "2026-01-09T10:13:01.489Z"
-  },
-  {
-    "file": "uploads/2026-01-09T10-16-01-846Z-screenshot.jpg",
-    "employeeId": "testdev@mail.com",
-    "ts": "2026-01-09T10:16:01.849Z"
-  },
-  {
-    "file": "uploads/2026-01-09T10-19-02-212Z-screenshot.jpg",
-    "employeeId": "testdev@mail.com",
-    "ts": "2026-01-09T10:19:02.214Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-18-42-873Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:18:42.883Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-21-42-253Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:21:42.258Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-24-42-752Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:24:42.784Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-27-43-210Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:27:43.231Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-30-43-623Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:30:43.654Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-39-02-989Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:39:02.999Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-42-03-352Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:42:03.371Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-45-03-658Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:45:03.673Z"
-  },
-  {
-    "file": "uploads/2026-01-10T08-49-16-917Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T08:49:16.962Z"
-  },
-  {
-    "file": "uploads/2026-01-10T09-18-11-564Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T09:18:11.645Z"
-  },
-  {
-    "file": "uploads/2026-01-10T09-21-24-267Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-10T09:21:24.285Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-34-54-954Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:34:54.982Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-35-52-383Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:35:52.387Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-36-52-721Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:36:52.726Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-37-53-026Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:37:53.032Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-38-53-931Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:38:53.944Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-39-53-861Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:39:53.887Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-44-04-390Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:44:04.403Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-45-04-199Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:45:04.201Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-46-04-481Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:46:04.485Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-47-05-011Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:47:05.021Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-48-05-430Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:48:05.432Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-49-05-653Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:49:05.656Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-50-05-919Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:50:05.922Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-51-06-223Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:51:06.228Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-52-06-558Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:52:06.571Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-53-06-829Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:53:06.843Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-54-06-775Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:54:06.781Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-55-06-765Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:55:06.768Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-56-07-089Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:56:07.091Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-57-07-212Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:57:07.215Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-58-07-639Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:58:07.642Z"
-  },
-  {
-    "file": "uploads/2026-01-21T15-59-07-961Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T15:59:07.962Z"
-  },
-  {
-    "file": "uploads/2026-01-21T16-12-41-437Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T16:12:41.460Z"
-  },
-  {
-    "file": "uploads/2026-01-21T16-14-41-308Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T16:14:41.322Z"
-  },
-  {
-    "file": "uploads/2026-01-21T16-16-41-510Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T16:16:41.514Z"
-  },
-  {
-    "file": "uploads/2026-01-21T16-18-41-881Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T16:18:41.886Z"
-  },
-  {
-    "file": "uploads/2026-01-21T16-20-42-277Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T16:20:42.283Z"
-  },
-  {
-    "file": "uploads/2026-01-21T17-06-13-770Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T17:06:13.784Z"
-  },
-  {
-    "file": "uploads/2026-01-21T17-11-55-598Z-screenshot.jpg",
-    "employeeId": "testglobal@mail.com",
-    "ts": "2026-01-21T17:11:55.616Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-32-46-877Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:32:46.907Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-33-47-168Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:33:47.171Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-34-47-454Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:34:47.492Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-35-47-780Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:35:47.788Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-36-48-074Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:36:48.095Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-37-48-377Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:37:48.381Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-38-48-647Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:38:48.668Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-39-49-028Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:39:49.031Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-40-49-313Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:40:49.315Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-41-49-412Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:41:49.415Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-42-49-689Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:42:49.696Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-43-49-933Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:43:49.934Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-44-50-250Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:44:50.251Z"
-  },
-  {
-    "file": "uploads/2026-01-21T18-45-50-548Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-21T18:45:50.550Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-19-44-191Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:19:44.220Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-20-44-058Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:20:44.063Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-21-44-330Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:21:44.348Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-22-44-691Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:22:44.693Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-23-45-029Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:23:45.031Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-24-45-440Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:24:45.441Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-25-45-740Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:25:45.743Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-26-46-020Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:26:46.024Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-27-46-593Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:27:46.634Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-28-46-976Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:28:47.002Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-29-46-822Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:29:46.824Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-30-47-107Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:30:47.111Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-31-47-542Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:31:47.547Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-32-48-085Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:32:48.134Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-33-47-981Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:33:47.987Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-34-48-376Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:34:48.381Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-35-48-798Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:35:48.799Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-36-49-134Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:36:49.136Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-37-49-523Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:37:49.526Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-38-49-812Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:38:49.814Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-39-50-081Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:39:50.084Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-40-50-697Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:40:50.706Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-41-50-757Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:41:50.761Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-42-51-274Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:42:51.275Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-43-51-431Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:43:51.434Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-44-51-427Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:44:51.433Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-45-51-791Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:45:51.793Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-46-52-205Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:46:52.220Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-47-52-689Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:47:52.693Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-48-53-108Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:48:53.111Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-49-53-621Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:49:53.625Z"
-  },
-  {
-    "file": "uploads/2026-01-24T10-50-53-936Z-screenshot.jpg",
-    "employeeId": "alex@spacex.com",
-    "company_id": null,
-    "ts": "2026-01-24T10:50:53.938Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-14-21-843Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:14:21.893Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-15-21-783Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:15:21.788Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-16-22-062Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:16:22.070Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-17-22-307Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:17:22.314Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-18-22-593Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:18:22.619Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-19-22-882Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:19:22.887Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-20-23-158Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:20:23.161Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-24-23-416Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:24:23.439Z"
-  },
-  {
-    "file": "uploads/2026-01-24T11-28-23-797Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T11:28:23.829Z"
-  },
-  {
-    "file": "uploads/2026-01-24T22-41-51-146Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T22:41:51.156Z"
-  },
-  {
-    "file": "uploads/2026-01-24T22-49-33-961Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-24T22:49:34.035Z"
-  },
-  {
-    "file": "uploads/2026-01-25T18-52-38-773Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-25T18:52:38.849Z"
-  },
-  {
-    "file": "uploads/2026-01-25T18-56-39-004Z-screenshot.jpg",
-    "employeeId": "sam@openai.com",
-    "company_id": 3,
-    "ts": "2026-01-25T18:56:39.026Z"
-  },
-  {
     "file": "uploads/2026-01-25T19-00-40-589Z-screenshot.jpg",
     "employeeId": "sam@openai.com",
     "company_id": 3,
@@ -1691,5 +1012,119 @@
     "employeeId": "kumaremp@gmail.com",
     "company_id": 6,
     "ts": "2026-01-27T20:37:52.344Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-38-52-593Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:38:52.596Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-39-52-701Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:39:52.722Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-40-52-645Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:40:52.662Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-41-53-144Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:41:53.146Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-42-53-563Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:42:53.573Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-43-53-951Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:43:53.954Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-44-54-387Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:44:54.438Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-45-54-617Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:45:54.620Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-46-54-580Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:46:54.585Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-47-54-779Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:47:54.783Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-48-54-946Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:48:54.950Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-49-55-285Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:49:55.290Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-50-55-780Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:50:55.786Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-51-56-124Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:51:56.129Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-52-56-138Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:52:56.143Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-53-56-763Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:53:56.770Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-54-57-063Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:54:57.068Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-55-57-121Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:55:57.126Z"
+  },
+  {
+    "file": "uploads/2026-01-27T20-56-57-182Z-screenshot.jpg",
+    "employeeId": "kumaremp@gmail.com",
+    "company_id": 6,
+    "ts": "2026-01-27T20:56:57.196Z"
   }
 ]

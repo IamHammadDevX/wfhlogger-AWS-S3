@@ -17,14 +17,14 @@ export default function EmployeeSidebar({ isOpen, setIsOpen }) {
   const { pathname } = useLocation()
   const { theme, toggleTheme } = useTheme()
   
-  const userEmail = useMemo(() => {
+  const user = useMemo(() => {
     try {
       const token = localStorage.getItem('token')
-      if (!token) return ''
+      if (!token) return { name: '', email: '' }
       const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-      return payload?.email || ''
+      return { name: payload?.full_name || payload?.name || 'User', email: payload?.email || '' }
     } catch {
-      return ''
+      return { name: '', email: '' }
     }
   }, [])
 

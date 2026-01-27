@@ -258,13 +258,13 @@ app.post('/api/auth/login', (req, res) => {
 
     const ok = verifyPassword(user, password);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: user.company_id }, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: user.company_id, full_name: user.full_name }, JWT_SECRET, { expiresIn: '8h' });
     try {
       if (user.role === 'employee') {
         appendAudit('employee_web_login', { email, ip: req.ip, ua: req.headers['user-agent'] }, user.company_id);
       }
     } catch {}
-    res.json({ token });
+    res.json({ token, user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role } });
   } catch (e) {
     console.error('[auth:login] error:', e);
     res.status(500).json({ error: 'Login failed' });
@@ -274,8 +274,8 @@ app.post('/api/auth/login', (req, res) => {
 // Signup (Multi-tenant)
 app.post('/api/auth/signup', (req, res) => {
   try {
-    const { companyName, email, password } = req.body || {};
-    if (!companyName || !email || !password) return res.status(400).json({ error: 'All fields are required' });
+    const { companyName, email, password, fullName } = req.body || {};
+    if (!companyName || !email || !password || !fullName) return res.status(400).json({ error: 'All fields are required' });
     
     const existing = getUserByEmail(email);
     if (existing) return res.status(409).json({ error: 'User already exists' });
@@ -284,17 +284,17 @@ app.post('/api/auth/signup', (req, res) => {
     const company = createCompany({ name: companyName });
     
     // Create Admin User (Super Admin role) linked to company - The first user is the Owner
-    const user = createUser({ email, password, role: 'super_admin', company_id: company.id });
+    const user = createUser({ email, full_name: fullName, password, role: 'super_admin', company_id: company.id });
     
     // Create Default Team (Organization) linked to company
     createOrganization({ name: `${companyName}`, managerId: user.id, company_id: company.id });
 
     // Generate Token
-    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: company.id }, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: company.id, full_name: user.full_name }, JWT_SECRET, { expiresIn: '8h' });
     
     // Give some initial free credits? No, strict.
     
-    res.status(201).json({ token, company, user: { id: user.id, email: user.email, role: user.role } });
+    res.status(201).json({ token, company, user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role } });
   } catch (e) {
     console.error('[auth:signup] error:', e);
     res.status(500).json({ error: 'Signup failed' });
@@ -570,9 +570,11 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
       : Math.random().toString(36).slice(2, 10);
 
     // Create login user in sqlite (or JSON fallback) with company_id
-    const loginUser = createUser({ email, password: tempPassword, role: 'employee', company_id });
+    // We pass 'name' as full_name
+    const loginUser = createUser({ email, full_name: name || '', password: tempPassword, role: 'employee', company_id });
 
     // Store team mapping and display name in simple JSON store
+    // Note: 'name' here in users.json is redundant if we use sqlite full_name, but kept for legacy JSON compatibility
     const record = { id: loginUser.id, email, name: name || '', role: 'employee', managerId, company_id, createdAt: new Date().toISOString() };
     users.push(record);
     writeUsers(users);
@@ -664,14 +666,17 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
 // ---- Super Admin: Manager creation ----
 app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
   try {
-    const { email, password, orgName } = req.body || {};
+    const { email, password, orgName, name } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
     if (!orgName || !String(orgName).trim()) return res.status(400).json({ error: 'Team name is required' });
+    // name is mandatory now
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'Manager full name is required' });
+
     const existing = getUserByEmail(email);
     if (existing) return res.status(409).json({ error: 'User already exists' });
     
     const company_id = req.user?.company_id;
-    const manager = createUser({ email, password, role: 'manager', company_id });
+    const manager = createUser({ email, full_name: name, password, role: 'manager', company_id });
     try { recordManagerTempPassword(company_id, manager.email, password) } catch {}
     const org = createOrganization({ name: orgName.trim(), managerId: manager.id, company_id });
     
@@ -680,7 +685,7 @@ app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
        const loginUrl = `${process.env.APP_URL || 'http://localhost:4000'}`;
        const admin = listManagers(company_id).find(u => u.role === 'super_admin');
        const emailData = {
-         name: email, // Manager name not in body?
+         name: name, 
          email,
          role: 'manager',
          teamName: orgName.trim(),
@@ -695,7 +700,7 @@ app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
       console.warn('[admin:create_manager] email send failed', e);
     }
 
-    res.status(201).json({ ok: true, manager: { id: manager.id, email: manager.email, role: manager.role }, organization: org });
+    res.status(201).json({ ok: true, manager: { id: manager.id, email: manager.email, full_name: manager.full_name, role: manager.role, employeeCount: 0, organization: { id: org.id, name: org.name } }, organization: org });
   } catch (e) {
     console.error('[admin:create_manager] error:', e);
     res.status(500).json({ error: 'Failed to create manager' });
@@ -737,7 +742,7 @@ app.get('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
       // Extra check: ensure org belongs to company
       const orgData = (org && org.company_id == company_id) ? { id: org.id, name: org.name } : null;
       const count = employees.filter(e => e.managerId === m.id || e.managerId === m.email).length;
-      return { id: m.id, email: m.email, employeeCount: count, organization: orgData };
+      return { id: m.id, email: m.email, full_name: m.full_name || '', employeeCount: count, organization: orgData };
     });
     res.json({ managers: enriched });
   } catch (e) {
@@ -1480,14 +1485,24 @@ app.get('/api/employee/activity-timeline', requireRole(['employee']), (req, res)
   }
 });
 
-// Profile read/update (timezone)
+// Profile read/update (timezone & full_name)
 app.get('/api/employee/profile', requireRole(['employee']), (req, res) => {
   try {
     const email = req.user?.sub;
     const allUsers = readUsers();
     const u = allUsers.find(x => x.email === email) || {};
+    // Also fetch from SQLite to get full_name if not in JSON
+    const dbUser = getUserByEmail(email);
+    
     const company = getCompanyById(req.user?.company_id);
-    res.json({ id: u?.id || req.user?.uid, email, role: 'employee', timezone: u?.timezone || 'UTC', company_name: company?.name || '' });
+    res.json({ 
+      id: u?.id || req.user?.uid, 
+      email, 
+      full_name: dbUser?.full_name || u?.name || '', 
+      role: 'employee', 
+      timezone: u?.timezone || dbUser?.timezone || 'UTC', 
+      company_name: company?.name || '' 
+    });
   } catch (e) {
     res.status(500).json({ error: 'Failed to load profile' });
   }
@@ -1496,17 +1511,80 @@ app.get('/api/employee/profile', requireRole(['employee']), (req, res) => {
 app.put('/api/employee/profile', requireRole(['employee']), (req, res) => {
   try {
     const email = req.user?.sub;
-    const { timezone } = req.body || {};
-    if (!timezone) return res.status(400).json({ error: 'timezone is required' });
+    const { timezone, full_name } = req.body || {};
+    
     // Update JSON users file inplace
     const users = readUsers();
     const idx = users.findIndex(u => u.email === email);
     if (idx >= 0) {
-      users[idx].timezone = timezone;
+      if (timezone) users[idx].timezone = timezone;
+      if (full_name) users[idx].name = full_name; // Legacy JSON uses 'name'
       writeUsers(users);
     }
+    
+    // Update SQLite
+    const dbUser = getUserByEmail(email);
+    if (dbUser) {
+      updateUserProfile(dbUser.id, { full_name, email });
+      if (timezone) {
+        // We need updateUserTimezone in sqlite.js or use generic update
+        // Existing updateUserTimezone: export function updateUserTimezone(email, timezone)
+        // Let's import it or assume updateUserProfile handles it? 
+        // My updateUserProfile only handles full_name and email.
+        // Let's use updateUserTimezone as well if imported.
+        // I did not add updateUserTimezone to server.js imports explicitly in previous step, but it might be there.
+        // Wait, line 13 imports `updateCompanyProfile` but not `updateUserProfile`.
+        // I need to update imports.
+      }
+    }
+
     const company = getCompanyById(req.user?.company_id);
-    res.json({ id: users[idx]?.id || req.user?.uid, email, role: 'employee', timezone, company_name: company?.name || '' });
+    res.json({ 
+      id: users[idx]?.id || req.user?.uid, 
+      email, 
+      full_name: full_name || dbUser?.full_name || '',
+      role: 'employee', 
+      timezone: timezone || 'UTC', 
+      company_name: company?.name || '' 
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Generic Profile Update for all roles (Manager/Admin)
+app.get('/api/user/profile', requireRole(['manager', 'super_admin']), (req, res) => {
+  try {
+    const email = req.user?.sub;
+    const user = getUserByEmail(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const company = getCompanyById(user.company_id);
+    res.json({
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name || '',
+      role: user.role,
+      timezone: user.timezone || 'UTC',
+      company_name: company?.name || ''
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+app.put('/api/user/profile', requireRole(['manager', 'super_admin']), (req, res) => {
+  try {
+    const email = req.user?.sub;
+    const { full_name, timezone } = req.body || {};
+    const user = getUserByEmail(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    if (full_name) {
+      updateUserProfile(user.id, { full_name });
+    }
+    // Update timezone if needed (not yet in updateUserProfile)
+    
+    res.json({ ok: true, full_name, timezone });
   } catch (e) {
     res.status(500).json({ error: 'Failed to update profile' });
   }

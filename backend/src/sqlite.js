@@ -42,6 +42,7 @@ try {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company_id INTEGER,
     email TEXT UNIQUE NOT NULL,
+    full_name TEXT,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('super_admin','manager','employee')),
     timezone TEXT DEFAULT 'UTC',
@@ -144,6 +145,10 @@ try {
     if (!tableInfo.find(c => c.name === 'company_id')) {
       db.exec("ALTER TABLE users ADD COLUMN company_id INTEGER REFERENCES companies(id)")
       console.log('[sqlite] Migrated users table: added company_id')
+    }
+    if (!tableInfo.find(c => c.name === 'full_name')) {
+      db.exec("ALTER TABLE users ADD COLUMN full_name TEXT")
+      console.log('[sqlite] Migrated users table: added full_name')
     }
     if (!tableInfo.find(c => c.name === 'timezone')) {
       db.exec("ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'UTC'")
@@ -361,20 +366,37 @@ export function updateCompanyProfile(company_id, { name, logo_url, billing_email
   return null
 }
 
-export function createUser({ email, password, role, company_id }) {
+export function updateUserProfile(id, { full_name, email }) {
+  if (db) {
+    const stmt = db.prepare('UPDATE users SET full_name = COALESCE(?, full_name), email = COALESCE(?, email) WHERE id = ?')
+    stmt.run(full_name || null, email || null, id)
+    return db.prepare('SELECT * FROM users WHERE id = ?').get(id)
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
+  const idx = arr.findIndex(u => u.id == id)
+  if (idx >= 0) {
+    if (full_name) arr[idx].full_name = full_name
+    if (email) arr[idx].email = email
+    fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
+    return arr[idx]
+  }
+  return null
+}
+
+export function createUser({ email, full_name, password, role, company_id }) {
   const hash = bcrypt.hashSync(password, 10)
   const now = new Date().toISOString()
   if (db) {
-    const stmt = db.prepare('INSERT INTO users (email, password_hash, role, created_at, company_id, timezone) VALUES (?, ?, ?, ?, ?, ?)')
-    const info = stmt.run(email, hash, role, now, company_id || null, 'UTC')
-    return { id: info.lastInsertRowid, email, role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
+    const stmt = db.prepare('INSERT INTO users (email, full_name, password_hash, role, created_at, company_id, timezone) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    const info = stmt.run(email, full_name || '', hash, role, now, company_id || null, 'UTC')
+    return { id: info.lastInsertRowid, email, full_name: full_name || '', role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
   const id = (arr[arr.length - 1]?.id || 0) + 1
-  const record = { id, email, password_hash: hash, role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
+  const record = { id, email, full_name: full_name || '', password_hash: hash, role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
   arr.push(record)
   fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
-  return { id, email, role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
+  return { id, email, full_name: full_name || '', role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
 }
 
 export function verifyPassword(user, password) {
@@ -434,7 +456,7 @@ export function getOrganizationByManagerId(managerId) {
 
 export function listManagers(company_id) {
   if (db) {
-    let sql = "SELECT id, email, role, created_at, company_id FROM users WHERE role = 'manager'"
+    let sql = "SELECT id, email, full_name, role, created_at, company_id FROM users WHERE role = 'manager'"
     if (company_id) {
       sql += " AND company_id = ?"
       return db.prepare(sql).all(company_id)
@@ -446,7 +468,7 @@ export function listManagers(company_id) {
   if (company_id) {
     res = res.filter(u => u.company_id == company_id)
   }
-  return res.map(u => ({ id: u.id, email: u.email, role: u.role, created_at: u.created_at, company_id: u.company_id }))
+  return res.map(u => ({ id: u.id, email: u.email, full_name: u.full_name, role: u.role, created_at: u.created_at, company_id: u.company_id }))
 }
 
 // Upsert an employee's password; creates the user if missing with role 'employee'

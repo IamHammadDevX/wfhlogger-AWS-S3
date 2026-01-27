@@ -34,6 +34,17 @@ export default function Sidebar({ isOpen, setIsOpen }) {
     }
   }, [])
 
+  const user = useMemo(() => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return { name: '', email: '' }
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+      return { name: payload?.full_name || payload?.name || 'User', email: payload?.email || '' }
+    } catch {
+      return { name: '', email: '' }
+    }
+  }, [])
+
   const NavItem = ({ to, icon: Icon, label }) => {
     const isActive = pathname === to
     return (
@@ -108,6 +119,10 @@ export default function Sidebar({ isOpen, setIsOpen }) {
 
           {/* Footer */}
           <div className="p-4 border-t border-slate-100 dark:border-slate-700 space-y-2">
+            <div className="px-3 py-2 mb-2">
+              <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{user.name}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</div>
+            </div>
             <button
               onClick={toggleTheme}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"

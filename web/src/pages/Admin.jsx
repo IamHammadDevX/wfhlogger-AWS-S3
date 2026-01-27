@@ -4,6 +4,7 @@ import { resolveApiBase } from '../api.js'
 
 export default function Admin() {
   const [email, setEmail] = useState('manager@example.com')
+  const [name, setName] = useState('')
   const [password, setPassword] = useState('secret')
   const [orgName, setOrgName] = useState('')
   const [msg, setMsg] = useState('')
@@ -27,7 +28,8 @@ export default function Admin() {
       const headers = { Authorization: `Bearer ${token}` }
       const BASE = await resolveApiBase()
       if (!orgName || !orgName.trim()) { setError('Team name is required'); return }
-      const r = await axios.post(`${BASE}/api/admin/managers`, { email, password, orgName }, { headers })
+      if (!name || !name.trim()) { setError('Full Name is required'); return }
+      const r = await axios.post(`${BASE}/api/admin/managers`, { email, name, password, orgName }, { headers })
       setMsg(`Manager ${r.data?.manager?.email} created${r.data?.organization ? ' with team '+r.data.organization.name : ''}.`)
       setEmail(''); setPassword(''); setOrgName('')
       loadManagers()
@@ -164,6 +166,10 @@ export default function Admin() {
             {msg && <div className="text-blue-700 dark:text-blue-400 text-sm bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">{msg}</div>}
             <div className="space-y-3">
               <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Full Name</label>
+                <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" placeholder="John Doe" value={name} onChange={e=>setName(e.target.value)} />
+              </div>
+              <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Email</label>
                 <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" placeholder="manager@example.com" value={email} onChange={e=>setEmail(e.target.value)} />
               </div>
@@ -214,7 +220,8 @@ export default function Admin() {
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
             <thead className="bg-slate-50 dark:bg-slate-700/50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Manager</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Team</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Employees</th>
                 <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
@@ -223,7 +230,8 @@ export default function Admin() {
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
               {managers.map(m => (
                 <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{m.email}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{m.full_name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{m.email}</td>
                   <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{m.organization?.name || '-'}</td>
                   <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{m.employeeCount}</td>
                   <td className="px-6 py-4 text-right">
@@ -231,7 +239,7 @@ export default function Admin() {
                   </td>
                 </tr>
               ))}
-              {managers.length === 0 && <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No managers found.</td></tr>}
+              {managers.length === 0 && <tr><td colSpan="5" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No managers found.</td></tr>}
             </tbody>
           </table>
         </div>

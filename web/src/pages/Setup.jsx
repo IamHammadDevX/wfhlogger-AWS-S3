@@ -56,12 +56,13 @@ export default function Setup() {
     setInviteMsg('')
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      const body = { email: inviteEmail, name: '', managerId: null, password: null } // Optional: allow manager to set temp password?
+      const body = { email: inviteEmail, name: inviteName, managerId: null, password: null } // Optional: allow manager to set temp password?
       // Call /api/employees directly to create the user
       const r = await axios.post(`${API}/api/employees`, body, { headers })
       const login = r.data?.login
       setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}`)
       setInviteEmail('')
+      setInviteName('')
       try { 
         refreshCredits()
         const BASE = await resolveApiBase()
@@ -120,6 +121,16 @@ export default function Setup() {
           </div>
           {inviteMsg && <div className={`mb-4 p-3 text-sm rounded-lg ${inviteMsg.startsWith('Error') ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>{inviteMsg}</div>}
           <form onSubmit={invite} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+              <input 
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                value={inviteName} 
+                onChange={e=>setInviteName(e.target.value)} 
+                placeholder="Jane Doe" 
+                required
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Employee Email</label>
               <input 
