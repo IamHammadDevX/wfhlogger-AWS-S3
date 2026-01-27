@@ -68,63 +68,62 @@ export async function sendEmail(to, subject, text, html) {
 export function sendLowCreditWarning(to, balance) {
   const subject = 'Action Required: Low Credit Balance';
   const text = `Your Time Tracker account balance is low (${balance} credits). Please add credits to ensure uninterrupted service.`;
-  return sendEmail(to, subject, text);
+  const html = `
+    <h2 style="color: #d97706;">Low Balance Warning</h2>
+    <p>Your Time Tracker account balance has dropped to <strong>${balance} credits</strong>.</p>
+    <p>Please add credits immediately to ensure uninterrupted service for your employees.</p>
+    <a href="${process.env.APP_URL || 'http://localhost:5173'}/billing" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Add Credits</a>
+  `;
+  return sendEmail(to, subject, text, html);
 }
 
 export function sendPaymentSuccess(to, amount, credits) {
   const subject = 'Payment Successful';
   const text = `We received your payment of $${amount}. ${credits} credits have been added to your account.`;
-  return sendEmail(to, subject, text);
+  const html = `
+    <h2 style="color: #059669;">Payment Received</h2>
+    <p>We successfully received your payment of <strong>$${amount}</strong>.</p>
+    <p><strong>${credits} credits</strong> have been added to your account.</p>
+    <p>Thank you for your business!</p>
+  `;
+  return sendEmail(to, subject, text, html);
 }
 
 export function sendCreationBlocked(to) {
   const subject = 'Action Required: Employee Creation Blocked';
   const text = `You attempted to create a new employee, but your account has insufficient credits. Please add credits to proceed.`;
-  return sendEmail(to, subject, text);
+  const html = `
+    <h2 style="color: #dc2626;">Action Blocked</h2>
+    <p>A manager attempted to create a new employee, but the action was blocked due to insufficient credits.</p>
+    <p>Please add credits to your account to allow your team to grow.</p>
+    <a href="${process.env.APP_URL || 'http://localhost:5173'}/billing" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Add Credits</a>
+  `;
+  return sendEmail(to, subject, text, html);
 }
 
 export function sendSubscriptionDeduction(to, deducted, remaining) {
   const subject = 'Monthly Subscription Deduction';
   const text = `We have deducted ${deducted} credits for your active employees. Remaining balance: ${remaining}.`;
-  return sendEmail(to, subject, text);
-}
-
-export function sendRequestStatus(to, status, date, reason) {
-  const subject = `Time Adjustment Request ${status === 'approved' ? 'Approved' : 'Rejected'}`;
-  const text = `Your request for manual time adjustment on ${date} has been ${status}.\n\nReason provided: ${reason}`;
-  return sendEmail(to, subject, text);
-}
-
-export function sendNewUserCreated(to, { name, email, role, teamName, password, loginUrl }) {
-  const subject = `New User Created: ${name} (${role})`;
-  const text = `A new user has been created in the system.
-
-User Details:
-- Name: ${name}
-- Email: ${email}
-- Role: ${role}
-- Team: ${teamName || 'Unassigned'}
-
-Login Instructions:
-- URL: ${loginUrl}
-- Temporary Password: ${password}
-
-Please log in and change your password immediately.`;
-
   const html = `
-    <h2>New User Created</h2>
-    <p>A new user has been created in the system.</p>
-    <h3>User Details</h3>
+    <h2>Subscription Update</h2>
+    <p>We have deducted <strong>${deducted} credits</strong> for your active employees this month.</p>
+    <p><strong>Remaining Balance:</strong> ${remaining} credits</p>
+  `;
+  return sendEmail(to, subject, text, html);
+}
+
+export function sendEmployeeCreatedDeduction(to, { employeeName, employeeEmail, deducted, remaining }) {
+  const subject = 'New Employee Created - Credit Deducted';
+  const text = `A new employee (${employeeName}) was created. ${deducted} credit has been deducted. Remaining balance: ${remaining}.`;
+  const html = `
+    <h2>New Employee Added</h2>
+    <p>A new employee has been successfully added to your organization:</p>
     <ul>
-      <li><strong>Name:</strong> ${name}</li>
-      <li><strong>Email:</strong> ${email}</li>
-      <li><strong>Role:</strong> ${role}</li>
-      <li><strong>Team:</strong> ${teamName || 'Unassigned'}</li>
+      <li><strong>Name:</strong> ${employeeName}</li>
+      <li><strong>Email:</strong> ${employeeEmail}</li>
     </ul>
-    <h3>Login Instructions</h3>
-    <p><strong>URL:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
-    <p><strong>Temporary Password:</strong> <code>${password}</code></p>
-    <p><em>Please log in and change your password immediately.</em></p>
+    <p><strong>${deducted} credit</strong> has been deducted from your account.</p>
+    <p><strong>Remaining Balance:</strong> ${remaining} credits</p>
   `;
   return sendEmail(to, subject, text, html);
 }
@@ -132,14 +131,44 @@ Please log in and change your password immediately.`;
 export function sendMonthlyBillingSummary(to, { period, activeEmployees, deducted, remaining }) {
   const subject = `Monthly Billing Summary - ${period}`;
   const text = `Here is your monthly billing summary for ${period}.
-
+  
 - Active Employees: ${activeEmployees}
 - Credits Deducted: ${deducted}
 - Remaining Balance: ${remaining}
 
 Thank you for using Time Tracker.`;
-  
-  return sendEmail(to, subject, text);
+  const html = `
+    <h2>Monthly Billing Summary</h2>
+    <p>Here is the summary for <strong>${period}</strong>:</p>
+    <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">Active Employees</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${activeEmployees}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">Credits Deducted</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${deducted}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">Remaining Balance</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${remaining}</strong></td>
+      </tr>
+    </table>
+    <p>Thank you for using Time Tracker.</p>
+  `;
+  return sendEmail(to, subject, text, html);
+}
+
+export function sendAccountSuspensionWarning(to) {
+  const subject = 'Urgent: Account Suspension Warning';
+  const text = `Your account credits have expired or reached zero. Your account will be suspended soon. Please recharge immediately.`;
+  const html = `
+    <h2 style="color: #dc2626;">Account Suspension Warning</h2>
+    <p>Your account credits have expired or reached zero.</p>
+    <p>To avoid service interruption for your team, please recharge your account immediately.</p>
+    <a href="${process.env.APP_URL || 'http://localhost:5173'}/billing" style="display:inline-block;padding:10px 20px;background-color:#dc2626;color:white;text-decoration:none;border-radius:5px;">Recharge Now</a>
+  `;
+  return sendEmail(to, subject, text, html);
 }
 
 export function sendContactFormEmail(to, { name, email, subject, message }) {

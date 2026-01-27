@@ -16,7 +16,7 @@ import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
 import { createStripeCheckoutSession, verifyStripeWebhookAndExtract } from './payments/stripe.js';
-import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail } from './email.js';
+import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning } from './email.js';
 import cron from 'node-cron';
 
 const PORT = process.env.PORT || 4000;
@@ -72,7 +72,9 @@ if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
       
       for (const comp of companies) {
         if (!comp.credits || comp.credits < 1) {
-          // Send low credit warning if not already sent?
+          // Send suspension warning
+          const admin = listManagers(comp.id).find(u => u.role === 'super_admin');
+          if (admin) sendAccountSuspensionWarning(admin.email);
           continue;
         }
         
@@ -629,7 +631,21 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
         status: 'success'
       });
       const admin = listManagers(company_id).find(u => u.role === 'super_admin');
-      if (admin) sendSubscriptionDeduction(admin.email, 1, newBalance);
+      if (admin) {
+        sendEmployeeCreatedDeduction(admin.email, {
+          employeeName: name || email,
+          employeeEmail: email,
+          deducted: 1,
+          remaining: newBalance
+        });
+        
+        // Check for Low Balance or Suspension after deduction
+        if (newBalance <= 0) {
+          sendAccountSuspensionWarning(admin.email);
+        } else if (newBalance < 5) {
+          sendLowCreditWarning(admin.email, newBalance);
+        }
+      }
       try { io.emit('company:credits_updated', { company_id, balance: newBalance }) } catch {}
     } catch (e) {
       console.warn('[employees:debit_on_create] failed:', e?.message || e);
