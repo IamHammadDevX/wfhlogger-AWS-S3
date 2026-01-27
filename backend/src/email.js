@@ -128,6 +128,50 @@ export function sendEmployeeCreatedDeduction(to, { employeeName, employeeEmail, 
   return sendEmail(to, subject, text, html);
 }
 
+export function sendNewUserCreated(to, { name, email, role, teamName, password, loginUrl }) {
+  const subject = 'New User Account Created';
+  const text = `A new user account has been created.
+  
+Name: ${name}
+Email: ${email}
+Role: ${role}
+Team: ${teamName}
+Password: ${password}
+
+Login here: ${loginUrl}`;
+
+  const html = `
+    <h2>New User Account Created</h2>
+    <p>A new user account has been successfully created.</p>
+    <ul>
+      <li><strong>Name:</strong> ${name}</li>
+      <li><strong>Email:</strong> ${email}</li>
+      <li><strong>Role:</strong> ${role}</li>
+      <li><strong>Team:</strong> ${teamName}</li>
+      <li><strong>Password:</strong> <code>${password}</code></li>
+    </ul>
+    <p>Please login and change your password immediately.</p>
+    <a href="${loginUrl}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Login Now</a>
+  `;
+  return sendEmail(to, subject, text, html);
+}
+
+export function sendRequestStatus(to, status, date, reason) {
+  const subject = `Time Request ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+  const text = `Your time request for ${date} has been ${status}.
+  
+Reason: ${reason}`;
+
+  const color = status === 'approved' ? '#059669' : '#dc2626';
+  const html = `
+    <h2 style="color: ${color};">Time Request ${status.charAt(0).toUpperCase() + status.slice(1)}</h2>
+    <p>Your time request for <strong>${date}</strong> has been processed.</p>
+    <p><strong>Status:</strong> <span style="color: ${color}; font-weight: bold;">${status.toUpperCase()}</span></p>
+    <p><strong>Reason:</strong> ${reason}</p>
+  `;
+  return sendEmail(to, subject, text, html);
+}
+
 export function sendMonthlyBillingSummary(to, { period, activeEmployees, deducted, remaining }) {
   const subject = `Monthly Billing Summary - ${period}`;
   const text = `Here is your monthly billing summary for ${period}.
