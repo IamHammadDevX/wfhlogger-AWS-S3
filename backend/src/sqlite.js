@@ -1,6 +1,7 @@
 import path from 'path'
 import fs from 'fs'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 let Database = null
 let db = null
@@ -12,7 +13,8 @@ const fallbacks = {
   orgs: path.resolve(process.cwd(), DATA_DIR, 'organizations.sqlite.json'),
   companies: path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json'),
   transactions: path.resolve(process.cwd(), DATA_DIR, 'transactions.sqlite.json'),
-  requests: path.resolve(process.cwd(), DATA_DIR, 'time_requests.sqlite.json')
+  requests: path.resolve(process.cwd(), DATA_DIR, 'time_requests.sqlite.json'),
+  reset_tokens: path.resolve(process.cwd(), DATA_DIR, 'reset_tokens.sqlite.json')
 }
 fs.mkdirSync(path.dirname(dbPath), { recursive: true })
 
@@ -125,6 +127,14 @@ try {
     action_at TEXT,
     FOREIGN KEY(company_id) REFERENCES companies(id),
     FOREIGN KEY(employee_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    token TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
   );
   `)
   
@@ -678,4 +688,72 @@ export function getTimeRequestById(id) {
 export function getWorkSessions(userId, date) {
   // Placeholder implementation to satisfy export
   return [];
+}
+
+export function createPasswordResetToken(email) {
+  const token = crypto.randomBytes(32).toString('hex')
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString() // 1 hour
+  const createdAt = now.toISOString()
+
+  if (db) {
+    // Invalidate old tokens
+    db.prepare('DELETE FROM password_reset_tokens WHERE email = ?').run(email)
+    const stmt = db.prepare('INSERT INTO password_reset_tokens (email, token, expires_at, created_at) VALUES (?, ?, ?, ?)')
+    stmt.run(email, token, expiresAt, createdAt)
+  } else {
+    if (!fs.existsSync(fallbacks.reset_tokens)) fs.writeFileSync(fallbacks.reset_tokens, '[]')
+    let arr = JSON.parse(fs.readFileSync(fallbacks.reset_tokens, 'utf-8'))
+    // Remove old tokens
+    arr = arr.filter(t => t.email !== email)
+    arr.push({ email, token, expires_at: expiresAt, created_at: createdAt })
+    fs.writeFileSync(fallbacks.reset_tokens, JSON.stringify(arr, null, 2))
+  }
+  return token
+}
+
+export function verifyResetToken(token) {
+  if (!token) return null
+  const now = new Date().toISOString()
+  
+  if (db) {
+    const row = db.prepare('SELECT * FROM password_reset_tokens WHERE token = ? AND expires_at > ?').get(token, now)
+    return row ? row.email : null
+  }
+  
+  if (!fs.existsSync(fallbacks.reset_tokens)) return null
+  const arr = JSON.parse(fs.readFileSync(fallbacks.reset_tokens, 'utf-8'))
+  const row = arr.find(t => t.token === token && t.expires_at > now)
+  return row ? row.email : null
+}
+
+export function resetPassword(token, newPassword) {
+  const email = verifyResetToken(token)
+  if (!email) return false
+  
+  const hash = bcrypt.hashSync(newPassword, 10)
+  
+  // Update user password
+  if (db) {
+    db.transaction(() => {
+      db.prepare('UPDATE users SET password_hash = ? WHERE email = ?').run(hash, email)
+      db.prepare('DELETE FROM password_reset_tokens WHERE email = ?').run(email)
+    })()
+  } else {
+    // JSON fallback
+    const users = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
+    const uIdx = users.findIndex(u => u.email === email)
+    if (uIdx >= 0) {
+      users[uIdx].password_hash = hash
+      fs.writeFileSync(fallbacks.users, JSON.stringify(users, null, 2))
+    }
+    
+    // Remove token
+    if (fs.existsSync(fallbacks.reset_tokens)) {
+      let tokens = JSON.parse(fs.readFileSync(fallbacks.reset_tokens, 'utf-8'))
+      tokens = tokens.filter(t => t.email !== email)
+      fs.writeFileSync(fallbacks.reset_tokens, JSON.stringify(tokens, null, 2))
+    }
+  }
+  return true
 }

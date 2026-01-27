@@ -166,3 +166,25 @@ ${message}`;
 
   return sendEmail(to, emailSubject, text, html);
 }
+
+export function sendPasswordResetEmail(to, resetUrl) {
+  const subject = 'Password Reset Request';
+  const text = `You requested a password reset for your Time Tracker account.
+  
+Please click the link below to reset your password:
+${resetUrl}
+
+If you did not request this, please ignore this email.
+Link expires in 1 hour.`;
+
+  const html = `
+    <h2>Password Reset Request</h2>
+    <p>You requested a password reset for your Time Tracker account.</p>
+    <p>Please click the button below to reset your password:</p>
+    <a href="${resetUrl}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Reset Password</a>
+    <p>If you did not request this, please ignore this email.</p>
+    <p><small>Link expires in 1 hour.</small></p>
+  `;
+  
+  return sendEmail(to, subject, text, html);
+}

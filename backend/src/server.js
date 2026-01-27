@@ -10,13 +10,13 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords } from './sqlite.js';
+import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
 import { createStripeCheckoutSession, verifyStripeWebhookAndExtract } from './payments/stripe.js';
-import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail } from './email.js';
+import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail } from './email.js';
 import cron from 'node-cron';
 
 const PORT = process.env.PORT || 4000;
@@ -298,6 +298,69 @@ app.post('/api/auth/signup', (req, res) => {
     res.status(500).json({ error: 'Signup failed' });
   }
 });
+
+// Forgot Password
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body || {}
+    if (!email) return res.status(400).json({ error: 'Email is required' })
+    
+    const user = getUserByEmail(email)
+    if (!user) {
+      // Don't reveal user existence
+      return res.json({ ok: true, message: 'If an account exists, instructions have been sent.' })
+    }
+
+    if (user.role === 'employee') {
+      return res.status(400).json({ 
+        error: 'Employee account', 
+        message: 'Please contact your Manager to reset your password.' 
+      })
+    }
+
+    if (user.role === 'manager') {
+      return res.status(400).json({ 
+        error: 'Manager account', 
+        message: 'Please contact your Company Admin to reset your password.' 
+      })
+    }
+
+    if (user.role === 'super_admin') {
+      const token = createPasswordResetToken(user.email)
+      // Determine base URL: In production it's likely the same domain.
+      // In dev, frontend is usually 5173, backend is 4000.
+      // We should use an environment variable FRONTEND_URL.
+      // Fallback: If request origin header exists, use it (likely the frontend making the request).
+      const origin = req.headers.origin || process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:5173'; 
+      const resetUrl = `${origin}/reset-password?token=${token}`
+      // Log for development ease
+      console.log(`[AUTH] Password Reset Link for ${user.email}: ${resetUrl}`);
+      await sendPasswordResetEmail(user.email, resetUrl)
+      return res.json({ ok: true, message: 'Password reset link sent to your email.' })
+    }
+
+    res.json({ ok: true })
+  } catch (e) {
+    console.error('[auth:forgot] error:', e)
+    res.status(500).json({ error: 'Request failed' })
+  }
+})
+
+// Reset Password
+app.post('/api/auth/reset-password', (req, res) => {
+  try {
+    const { token, password } = req.body || {}
+    if (!token || !password) return res.status(400).json({ error: 'Token and password are required' })
+    
+    const success = resetPassword(token, password)
+    if (!success) return res.status(400).json({ error: 'Invalid or expired token' })
+    
+    res.json({ ok: true, message: 'Password reset successfully' })
+  } catch (e) {
+    console.error('[auth:reset] error:', e)
+    res.status(500).json({ error: 'Reset failed' })
+  }
+})
 
 // Contact Us Form Submission
 app.post('/api/contact', async (req, res) => {
@@ -2107,9 +2170,38 @@ try {
   if (fs.existsSync(webDistPath)) {
     app.use(express.static(webDistPath));
     // SPA fallback: send index.html for non-API routes
+    // But exclude /reset-password if it's handled by frontend routing?
+    // Wait, the error is "Cannot GET /reset-password" from Express.
+    // This means Express is trying to handle it but finding no route, AND static file serving didn't catch it?
+    // If 'web/dist' exists, line 2168 handles it.
+    // If 'web/dist' does NOT exist (dev mode), Express returns 404 because no route matches.
+    // In dev mode, we usually run Vite dev server on 5173.
+    // The link generated is http://localhost:4000/reset-password...
+    // If we are in dev mode, we should point to the frontend URL (e.g. localhost:5173 or process.env.FRONTEND_URL)
+    
+    app.get('/reset-password', (req, res) => {
+      // In dev mode, redirect to frontend port 5173
+      const token = req.query.token;
+      if (token) {
+        // Assume frontend is on 5173 if not specified
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(`${frontendUrl}/reset-password?token=${token}`);
+      }
+      res.status(404).send('Reset token missing');
+    });
+
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/downloads')) return next();
-      res.sendFile(path.join(webDistPath, 'index.html'));
+      // If we are serving static files, send index.html
+      if (fs.existsSync(path.join(process.cwd(), 'web', 'dist', 'index.html'))) {
+         res.sendFile(path.join(process.cwd(), 'web', 'dist', 'index.html'));
+      } else {
+         // If no static build, and we are hitting backend port with frontend route, we should redirect or inform user?
+         // Ideally, the email link should point to the FRONTEND port in dev.
+         // But let's support it via redirect if possible? 
+         // Or just return 404 with message.
+         next();
+      }
     });
     console.log('[server] Serving static frontend from', webDistPath);
   }
