@@ -43,6 +43,7 @@ try {
     company_id INTEGER,
     email TEXT UNIQUE NOT NULL,
     full_name TEXT,
+    country TEXT,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('super_admin','manager','employee')),
     timezone TEXT DEFAULT 'UTC',
@@ -149,6 +150,10 @@ try {
     if (!tableInfo.find(c => c.name === 'full_name')) {
       db.exec("ALTER TABLE users ADD COLUMN full_name TEXT")
       console.log('[sqlite] Migrated users table: added full_name')
+    }
+    if (!tableInfo.find(c => c.name === 'country')) {
+      db.exec("ALTER TABLE users ADD COLUMN country TEXT")
+      console.log('[sqlite] Migrated users table: added country')
     }
     if (!tableInfo.find(c => c.name === 'timezone')) {
       db.exec("ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'UTC'")
@@ -366,10 +371,10 @@ export function updateCompanyProfile(company_id, { name, logo_url, billing_email
   return null
 }
 
-export function updateUserProfile(id, { full_name, email }) {
+export function updateUserProfile(id, { full_name, email, country, timezone }) {
   if (db) {
-    const stmt = db.prepare('UPDATE users SET full_name = COALESCE(?, full_name), email = COALESCE(?, email) WHERE id = ?')
-    stmt.run(full_name || null, email || null, id)
+    const stmt = db.prepare('UPDATE users SET full_name = COALESCE(?, full_name), email = COALESCE(?, email), country = COALESCE(?, country), timezone = COALESCE(?, timezone) WHERE id = ?')
+    stmt.run(full_name || null, email || null, country || null, timezone || null, id)
     return db.prepare('SELECT * FROM users WHERE id = ?').get(id)
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
@@ -377,26 +382,28 @@ export function updateUserProfile(id, { full_name, email }) {
   if (idx >= 0) {
     if (full_name) arr[idx].full_name = full_name
     if (email) arr[idx].email = email
+    if (country) arr[idx].country = country
+    if (timezone) arr[idx].timezone = timezone
     fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
     return arr[idx]
   }
   return null
 }
 
-export function createUser({ email, full_name, password, role, company_id }) {
+export function createUser({ email, full_name, password, role, company_id, country, timezone }) {
   const hash = bcrypt.hashSync(password, 10)
   const now = new Date().toISOString()
   if (db) {
-    const stmt = db.prepare('INSERT INTO users (email, full_name, password_hash, role, created_at, company_id, timezone) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    const info = stmt.run(email, full_name || '', hash, role, now, company_id || null, 'UTC')
-    return { id: info.lastInsertRowid, email, full_name: full_name || '', role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
+    const stmt = db.prepare('INSERT INTO users (email, full_name, country, password_hash, role, created_at, company_id, timezone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    const info = stmt.run(email, full_name || '', country || '', hash, role, now, company_id || null, timezone || 'UTC')
+    return { id: info.lastInsertRowid, email, full_name: full_name || '', country: country || '', role, created_at: now, company_id: company_id || null, timezone: timezone || 'UTC' }
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
   const id = (arr[arr.length - 1]?.id || 0) + 1
-  const record = { id, email, full_name: full_name || '', password_hash: hash, role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
+  const record = { id, email, full_name: full_name || '', country: country || '', password_hash: hash, role, created_at: now, company_id: company_id || null, timezone: timezone || 'UTC' }
   arr.push(record)
   fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
-  return { id, email, full_name: full_name || '', role, created_at: now, company_id: company_id || null, timezone: 'UTC' }
+  return { id, email, full_name: full_name || '', country: country || '', role, created_at: now, company_id: company_id || null, timezone: timezone || 'UTC' }
 }
 
 export function verifyPassword(user, password) {

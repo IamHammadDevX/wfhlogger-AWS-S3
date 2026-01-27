@@ -7,6 +7,8 @@ export default function Signup() {
   const [companyName, setCompanyName] = useState('')
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
+  const [country, setCountry] = useState('United States')
+  const [timezone, setTimezone] = useState('UTC')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -16,7 +18,7 @@ export default function Signup() {
     setLoading(true)
     setError('')
     try {
-      const resp = await axios.post('/api/auth/signup', { companyName, email, fullName, password })
+      const resp = await axios.post('/api/auth/signup', { companyName, email, fullName, country, timezone, password })
       localStorage.setItem('token', resp.data.token)
       location.href = '/dashboard'
     } catch (err) {
@@ -71,6 +73,26 @@ export default function Signup() {
                 onChange={e=>setFullName(e.target.value)} 
                 required
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Country</label>
+              <select className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" value={country} onChange={e=>setCountry(e.target.value)} required>
+                <option>United States</option>
+                <option>India</option>
+                <option>United Kingdom</option>
+                <option>Canada</option>
+                <option>Australia</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Timezone</label>
+              <select className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" value={timezone} onChange={e=>setTimezone(e.target.value)} required>
+                <option>UTC</option>
+                <option>America/New_York</option>
+                <option>Europe/London</option>
+                <option>Asia/Kolkata</option>
+                <option>Asia/Dubai</option>
+              </select>
             </div>
 
             <div>

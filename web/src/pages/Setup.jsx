@@ -11,6 +11,9 @@ export default function Setup() {
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteName, setInviteName] = useState('')
+  const [inviteCountry, setInviteCountry] = useState('United States')
+  const [inviteTimezone, setInviteTimezone] = useState('UTC')
   const [inviteRole, setInviteRole] = useState('employee')
   const [inviteMsg, setInviteMsg] = useState('')
   const [creds, setCreds] = useState([])
@@ -55,14 +58,17 @@ export default function Setup() {
     e.preventDefault()
     setInviteMsg('')
     try {
+      const BASE = await resolveApiBase()
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      const body = { email: inviteEmail, name: inviteName, managerId: null, password: null } // Optional: allow manager to set temp password?
+      const body = { email: inviteEmail, name: inviteName, country: inviteCountry, timezone: inviteTimezone, managerId: null, password: null }
       // Call /api/employees directly to create the user
-      const r = await axios.post(`${API}/api/employees`, body, { headers })
+      const r = await axios.post(`${BASE}/api/employees`, body, { headers })
       const login = r.data?.login
       setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}`)
       setInviteEmail('')
       setInviteName('')
+      setInviteCountry('United States')
+      setInviteTimezone('UTC')
       try { 
         refreshCredits()
         const BASE = await resolveApiBase()
@@ -130,6 +136,36 @@ export default function Setup() {
                 placeholder="Jane Doe" 
                 required
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Country</label>
+              <select 
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                value={inviteCountry}
+                onChange={e=>setInviteCountry(e.target.value)}
+                required
+              >
+                <option>United States</option>
+                <option>India</option>
+                <option>United Kingdom</option>
+                <option>Canada</option>
+                <option>Australia</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Timezone</label>
+              <select 
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                value={inviteTimezone}
+                onChange={e=>setInviteTimezone(e.target.value)}
+                required
+              >
+                <option>UTC</option>
+                <option>America/New_York</option>
+                <option>Europe/London</option>
+                <option>Asia/Kolkata</option>
+                <option>Asia/Dubai</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Employee Email</label>

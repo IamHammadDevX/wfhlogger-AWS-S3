@@ -5,6 +5,8 @@ import { resolveApiBase } from '../api.js'
 export default function Admin() {
   const [email, setEmail] = useState('manager@example.com')
   const [name, setName] = useState('')
+  const [country, setCountry] = useState('United States')
+  const [timezone, setTimezone] = useState('UTC')
   const [password, setPassword] = useState('secret')
   const [orgName, setOrgName] = useState('')
   const [msg, setMsg] = useState('')
@@ -29,9 +31,11 @@ export default function Admin() {
       const BASE = await resolveApiBase()
       if (!orgName || !orgName.trim()) { setError('Team name is required'); return }
       if (!name || !name.trim()) { setError('Full Name is required'); return }
-      const r = await axios.post(`${BASE}/api/admin/managers`, { email, name, password, orgName }, { headers })
+      if (!country || !country.trim()) { setError('Country is required'); return }
+      if (!timezone || !timezone.trim()) { setError('Timezone is required'); return }
+      const r = await axios.post(`${BASE}/api/admin/managers`, { email, name, country, timezone, password, orgName }, { headers })
       setMsg(`Manager ${r.data?.manager?.email} created${r.data?.organization ? ' with team '+r.data.organization.name : ''}.`)
-      setEmail(''); setPassword(''); setOrgName('')
+      setEmail(''); setPassword(''); setOrgName(''); setName(''); setCountry('United States'); setTimezone('UTC')
       loadManagers()
       loadManagerCreds()
     } catch (e) {
@@ -168,6 +172,26 @@ export default function Admin() {
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Full Name</label>
                 <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" placeholder="John Doe" value={name} onChange={e=>setName(e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Country</label>
+                <select className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" value={country} onChange={e=>setCountry(e.target.value)}>
+                  <option>United States</option>
+                  <option>India</option>
+                  <option>United Kingdom</option>
+                  <option>Canada</option>
+                  <option>Australia</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Timezone</label>
+                <select className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" value={timezone} onChange={e=>setTimezone(e.target.value)}>
+                  <option>UTC</option>
+                  <option>America/New_York</option>
+                  <option>Europe/London</option>
+                  <option>Asia/Kolkata</option>
+                  <option>Asia/Dubai</option>
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Email</label>
