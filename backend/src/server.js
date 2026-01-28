@@ -71,7 +71,7 @@ if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
       const companies = JSON.parse(fs.readFileSync(companiesPath, 'utf-8'));
       
       for (const comp of companies) {
-        if (!comp.credits || comp.credits < 1) {
+        if (!comp.credits || comp.credits <= 0) {
           // Send suspension warning
           const admin = listManagers(comp.id).find(u => u.role === 'super_admin');
           if (admin) sendAccountSuspensionWarning(admin.email);
@@ -83,8 +83,8 @@ if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
         const cost = employees.length; // $1 per employee
         
         if (cost > 0) {
-          if (comp.credits >= cost) {
-            comp.credits -= cost;
+          if (comp.credits >= cost && comp.credits > 0) {
+            comp.credits = Math.max(0, comp.credits - cost);
             // Record Transaction
             createTransaction({
               company_id: comp.id,

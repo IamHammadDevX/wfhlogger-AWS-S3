@@ -587,17 +587,18 @@ export function getTransactions(company_id) {
 export function updateCompanyCredits(company_id, delta) {
   if (db) {
     const tx = db.transaction((cid, d) => {
-      const upd = db.prepare('UPDATE companies SET credits = credits + ? WHERE id = ?')
-      upd.run(d, cid)
-      const row = db.prepare('SELECT credits FROM companies WHERE id = ?').get(cid)
-      return row?.credits || 0
+      const cur = db.prepare('SELECT credits FROM companies WHERE id = ?').get(cid)
+      const next = Math.max(0, (cur?.credits || 0) + d)
+      db.prepare('UPDATE companies SET credits = ? WHERE id = ?').run(next, cid)
+      return next
     })
     return tx(company_id, delta)
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
   const idx = arr.findIndex(c => c.id == company_id)
   if (idx >= 0) {
-    arr[idx].credits = (arr[idx].credits || 0) + delta
+    const cur = arr[idx].credits || 0
+    arr[idx].credits = Math.max(0, cur + delta)
     fs.writeFileSync(fallbacks.companies, JSON.stringify(arr, null, 2))
     return arr[idx].credits
   }
