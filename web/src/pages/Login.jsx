@@ -21,6 +21,8 @@ export default function Login() {
         const payload = JSON.parse(atob(resp.data.token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
         if (payload.role === 'employee') {
           location.href = '/employee/dashboard'
+        } else if (payload.role === 'super_admin') {
+          location.href = '/platform'
         } else {
           location.href = '/dashboard'
         }
@@ -119,6 +121,7 @@ export default function Login() {
                 onChange={e=>setRole(e.target.value)}
               >
                 <option value="super_admin">Super Admin</option>
+                <option value="company_admin">Company Admin</option>
                 <option value="manager">Manager</option>
                 <option value="employee">Employee</option>
               </select>

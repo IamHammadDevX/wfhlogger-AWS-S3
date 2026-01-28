@@ -10,6 +10,7 @@ import Signup from './pages/Signup.jsx'
 import ForgotPassword from './pages/ForgotPassword.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import SADashboard from './pages/platform/SADashboard.jsx'
 import LiveView from './pages/LiveView.jsx'
 import Report from './pages/Report.jsx'
 import Activity from './pages/Activity.jsx'
@@ -44,7 +45,8 @@ function ProtectedRoute({ children, allowedRoles }) {
     
     if (allowedRoles) {
       if (!allowedRoles.includes(payload.role)) {
-        return <Navigate to="/dashboard" replace />
+        const fallback = payload.role === 'super_admin' ? '/platform' : (payload.role === 'employee' ? '/employee/dashboard' : '/dashboard')
+        return <Navigate to={fallback} replace />
       }
     }
 
@@ -80,11 +82,12 @@ function AppRoutes() {
       <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
       <Route path="/hours" element={<ProtectedRoute><WorkHours /></ProtectedRoute>} />
       <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
-      <Route path="/setup" element={<ProtectedRoute allowedRoles={['manager', 'super_admin']}><Setup /></ProtectedRoute>} />
+      <Route path="/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><Setup /></ProtectedRoute>} />
       <Route path="/downloads" element={<ProtectedRoute><Downloads /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute allowedRoles={['super_admin']}><Admin /></ProtectedRoute>} />
-      <Route path="/billing" element={<ProtectedRoute allowedRoles={['super_admin']}><Billing /></ProtectedRoute>} />
-      <Route path="/company" element={<ProtectedRoute allowedRoles={['super_admin']}><CompanyProfile /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['company_admin']}><Admin /></ProtectedRoute>} />
+      <Route path="/billing" element={<ProtectedRoute allowedRoles={['company_admin']}><Billing /></ProtectedRoute>} />
+      <Route path="/company" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyProfile /></ProtectedRoute>} />
+      <Route path="/platform" element={<ProtectedRoute allowedRoles={['super_admin']}><SADashboard /></ProtectedRoute>} />
       
       {/* Employee Routes */}
       <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={['employee']}><EmployeeDashboard /></ProtectedRoute>} />

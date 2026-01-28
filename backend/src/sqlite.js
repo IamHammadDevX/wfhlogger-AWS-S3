@@ -45,7 +45,7 @@ try {
     full_name TEXT,
     country TEXT,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('super_admin','manager','employee')),
+    role TEXT NOT NULL CHECK(role IN ('super_admin','company_admin','manager','employee')),
     timezone TEXT DEFAULT 'UTC',
     created_at TEXT NOT NULL,
     FOREIGN KEY(company_id) REFERENCES companies(id)
@@ -175,6 +175,45 @@ try {
     console.error('[sqlite] Migration check failed:', e)
   }
 
+  try {
+    const def = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get()
+    const hasCompanyAdmin = String(def?.sql || '').includes("company_admin")
+    if (!hasCompanyAdmin) {
+      db.transaction(() => {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS users_mig (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER,
+            email TEXT UNIQUE NOT NULL,
+            full_name TEXT,
+            country TEXT,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('super_admin','company_admin','manager','employee')),
+            timezone TEXT DEFAULT 'UTC',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(company_id) REFERENCES companies(id)
+          );
+        `)
+        db.exec(`
+          INSERT INTO users_mig (id, company_id, email, full_name, country, password_hash, role, timezone, created_at)
+          SELECT id, company_id, email, full_name, country, password_hash,
+                 CASE 
+                   WHEN lower(email) = lower('admin@example.com') THEN 'super_admin'
+                   WHEN role = 'super_admin' AND company_id IS NOT NULL THEN 'company_admin'
+                   ELSE role
+                 END,
+                 timezone, created_at
+          FROM users;
+        `)
+        db.exec("DROP TABLE users")
+        db.exec("ALTER TABLE users_mig RENAME TO users")
+        console.log('[sqlite] Migrated users table to include company_admin role')
+      })()
+    }
+  } catch (e) {
+    console.error('[sqlite] Role migration failed:', e)
+  }
+
   // Migration: Default Company for existing data
   const defaultCompany = db.prepare("SELECT * FROM companies WHERE id = 1").get()
   if (!defaultCompany) {
@@ -195,6 +234,19 @@ try {
   for (const p of Object.values(fallbacks)) {
     if (!fs.existsSync(p)) fs.writeFileSync(p, '[]')
   }
+  try {
+    let arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
+    let changed = false
+    arr = arr.map(u => {
+      if (String(u.email).toLowerCase() === 'admin@example.com') return u
+      if (u.role === 'super_admin' && u.company_id != null) {
+        changed = true
+        return { ...u, role: 'company_admin' }
+      }
+      return u
+    })
+    if (changed) fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
+  } catch {}
 }
 
 export { db }
@@ -206,6 +258,30 @@ export function getUserByEmail(email) {
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
   return arr.find(u => String(u.email).toLowerCase() === String(email).toLowerCase())
+}
+
+export function listCompanies() {
+  if (db) {
+    return db.prepare('SELECT * FROM companies ORDER BY created_at DESC').all()
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
+  return arr
+}
+
+export function listUsersByCompany(company_id) {
+  if (db) {
+    return db.prepare('SELECT id, email, role, country, timezone, company_id FROM users WHERE company_id = ?').all(company_id)
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
+  return arr.filter(u => u.company_id == company_id).map(u => ({ id: u.id, email: u.email, role: u.role, country: u.country, timezone: u.timezone, company_id: u.company_id }))
+}
+
+export function listAllUsers() {
+  if (db) {
+    return db.prepare('SELECT id, email, role, country, timezone, company_id FROM users').all()
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
+  return arr.map(u => ({ id: u.id, email: u.email, role: u.role, country: u.country, timezone: u.timezone, company_id: u.company_id }))
 }
 
 export function createCompany({ name }) {

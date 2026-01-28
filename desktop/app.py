@@ -335,7 +335,7 @@ class TimeTrackerApp:
             return
 
         try:
-            resp = requests.post(f'{self.backend_url}/api/auth/login', json={'email': email, 'password': password}, timeout=10)
+            resp = requests.post(f'{self.backend_url}/api/auth/login', json={'email': email, 'password': password, 'role': 'employee'}, timeout=10)
             
             if resp.status_code == 401:
                 messagebox.showerror('Login Failed', 'Incorrect email or password.')

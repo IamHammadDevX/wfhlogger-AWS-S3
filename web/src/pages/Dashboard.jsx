@@ -126,7 +126,7 @@ export default function Dashboard() {
 
       {/* Stats */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Stat label={role === 'super_admin' ? "Company" : "Active Team"} value={team?.name || 'Not configured'} />
+        <Stat label={(role === 'super_admin' || role === 'company_admin') ? "Company" : "Active Team"} value={team?.name || 'Not configured'} />
         <Stat label="Total Employees" value={filteredEmployees.length} />
         <Stat label="Recent Screenshots" value={filteredFiles.length} />
         <Stat label="System Status" value={loading ? 'Loading…' : 'Operational'} />

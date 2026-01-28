@@ -87,34 +87,53 @@ export default function Sidebar({ isOpen, setIsOpen }) {
 
           {/* Navigation */}
           <div className="flex-1 overflow-y-auto scroll-smooth py-6 px-4 space-y-1">
-            <div className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Overview
-            </div>
-            <NavItem to="/dashboard" icon={Icons.Dashboard} label="Dashboard" />
-            <NavItem to="/live" icon={Icons.Live} label="Live View" />
+            {role === 'super_admin' ? (
+              <>
+                <div className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Platform
+                </div>
+                <NavItem to="/platform" icon={Icons.Dashboard} label="Analytics" />
+              </>
+            ) : (
+              <>
+                <div className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Overview
+                </div>
+                <NavItem to="/dashboard" icon={Icons.Dashboard} label="Dashboard" />
+                <NavItem to="/live" icon={Icons.Live} label="Live View" />
+              </>
+            )}
             
-            <div className="px-3 mb-2 mt-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Management
-            </div>
-            <NavItem to="/report" icon={Icons.Reports} label="Reports" />
-            <NavItem to="/activity" icon={Icons.Activity} label="Activity Logs" />
-            <NavItem to="/hours" icon={Icons.WorkHours} label="Work Hours" />
-            <NavItem to="/requests" icon={Icons.Requests} label="Requests" />
+            {role !== 'super_admin' && (
+              <>
+                <div className="px-3 mb-2 mt-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Management
+                </div>
+                <NavItem to="/report" icon={Icons.Reports} label="Reports" />
+                <NavItem to="/activity" icon={Icons.Activity} label="Activity Logs" />
+                <NavItem to="/hours" icon={Icons.WorkHours} label="Work Hours" />
+                <NavItem to="/requests" icon={Icons.Requests} label="Requests" />
+              </>
+            )}
             
-            <div className="px-3 mb-2 mt-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              System
-            </div>
-            <NavItem to="/setup" icon={Icons.Setup} label={role === 'super_admin' ? 'Company' : 'Organization'} />
-            {role === 'super_admin' && (
-              <NavItem to="/company" icon={Icons.Admin} label="Company Profile" />
+            {role !== 'super_admin' && (
+              <>
+                <div className="px-3 mb-2 mt-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  System
+                </div>
+                <NavItem to="/setup" icon={Icons.Setup} label={role === 'company_admin' ? 'Company' : 'Organization'} />
+                {role === 'company_admin' && (
+                  <NavItem to="/company" icon={Icons.Admin} label="Company Profile" />
+                )}
+                {role === 'company_admin' && (
+                  <NavItem to="/billing" icon={Icons.Billing} label="Billing" />
+                )}
+                {role === 'company_admin' && (
+                  <NavItem to="/admin" icon={Icons.Admin} label="Administration" />
+                )}
+                <NavItem to="/downloads" icon={Icons.Downloads} label="Downloads" />
+              </>
             )}
-            {role === 'super_admin' && (
-              <NavItem to="/billing" icon={Icons.Billing} label="Billing" />
-            )}
-            {role === 'super_admin' && (
-              <NavItem to="/admin" icon={Icons.Admin} label="Administration" />
-            )}
-            <NavItem to="/downloads" icon={Icons.Downloads} label="Downloads" />
           </div>
 
           {/* Footer */}

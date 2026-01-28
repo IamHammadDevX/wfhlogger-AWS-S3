@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
@@ -73,7 +73,7 @@ if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
       for (const comp of companies) {
         if (!comp.credits || comp.credits <= 0) {
           // Send suspension warning
-          const admin = listManagers(comp.id).find(u => u.role === 'super_admin');
+          const admin = listAllUsers().find(u => u.company_id == comp.id && u.role === 'company_admin');
           if (admin) sendAccountSuspensionWarning(admin.email);
           continue;
         }
@@ -96,7 +96,7 @@ if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
               status: 'success'
             });
             // Send Email
-            const admin = listManagers(comp.id).find(u => u.role === 'super_admin');
+            const admin = listAllUsers().find(u => u.company_id == comp.id && u.role === 'company_admin');
             if (admin) {
               // Legacy
               // sendSubscriptionDeduction(admin.email, cost, comp.credits);
@@ -107,7 +107,7 @@ if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
           } else {
             // Partial deduction or suspend?
             // For now, just warn
-            const admin = listManagers(comp.id).find(u => u.role === 'super_admin');
+            const admin = listAllUsers().find(u => u.company_id == comp.id && u.role === 'company_admin');
             if (admin) sendLowCreditWarning(admin.email, comp.credits);
           }
         }
@@ -237,34 +237,25 @@ seedDefaultSuperAdmin();
 app.post('/api/auth/login', (req, res) => {
   try {
     const { email, password, role } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+    if (!email || !password || !role) return res.status(400).json({ error: 'Email, password and role are required' });
     const user = getUserByEmail(email);
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     
-    // Role Check: If role is provided, validate it.
-    // Allow 'super_admin' to login even if they selected 'manager' (downwards compatibility) or vice versa if roles overlap?
-    // STRICT MODE: Enforce exact match or hierarchy?
-    // For now: 
-    // - If user is super_admin, they can login as super_admin or manager (dashboard access)
-    // - If user is manager, they can only login as manager
-    
-    if (role) {
-      if (user.role === 'super_admin') {
-        // Super admin can access everything, pass
-      } else if (user.role !== role) {
-        return res.status(403).json({ error: 'Forbidden: role mismatch' });
-      }
+    const effectiveRole = (user.role === 'super_admin' && user.company_id != null) ? 'company_admin' : user.role;
+    if (String(role) !== String(effectiveRole)) {
+      try { appendAudit('rbac_role_mismatch', { email, selectedRole: role, actualRole: effectiveRole }, user.company_id); } catch {}
+      return res.status(403).json({ error: 'Forbidden: role mismatch' });
     }
 
     const ok = verifyPassword(user, password);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: user.company_id, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC' }, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ sub: user.email, email: user.email, role: effectiveRole, uid: user.id, company_id: user.company_id, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC' }, JWT_SECRET, { expiresIn: '8h' });
     try {
       if (user.role === 'employee') {
         appendAudit('employee_web_login', { email, ip: req.ip, ua: req.headers['user-agent'] }, user.company_id);
       }
     } catch {}
-    res.json({ token, user: { id: user.id, email: user.email, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC', role: user.role } });
+    res.json({ token, user: { id: user.id, email: user.email, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC', role: effectiveRole } });
   } catch (e) {
     console.error('[auth:login] error:', e);
     res.status(500).json({ error: 'Login failed' });
@@ -394,15 +385,20 @@ function requireRole(roles = []) {
   return (req, res, next) => {
     const auth = req.headers.authorization || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    if (!token) {
+      try { appendAudit('rbac_unauthorized', { path: req.path, method: req.method }, null) } catch {}
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     try {
       const payload = jwt.verify(token, JWT_SECRET);
       req.user = payload;
       if (roles.length && !roles.includes(payload.role)) {
+        try { appendAudit('rbac_forbidden', { path: req.path, method: req.method, role: payload.role, company_id: payload.company_id }, payload.company_id) } catch {}
         return res.status(403).json({ error: 'Forbidden' });
       }
       next();
     } catch (e) {
+      try { appendAudit('rbac_invalid_token', { path: req.path, method: req.method }, null) } catch {}
       return res.status(401).json({ error: 'Invalid token' });
     }
   };
@@ -491,11 +487,11 @@ app.get('/api/org', requireRole(['manager', 'super_admin']), (req, res) => {
 });
 
 // Team info for the authenticated manager (maps to organization by manager)
-app.get('/api/team', requireRole(['manager', 'super_admin']), (req, res) => {
+app.get('/api/team', requireRole(['manager', 'super_admin', 'company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id;
-    // For super_admin owner, we return the company info as the "team"
-    if (req.user?.role === 'super_admin') {
+    // For super_admin owner or company_admin, we return the company info as the "team"
+    if (req.user?.role === 'super_admin' || req.user?.role === 'company_admin') {
       const company = getCompanyById(company_id);
       if (company) {
         return res.json({ team: { id: company.id, name: company.name } });
@@ -635,7 +631,7 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
         reference_id: `emp_${loginUser.id}`,
         status: 'success'
       });
-      const admin = listManagers(company_id).find(u => u.role === 'super_admin');
+      const admin = listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin');
       if (admin) {
         sendEmployeeCreatedDeduction(admin.email, {
           employeeName: name || email,
@@ -667,7 +663,7 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
 });
 
 // ---- Super Admin: Manager creation ----
-app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
+app.post('/api/admin/managers', requireRole(['company_admin']), (req, res) => {
   try {
     const { email, password, orgName, name, country, timezone } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
@@ -713,7 +709,7 @@ app.post('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
 });
 
 // Admin: List manager initial credentials
-app.get('/api/admin/managers/creds', requireRole(['super_admin']), (req, res) => {
+app.get('/api/admin/managers/creds', requireRole(['company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id
     const rows = listManagerTempPasswords(company_id)
@@ -724,7 +720,7 @@ app.get('/api/admin/managers/creds', requireRole(['super_admin']), (req, res) =>
 })
 
 // Manager/Admin: List employee initial credentials (tenant-scoped)
-app.get('/api/employees/initial-creds', requireRole(['manager','super_admin']), (req, res) => {
+app.get('/api/employees/initial-creds', requireRole(['manager','company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id
     const rows = listEmployeeTempPasswords(company_id)
@@ -735,7 +731,7 @@ app.get('/api/employees/initial-creds', requireRole(['manager','super_admin']), 
 })
 
 // ---- Super Admin: Managers list with employee counts ----
-app.get('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
+app.get('/api/admin/managers', requireRole(['company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id;
     const managers = listManagers(company_id);
@@ -757,7 +753,7 @@ app.get('/api/admin/managers', requireRole(['super_admin']), (req, res) => {
 });
 
 // ---- Super Admin: Delete a manager ----
-app.delete('/api/admin/managers/:id', requireRole(['super_admin']), (req, res) => {
+app.delete('/api/admin/managers/:id', requireRole(['company_admin']), (req, res) => {
   try {
     const { id } = req.params;
     // Verify manager exists
@@ -786,7 +782,7 @@ app.delete('/api/admin/managers/:id', requireRole(['super_admin']), (req, res) =
 });
 
 // ---- Super Admin: Audit logs ----
-app.get('/api/admin/audit-logs', requireRole(['super_admin']), (req, res) => {
+app.get('/api/admin/audit-logs', requireRole(['company_admin']), (req, res) => {
   try {
     let logs = [];
     try { logs = JSON.parse(fs.readFileSync(auditFile, 'utf-8')); } catch {}
@@ -804,7 +800,7 @@ app.get('/api/admin/audit-logs', requireRole(['super_admin']), (req, res) => {
   }
 });
 
-app.get('/api/employees', requireRole(['manager', 'super_admin']), (req, res) => {
+app.get('/api/employees', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     const allUsers = readUsers();
     const company_id = req.user?.company_id;
@@ -834,7 +830,7 @@ app.get('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =>
 });
 
 // ---- Admin/Manager: Delete an employee ----
-app.delete('/api/employees/:email', requireRole(['manager', 'super_admin']), (req, res) => {
+app.delete('/api/employees/:email', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     let { email } = req.params;
     if (!email) return res.status(400).json({ error: 'Email is required' });
@@ -889,7 +885,7 @@ app.delete('/api/employees/:email', requireRole(['manager', 'super_admin']), (re
 });
 
 // Admin/Manager: Set or reset an employee password (provision login if missing)
-app.post('/api/admin/employees/password', requireRole(['manager', 'super_admin']), (req, res) => {
+app.post('/api/admin/employees/password', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     let { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
@@ -1066,7 +1062,7 @@ app.post('/api/billing/verify', requireRole(['super_admin']), async (req, res) =
   return res.status(503).json({ error: 'Razorpay is temporarily disabled' });
 });
 
-app.get('/api/billing/history', requireRole(['super_admin']), (req, res) => {
+app.get('/api/billing/history', requireRole(['company_admin']), (req, res) => {
   try {
     const history = getTransactions(req.user?.company_id);
     res.json({ history });
@@ -1075,7 +1071,7 @@ app.get('/api/billing/history', requireRole(['super_admin']), (req, res) => {
   }
 });
 
-app.get('/api/billing/balance', requireRole(['super_admin', 'manager']), (req, res) => {
+app.get('/api/billing/balance', requireRole(['company_admin', 'manager']), (req, res) => {
   try {
     const company = getCompanyById(req.user?.company_id);
     res.json({ credits: company?.credits || 0, plan: company?.plan });
@@ -1085,7 +1081,7 @@ app.get('/api/billing/balance', requireRole(['super_admin', 'manager']), (req, r
 });
 
 // Billing summary (admin)
-app.get('/api/billing/summary', requireRole(['super_admin']), (req, res) => {
+app.get('/api/billing/summary', requireRole(['company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id;
     const company = getCompanyById(company_id);
@@ -1097,7 +1093,7 @@ app.get('/api/billing/summary', requireRole(['super_admin']), (req, res) => {
   }
 });
 
-app.get('/api/billing/invoices', requireRole(['super_admin']), (req, res) => {
+app.get('/api/billing/invoices', requireRole(['company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id
     const list = listInvoices(company_id)
@@ -1107,7 +1103,7 @@ app.get('/api/billing/invoices', requireRole(['super_admin']), (req, res) => {
   }
 })
 
-app.get('/api/billing/invoices/:invoice_id/download', requireRole(['super_admin']), async (req, res) => {
+app.get('/api/billing/invoices/:invoice_id/download', requireRole(['company_admin']), async (req, res) => {
   try {
     const company_id = req.user?.company_id
     const invoice_id = req.params.invoice_id
@@ -1142,7 +1138,7 @@ app.get('/api/billing/invoices/:invoice_id/download', requireRole(['super_admin'
 })
 
 // ---- Company Profile (Admin only) ----
-app.get('/api/company/profile', requireRole(['super_admin']), (req, res) => {
+app.get('/api/company/profile', requireRole(['company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id
     const c = getCompanyById(company_id)
@@ -1166,7 +1162,7 @@ app.get('/api/company/profile', requireRole(['super_admin']), (req, res) => {
 
 // Accept multipart for logo; and JSON fields for name/emails
 const logoUpload = upload.single('logo')
-app.put('/api/company/profile', requireRole(['super_admin']), (req, res, next) => logoUpload(req, res, next), (req, res) => {
+app.put('/api/company/profile', requireRole(['company_admin']), (req, res, next) => logoUpload(req, res, next), (req, res) => {
   try {
     const company_id = req.user?.company_id
     const { name, billing_email, admin_contact_email } = req.body || {}
@@ -1186,7 +1182,7 @@ app.put('/api/company/profile', requireRole(['super_admin']), (req, res, next) =
 })
 
 // Company brand (name/logo) for all roles, scoped by company_id
-app.get('/api/company/brand', requireRole(['super_admin','manager','employee']), (req, res) => {
+app.get('/api/company/brand', requireRole(['company_admin','manager','employee']), (req, res) => {
   try {
     const company_id = req.user?.company_id
     const c = getCompanyById(company_id)
@@ -1197,7 +1193,7 @@ app.get('/api/company/brand', requireRole(['super_admin','manager','employee']),
   }
 })
 // Stripe: Create Checkout Session
-app.post('/api/billing/stripe/checkout-session', requireRole(['super_admin']), async (req, res) => {
+app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']), async (req, res) => {
   try {
     if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' });
     const { amount_usd } = req.body || {};
@@ -1285,7 +1281,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
 // ---- Screen capture interval configuration ----
 // Align with web UI options (include 1 minute)
 const allowedMinutes = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
-app.get('/api/capture-interval', requireRole(['employee', 'manager', 'super_admin']), (req, res) => {
+app.get('/api/capture-interval', requireRole(['employee', 'manager', 'company_admin']), (req, res) => {
   try {
     const intervals = JSON.parse(fs.readFileSync(intervalsFile, 'utf-8'));
     const requesterRole = req.user?.role;
@@ -1316,7 +1312,7 @@ app.get('/api/capture-interval', requireRole(['employee', 'manager', 'super_admi
   }
 });
 
-app.post('/api/capture-interval', requireRole(['manager', 'super_admin']), (req, res) => {
+app.post('/api/capture-interval', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     const { employeeId, intervalMinutes } = req.body || {};
     if (!employeeId) return res.status(400).json({ error: 'employeeId is required' });
@@ -1353,7 +1349,7 @@ app.post('/api/capture-interval', requireRole(['manager', 'super_admin']), (req,
   }
 });
 
-app.get('/api/capture-intervals', requireRole(['manager','super_admin']), (req, res) => {
+app.get('/api/capture-intervals', requireRole(['manager','company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id
     const intervals = JSON.parse(fs.readFileSync(intervalsFile, 'utf-8'))
@@ -1722,7 +1718,7 @@ app.post('/api/work/stop', requireRole(['employee']), (req, res) => {
 });
 
 // Manager summary: today per employee
-app.get('/api/work/summary/today', requireRole(['manager', 'super_admin']), (req, res) => {
+app.get('/api/work/summary/today', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     const sessions = readSessions();
     
@@ -1769,7 +1765,7 @@ app.get('/api/work/summary/today', requireRole(['manager', 'super_admin']), (req
 });
 
 // Manager endpoint: today sessions per employee with per-session details
-app.get('/api/work/sessions/today', requireRole(['manager', 'super_admin']), (req, res) => {
+app.get('/api/work/sessions/today', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     const sessions = readSessions();
     
@@ -1908,7 +1904,7 @@ app.post('/api/uploads/cleanup', requireRole(['super_admin']), (req, res) => {
 });
 
 // List uploaded screenshots (development helper)
-app.get('/api/uploads/list', requireRole(['manager', 'super_admin']), async (req, res) => {
+app.get('/api/uploads/list', requireRole(['manager', 'company_admin']), async (req, res) => {
   try {
     const files = fs.readdirSync(uploadPath).filter(f => /\.(jpg|jpeg|png)$/i.test(f)).sort();
     let meta = [];
@@ -1945,7 +1941,7 @@ app.get('/api/uploads/list', requireRole(['manager', 'super_admin']), async (req
 });
 
 // Query uploaded screenshots by employee and date range
-app.get('/api/uploads/query', requireRole(['manager', 'super_admin']), async (req, res) => {
+app.get('/api/uploads/query', requireRole(['manager', 'company_admin']), async (req, res) => {
   try {
     const { employeeId, from, to } = req.query || {};
     let meta = [];
@@ -2038,7 +2034,7 @@ app.get('/api/work/sessions/range', requireRole(['manager', 'super_admin']), (re
 });
 
 // Activity: recent screenshots grouped by employee (dev helper)
-app.get('/api/activity/recent', requireRole(['manager', 'super_admin']), (req, res) => {
+app.get('/api/activity/recent', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     const arr = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
     // group by employeeId
@@ -2134,8 +2130,8 @@ io.on('connection', (socket) => {
     }
   }
 
-  // On manager connection, send current online employees list (scoped to team AND company)
-  if (role === 'manager' || role === 'super_admin') {
+  // On manager/company_admin connection, send current online employees list (scoped to team AND company)
+  if (role === 'manager' || role === 'company_admin') {
     let users = Array.from(onlineEmployees);
     
     // Filter users by company (needs lookup if we don't store company_id in onlineEmployees)
@@ -2156,8 +2152,10 @@ io.on('connection', (socket) => {
 
   // Manager can start live view: join the viewer room and signal employee
   socket.on('live_view:start', ({ employeeId }) => {
-    // Only allow verified manager/super_admin via JWT
-    if (role !== 'manager' && role !== 'super_admin') return;
+    if (role !== 'manager' && role !== 'company_admin') {
+      try { appendAudit('rbac_forbidden_socket', { actorId: socket.data.userId || userId, event: 'live_view:start' }, company_id) } catch {}
+      return;
+    }
 
     // Validate permission
     const allUsers = readUsers();
@@ -2178,7 +2176,10 @@ io.on('connection', (socket) => {
 
   // Manager can stop live view: leave the viewer room and signal employee
   socket.on('live_view:stop', ({ employeeId }) => {
-    if (role !== 'manager' && role !== 'super_admin') return;
+    if (role !== 'manager' && role !== 'company_admin') {
+      try { appendAudit('rbac_forbidden_socket', { actorId: socket.data.userId || userId, event: 'live_view:stop' }, company_id) } catch {}
+      return;
+    }
     
     // Validate permission
     const allUsers = readUsers();
@@ -2375,6 +2376,58 @@ app.post('/api/admin/reset-all', requireRole(['super_admin']), (req, res) => {
   }
 })
 
+app.get('/api/platform/metrics', requireRole(['super_admin']), (req, res) => {
+  try {
+    const companies = listCompanies()
+    const users = listAllUsers()
+    const total_companies = companies.length
+    const country_distribution = {}
+    const timezone_distribution = {}
+    for (const u of users) {
+      const c = (u.country || '').trim() || 'Unknown'
+      const t = (u.timezone || '').trim() || 'UTC'
+      country_distribution[c] = (country_distribution[c] || 0) + 1
+      timezone_distribution[t] = (timezone_distribution[t] || 0) + 1
+    }
+    const per_company = companies.map(c => {
+      const cu = users.filter(u => u.company_id == c.id)
+      const admins = cu.filter(u => u.role === 'company_admin').length
+      const managers = cu.filter(u => u.role === 'manager').length
+      const employees = cu.filter(u => u.role === 'employee').length
+      const tx = getTransactions(c.id) || []
+      const revenue = tx.filter(t => t.type === 'credit').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+      return {
+        company_id: c.id,
+        name: c.name,
+        plan: c.plan || 'free',
+        credits: c.credits || 0,
+        admins,
+        managers,
+        employees,
+        revenue
+      }
+    })
+    const total_revenue = per_company.reduce((s, r) => s + (r.revenue || 0), 0)
+    const growth = (() => {
+      const byMonth = {}
+      for (const c of companies) {
+        const tx = getTransactions(c.id) || []
+        for (const t of tx) {
+          if (t.type !== 'credit') continue
+          const d = new Date(t.created_at)
+          const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`
+          byMonth[key] = (byMonth[key] || 0) + (Number(t.amount) || 0)
+        }
+      }
+      const series = Object.entries(byMonth).sort((a,b)=> a[0] > b[0] ? 1 : -1).map(([month, revenue]) => ({ month, revenue }))
+      return { monthly_revenue: series }
+    })()
+    res.json({ total_companies, total_revenue, per_company, country_distribution, timezone_distribution, growth })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load platform metrics' })
+  }
+})
+
 
 // ---------- BEGIN: compatibility proxy to support hardcoded :4000 frontend ----------
 // If the backend starts on a different port than 4000, create a tiny proxy
@@ -2437,7 +2490,7 @@ httpServer.listen(PORT, () => {
 });
 // ---------- END: compatibility proxy ----------
 // Query current online employees (role-scoped)
-app.get('/api/presence/online', requireRole(['manager', 'super_admin']), (req, res) => {
+app.get('/api/presence/online', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     let users = Array.from(onlineEmployees);
     const company_id = req.user?.company_id;
