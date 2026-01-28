@@ -11,6 +11,8 @@ import ForgotPassword from './pages/ForgotPassword.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import SADashboard from './pages/platform/SADashboard.jsx'
+import SACompanies from './pages/platform/SACompanies.jsx'
+import SARevenue from './pages/platform/SARevenue.jsx'
 import LiveView from './pages/LiveView.jsx'
 import Report from './pages/Report.jsx'
 import Activity from './pages/Activity.jsx'
@@ -88,6 +90,8 @@ function AppRoutes() {
       <Route path="/billing" element={<ProtectedRoute allowedRoles={['company_admin']}><Billing /></ProtectedRoute>} />
       <Route path="/company" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyProfile /></ProtectedRoute>} />
       <Route path="/platform" element={<ProtectedRoute allowedRoles={['super_admin']}><SADashboard /></ProtectedRoute>} />
+      <Route path="/platform/companies" element={<ProtectedRoute allowedRoles={['super_admin']}><SACompanies /></ProtectedRoute>} />
+      <Route path="/platform/revenue" element={<ProtectedRoute allowedRoles={['super_admin']}><SARevenue /></ProtectedRoute>} />
       
       {/* Employee Routes */}
       <Route path="/employee/dashboard" element={<ProtectedRoute allowedRoles={['employee']}><EmployeeDashboard /></ProtectedRoute>} />
