@@ -11,6 +11,7 @@ export default function LiveView() {
   const [onlineEmployees, setOnlineEmployees] = useState([])
   const [filteredOnline, setFilteredOnline] = useState([])
   const [allEmployees, setAllEmployees] = useState([])
+  const [visibleEmployees, setVisibleEmployees] = useState([])
   const [managers, setManagers] = useState([])
   const [selectedManager, setSelectedManager] = useState('')
   const [role, setRole] = useState('')
@@ -114,7 +115,11 @@ export default function LiveView() {
     const headers = { Authorization: `Bearer ${token}` }
     let decoded = null
     resolveApiBase().then((BASE)=>{
-      axios.get(`${BASE}/api/employees`, { headers }).then(r => setAllEmployees(r.data?.users || [])).catch(()=>{})
+      axios.get(`${BASE}/api/employees`, { headers }).then(r => {
+        const users = Array.isArray(r.data?.users) ? r.data.users : []
+        setAllEmployees(users)
+        setVisibleEmployees(users.filter(u => u.role === 'employee'))
+      }).catch(()=>{})
       axios.get(`${BASE}/api/presence/online`, { headers }).then(r => {
         const list = Array.isArray(r.data?.users) ? r.data.users : []
         setOnlineEmployees(list)
@@ -132,12 +137,14 @@ export default function LiveView() {
   useEffect(() => {
     if (!selectedManager) {
       setFilteredOnline(onlineEmployees)
+      setVisibleEmployees(allEmployees.filter(u => u.role === 'employee'))
       return
     }
     const team = allEmployees.filter(e => String(e.managerId || '') === String(selectedManager))
       .map(e => e.email)
     const filtered = onlineEmployees.filter(e => team.includes(e))
     setFilteredOnline(filtered)
+    setVisibleEmployees(allEmployees.filter(u => u.role === 'employee' && team.includes(u.email)))
   }, [selectedManager, onlineEmployees, allEmployees, managers])
 
   useEffect(() => {
@@ -230,16 +237,18 @@ export default function LiveView() {
             value={employeeId}
             onChange={e=>setEmployeeId(e.target.value)}
           >
-            <option value="">{filteredOnline.length > 0 ? "Select active employee..." : "No employees online"}</option>
-            {filteredOnline.map(email => (
-              <option key={email} value={email}>
-                {email} {status === 'active' && employeeId === email ? '(Viewing)' : ''}
-              </option>
-            ))}
-            {/* Only show selected offline employee if explicitly selected previously */}
-            {employeeId && !filteredOnline.includes(employeeId) && (
-              <option value={employeeId}>{employeeId} (Offline)</option>
-            )}
+            <option value="">{visibleEmployees.length > 0 ? "Select employee..." : "No employees in company yet"}</option>
+            {visibleEmployees.map(emp => {
+              const email = emp.email
+              const name = emp.full_name || emp.name || email
+              const isOn = onlineEmployees.includes(email)
+              const viewing = status === 'active' && employeeId === email
+              return (
+                <option key={email} value={email}>
+                  {name} ({email}) {viewing ? '(Viewing)' : isOn ? '(Online)' : '(Offline)'}
+                </option>
+              )
+            })}
           </select>
 
           <button 
