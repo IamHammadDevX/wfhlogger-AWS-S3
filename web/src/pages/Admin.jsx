@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
+import { getSocket } from '../socket.js'
 import { TextField, CountrySelect, TimezoneSelect, DateField } from '../components/FormControls.jsx'
 
 export default function Admin() {
@@ -123,6 +124,13 @@ export default function Admin() {
     loadManagerCreds()
   }, [])
 
+  useEffect(() => {
+    const s = getSocket()
+    if (!s) return
+    const handler = () => { loadEmployees() }
+    s.on('employees:updated', handler)
+    return () => { try { s.off('employees:updated', handler) } catch {} }
+  }, [])
   useEffect(() => {
     loadLogs()
   }, [filterManagerId, filterEmployeeId])

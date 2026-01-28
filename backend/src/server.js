@@ -105,6 +105,7 @@ if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
               const period = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
               sendMonthlyBillingSummary(admin.email, { period, activeEmployees: employees.length, deducted: cost, remaining: comp.credits });
             }
+          try { io.to(`company:${comp.id}`).emit('company:credits_updated', { company_id: comp.id, balance: comp.credits }) } catch {}
           } else {
             // Partial deduction or suspend?
             // For now, just warn
@@ -705,11 +706,12 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
           sendLowCreditWarning(admin.email, newBalance);
         }
       }
-      try { io.emit('company:credits_updated', { company_id, balance: newBalance }) } catch {}
+      try { io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance }) } catch {}
     } catch (e) {
       console.warn('[employees:debit_on_create] failed:', e?.message || e);
     }
 
+    try { io.to(`company:${company_id}`).emit('employees:updated', { company_id, email }) } catch {}
     res.status(201).json({
       user: record,
       login: { id: loginUser.id, email: loginUser.email, tempPassword }
@@ -981,6 +983,7 @@ app.delete('/api/employees/:email', requireRole(['manager', 'company_admin']), (
       console.warn('[employees:delete] screenshot cleanup failed:', cleanupErr?.message || cleanupErr);
     }
 
+    try { io.to(`company:${req.user?.company_id}`).emit('employees:updated', { company_id: req.user?.company_id, email }) } catch {}
     res.json({ ok: true });
   } catch (e) {
     console.error('[employees:delete] error:', e);
@@ -1394,7 +1397,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
           if (admin) sendPaymentSuccess(admin.email, credit_amount_usd, credits);
         } catch {}
         try {
-          io.emit('company:credits_updated', { company_id, balance: newBalance })
+          io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance })
         } catch {}
       }
     }
@@ -1850,6 +1853,7 @@ app.post('/api/work/start', requireRole(['employee']), (req, res) => {
     const record = { id: `${employeeId}-${Date.now()}`, employeeId, company_id, startedAt: now, endedAt: null, isActive: true, idleSeconds: 0, lastHeartbeatAt: now, date: todayStr() };
     sessions.push(record);
     writeSessions(sessions);
+    try { io.to(`company:${company_id}`).emit('work:updated', { employeeId, company_id, event: 'start' }) } catch {}
     res.status(201).json({ ok: true, session: record });
   } catch (e) {
     console.error('[work:start] error:', e);
@@ -1891,6 +1895,7 @@ app.post('/api/work/stop', requireRole(['employee']), (req, res) => {
       liveStreamOn.set(employeeId, false);
       io.to(viewersRoom(employeeId)).emit('live_view:terminate', { by: employeeId, reason: 'work_stop' });
     } catch {}
+    try { io.to(`company:${req.user?.company_id}`).emit('work:updated', { employeeId, company_id: req.user?.company_id, event: 'stop' }) } catch {}
     res.json({ ok: true, session: active });
   } catch (e) {
     console.error('[work:stop] error:', e);

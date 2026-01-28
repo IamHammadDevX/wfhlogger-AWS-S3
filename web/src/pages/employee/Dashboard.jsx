@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTheme } from '../../ThemeContext.jsx'
 import axios from 'axios'
+import { getSocket } from '../../socket.js'
 
 export default function EmployeeDashboard() {
   const { theme, toggleTheme } = useTheme()
@@ -11,6 +12,23 @@ export default function EmployeeDashboard() {
 
   useEffect(() => {
     fetchDashboardSummary()
+  }, [])
+  useEffect(() => {
+    const s = getSocket()
+    if (!s) return
+    let email = ''
+    try {
+      const token = localStorage.getItem('token')
+      const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+      email = payload?.email || ''
+    } catch {}
+    const handler = (p) => {
+      if (p?.employeeId && email && p.employeeId === email) {
+        fetchDashboardSummary()
+      }
+    }
+    s.on('work:updated', handler)
+    return () => { try { s.off('work:updated', handler) } catch {} }
   }, [])
 
   const fetchDashboardSummary = async () => {

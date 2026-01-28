@@ -54,6 +54,14 @@ export default function Dashboard() {
     }
     s.on('uploads:cleanup_done', refreshShots)
     s.on('uploads:new', refreshShots)
+    const refreshEmployees = () => {
+      resolveApiBase().then((BASE)=>{
+        axios.get(`${BASE}/api/employees`, { headers })
+          .then(r => { const list = r.data.users || []; setEmployees(list); setEmployeesCount(list.length) })
+          .catch(()=> { setEmployees([]); setEmployeesCount(0) })
+      })
+    }
+    s.on('employees:updated', refreshEmployees)
     return () => { s.off('uploads:cleanup_done', refreshShots); s.off('uploads:new', refreshShots) }
   }, [])
 

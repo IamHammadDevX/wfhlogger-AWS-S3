@@ -280,5 +280,11 @@
     "employeeId": "robert@apl.com",
     "company_id": 1,
     "ts": "2026-01-28T21:05:43.763Z"
+  },
+  {
+    "file": "uploads/2026-01-28T21-26-31-119Z-screenshot.jpg",
+    "employeeId": "jane@ms.com",
+    "company_id": 2,
+    "ts": "2026-01-28T21:26:31.132Z"
   }
 ]
