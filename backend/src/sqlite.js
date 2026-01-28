@@ -122,6 +122,9 @@ try {
     date TEXT NOT NULL,
     start_time TEXT NOT NULL,
     end_time TEXT NOT NULL,
+    timezone TEXT,
+    start_utc TEXT,
+    end_utc TEXT,
     reason TEXT,
     status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected')),
     created_at TEXT NOT NULL,
@@ -171,6 +174,12 @@ try {
     ensureCol('billing_address', "ALTER TABLE companies ADD COLUMN billing_address TEXT")
     ensureCol('admin_contact_email', "ALTER TABLE companies ADD COLUMN admin_contact_email TEXT")
     ensureCol('updated_at', "ALTER TABLE companies ADD COLUMN updated_at TEXT")
+
+    const reqInfo = db.prepare("PRAGMA table_info(time_requests)").all()
+    const ensureReqCol = (name, sql) => { if (!reqInfo.find(c => c.name === name)) { db.exec(sql); console.log('[sqlite] Migrated time_requests: added', name) } }
+    ensureReqCol('timezone', "ALTER TABLE time_requests ADD COLUMN timezone TEXT")
+    ensureReqCol('start_utc', "ALTER TABLE time_requests ADD COLUMN start_utc TEXT")
+    ensureReqCol('end_utc', "ALTER TABLE time_requests ADD COLUMN end_utc TEXT")
   } catch (e) {
     console.error('[sqlite] Migration check failed:', e)
   }
@@ -714,11 +723,11 @@ export function creditCompanyWithTransaction({ company_id, amount_usd, credits, 
 // ---- Time Requests ----
 
 export function createTimeRequest(data) {
-  const { company_id, employee_id, date, start_time, end_time, reason } = data;
   const now = new Date().toISOString();
   if (db) {
-    const stmt = db.prepare('INSERT INTO time_requests (company_id, employee_id, date, start_time, end_time, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    const info = stmt.run(company_id, employee_id, date, start_time, end_time, reason, now);
+    const { company_id, employee_id, date, start_time, end_time, timezone = null, start_utc = null, end_utc = null, reason } = data;
+    const stmt = db.prepare('INSERT INTO time_requests (company_id, employee_id, date, start_time, end_time, timezone, start_utc, end_utc, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    const info = stmt.run(company_id, employee_id, date, start_time, end_time, timezone, start_utc, end_utc, reason, now);
     return { id: info.lastInsertRowid, ...data, status: 'pending', created_at: now };
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.requests, 'utf-8'));

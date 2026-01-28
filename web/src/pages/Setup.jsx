@@ -19,6 +19,8 @@ export default function Setup() {
   const [inviteMsg, setInviteMsg] = useState('')
   const [creds, setCreds] = useState([])
   const [teamEmployees, setTeamEmployees] = useState([])
+  const [employeeTzDraft, setEmployeeTzDraft] = useState({})
+  const [tzSaving, setTzSaving] = useState('')
   const [credits, setCredits] = useState(0)
 
   useEffect(() => {
@@ -35,7 +37,17 @@ export default function Setup() {
         .then(r => setCreds(r.data?.creds || []))
         .catch(()=>{})
       axios.get(`${BASE}/api/employees`, { headers })
-        .then(r => setTeamEmployees(r.data?.users || []))
+        .then(r => {
+          const users = r.data?.users || []
+          setTeamEmployees(users)
+          setEmployeeTzDraft(prev => {
+            const next = { ...prev }
+            for (const u of users) {
+              if (u?.email && next[u.email] == null) next[u.email] = u.timezone || 'UTC'
+            }
+            return next
+          })
+        })
         .catch(()=>{})
     })
   }, [])
@@ -78,7 +90,15 @@ export default function Setup() {
         const cr = await axios.get(`${BASE}/api/employees/initial-creds`, { headers })
         setCreds(cr.data?.creds || [])
         const team = await axios.get(`${BASE}/api/employees`, { headers })
-        setTeamEmployees(team.data?.users || [])
+        const users = team.data?.users || []
+        setTeamEmployees(users)
+        setEmployeeTzDraft(prev => {
+          const next = { ...prev }
+          for (const u of users) {
+            if (u?.email && next[u.email] == null) next[u.email] = u.timezone || 'UTC'
+          }
+          return next
+        })
       } catch {}
     } catch (e) {
       if (e?.response?.status === 402) {
@@ -96,9 +116,9 @@ export default function Setup() {
         <p className="mt-1 text-slate-500 dark:text-slate-400">Configure your team details.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         {/* Team Settings */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Team Details</h2>
           {msg && <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm rounded-lg">{msg}</div>}
           <form onSubmit={saveTeam} className="space-y-4">
@@ -121,8 +141,8 @@ export default function Setup() {
         </div>
 
         {/* Add Employee (Direct) */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Add Employee</h2>
             <div className="text-sm text-slate-600 dark:text-slate-300">Available Credits: <span className="font-semibold">{credits}</span></div>
           </div>
@@ -144,39 +164,65 @@ export default function Setup() {
         </div>
 
         {/* Initial Credentials */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Employee Initial Credentials</h2>
             <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Visible to Managers</span>
           </div>
-          <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
-              <tr>
-                <th className="px-4 py-2">Email</th>
-                <th className="px-4 py-2">Initial Password</th>
-                <th className="px-4 py-2">Created</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {creds.length === 0 ? (
-                <tr><td colSpan="3" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No initial credentials yet</td></tr>
-              ) : (
-                creds.map(c => (
-                  <tr key={`${c.employee_email}-${c.created_at}`} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                    <td className="px-4 py-2">{c.employee_email}</td>
-                    <td className="px-4 py-2 font-mono">{c.temp_password}</td>
-                    <td className="px-4 py-2">{new Date(c.created_at).toLocaleString()}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+
+          <div className="sm:hidden space-y-3">
+            {creds.length === 0 ? (
+              <div className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No initial credentials yet</div>
+            ) : (
+              creds.map(c => (
+                <div key={`${c.employee_email}-${c.created_at}`} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/50 dark:bg-slate-900/20">
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100 break-words">{c.employee_email}</div>
+                  <div className="mt-2 grid grid-cols-1 gap-2">
+                    <div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Initial Password</div>
+                      <div className="font-mono text-sm text-slate-800 dark:text-slate-200 break-all">{c.temp_password}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Created</div>
+                      <div className="text-sm text-slate-700 dark:text-slate-300">{new Date(c.created_at).toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="min-w-[640px] w-full text-left text-sm text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-2">Email</th>
+                  <th className="px-4 py-2">Initial Password</th>
+                  <th className="px-4 py-2">Created</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {creds.length === 0 ? (
+                  <tr><td colSpan="3" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No initial credentials yet</td></tr>
+                ) : (
+                  creds.map(c => (
+                    <tr key={`${c.employee_email}-${c.created_at}`} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                      <td className="px-4 py-2">{c.employee_email}</td>
+                      <td className="px-4 py-2 font-mono">{c.temp_password}</td>
+                      <td className="px-4 py-2">{new Date(c.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Use these passwords only for first login; advise employees to change their password after login.</p>
         </div>
 
         {/* My Team Employees */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">My Team Employees</h2>
             <button className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium" onClick={async()=>{
               const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -185,28 +231,112 @@ export default function Setup() {
               setTeamEmployees(r.data?.users || [])
             }}>Refresh</button>
           </div>
-          <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
-              <tr>
-                <th className="px-4 py-2">Email</th>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Created</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-              {teamEmployees.length === 0 ? (
-                <tr><td colSpan="3" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No employees yet</td></tr>
-              ) : (
-                teamEmployees.map(u => (
-                  <tr key={u.email} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                    <td className="px-4 py-2">{u.email}</td>
-                    <td className="px-4 py-2">{u.name || '-'}</td>
-                    <td className="px-4 py-2">{new Date(u.createdAt || Date.now()).toLocaleString()}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+
+          <div className="sm:hidden space-y-3">
+            {teamEmployees.length === 0 ? (
+              <div className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No employees yet</div>
+            ) : (
+              teamEmployees.map(u => (
+                <div key={u.email} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/50 dark:bg-slate-900/20">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100 break-words">{u.email}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{u.name || '-'}</div>
+                    </div>
+                    <button
+                      disabled={tzSaving === u.email}
+                      className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-70"
+                      onClick={async () => {
+                        try {
+                          setTzSaving(u.email)
+                          const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                          const base = await resolveApiBase()
+                          const timezone = employeeTzDraft[u.email] ?? (u.timezone || 'UTC')
+                          await axios.post(`${base}/api/employees/timezone`, { email: u.email, timezone }, { headers })
+                          setTeamEmployees(prev => prev.map(x => x.email === u.email ? { ...x, timezone } : x))
+                        } catch (e) {
+                          setInviteMsg(e?.response?.data?.error || 'Failed to update timezone')
+                        } finally {
+                          setTzSaving('')
+                        }
+                      }}
+                    >
+                      {tzSaving === u.email ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+
+                  <div className="mt-3">
+                    <TimezoneSelect
+                      value={employeeTzDraft[u.email] ?? (u.timezone || 'UTC')}
+                      onChange={e => setEmployeeTzDraft(prev => ({ ...prev, [u.email]: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    Created: {u.createdAt_local || (u.createdAt ? new Date(u.createdAt).toLocaleString() : '-')}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="min-w-[820px] w-full text-left text-sm text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-2">Email</th>
+                  <th className="px-4 py-2">Name</th>
+                  <th className="px-4 py-2">Timezone</th>
+                  <th className="px-4 py-2">Created</th>
+                  <th className="px-4 py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {teamEmployees.length === 0 ? (
+                  <tr><td colSpan="5" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No employees yet</td></tr>
+                ) : (
+                  teamEmployees.map(u => (
+                    <tr key={u.email} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                      <td className="px-4 py-2">{u.email}</td>
+                      <td className="px-4 py-2">{u.name || '-'}</td>
+                      <td className="px-4 py-2">
+                        <TimezoneSelect
+                          label=""
+                          value={employeeTzDraft[u.email] ?? (u.timezone || 'UTC')}
+                          onChange={e => setEmployeeTzDraft(prev => ({ ...prev, [u.email]: e.target.value }))}
+                          required
+                        />
+                      </td>
+                      <td className="px-4 py-2">{u.createdAt_local || (u.createdAt ? new Date(u.createdAt).toLocaleString() : '-')}</td>
+                      <td className="px-4 py-2">
+                        <button
+                          disabled={tzSaving === u.email}
+                          className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-70"
+                          onClick={async () => {
+                            try {
+                              setTzSaving(u.email)
+                              const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                              const base = await resolveApiBase()
+                              const timezone = employeeTzDraft[u.email] ?? (u.timezone || 'UTC')
+                              await axios.post(`${base}/api/employees/timezone`, { email: u.email, timezone }, { headers })
+                              setTeamEmployees(prev => prev.map(x => x.email === u.email ? { ...x, timezone } : x))
+                            } catch (e) {
+                              setInviteMsg(e?.response?.data?.error || 'Failed to update timezone')
+                            } finally {
+                              setTzSaving('')
+                            }
+                          }}
+                        >
+                          {tzSaving === u.email ? 'Saving...' : 'Save'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -15,7 +15,11 @@ export default function Login() {
     setLoading(true)
     setError('')
     try {
-      const resp = await axios.post('/api/auth/login', { email, password, role })
+      let client_timezone = 'UTC'
+      try {
+        client_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      } catch {}
+      const resp = await axios.post('/api/auth/login', { email, password, role, client_timezone })
       localStorage.setItem('token', resp.data.token)
       try {
         const payload = JSON.parse(atob(resp.data.token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))

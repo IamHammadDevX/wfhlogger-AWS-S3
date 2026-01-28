@@ -12,6 +12,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
 import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
+import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
@@ -123,6 +124,42 @@ function readUsers(){
   try { return JSON.parse(fs.readFileSync(usersFile, 'utf-8')); } catch { return []; }
 }
 function writeUsers(arr){ fs.writeFileSync(usersFile, JSON.stringify(arr, null, 2)); }
+
+function getEmployeeTimezone(email, companyId) {
+  const e = String(email || '').trim().toLowerCase()
+  if (!e) return 'UTC'
+  try {
+    const u = getUserByEmail(e)
+    if (u && (!companyId || u.company_id == companyId)) return (u.timezone || 'UTC')
+  } catch {}
+  try {
+    const arr = readUsers()
+    const r = arr.find(x => String(x.email || '').toLowerCase() === e && (!companyId || x.company_id == companyId))
+    return (r?.timezone || 'UTC')
+  } catch {}
+  return 'UTC'
+}
+
+function setEmployeeTimezone(email, companyId, timezone) {
+  const e = String(email || '').trim().toLowerCase()
+  const tz = String(timezone || '').trim() || 'UTC'
+  if (!e) return null
+  try {
+    const u = getUserByEmail(e)
+    if (u && (!companyId || u.company_id == companyId)) {
+      try { updateUserTimezone(e, tz) } catch {}
+    }
+  } catch {}
+  try {
+    const arr = readUsers()
+    const idx = arr.findIndex(x => String(x.email || '').toLowerCase() === e && (!companyId || x.company_id == companyId))
+    if (idx >= 0) {
+      arr[idx].timezone = tz
+      writeUsers(arr)
+    }
+  } catch {}
+  return tz
+}
 function getTeamEmailsForManager(managerKey, companyId){
   const users = readUsers();
   // Accept either manager numeric id or email; resolve both forms
@@ -184,6 +221,21 @@ app.use(morgan('dev'));
 // Serve uploaded images statically for the web UI
 app.use('/uploads', express.static(uploadPath));
 const publicDownloadsPath = path.join(process.cwd(), 'public', 'downloads');
+
+app.get(['/downloads', '/downloads/'], (req, res) => {
+  const indexPath = path.join(process.cwd(), 'web', 'dist', 'index.html')
+  const accept = String(req.headers?.accept || '')
+  const wantsHtml = accept.includes('text/html') || accept.includes('*/*')
+  if (wantsHtml && fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath)
+  }
+  if (wantsHtml && !fs.existsSync(indexPath)) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    return res.redirect(`${frontendUrl}/downloads`)
+  }
+  return res.redirect('/downloads/TimeTrackerSetup.exe')
+})
+
 // Robust download serving: check public/downloads, then desktop folder candidates
 app.use('/downloads', (req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
@@ -249,13 +301,20 @@ app.post('/api/auth/login', (req, res) => {
 
     const ok = verifyPassword(user, password);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ sub: user.email, email: user.email, role: effectiveRole, uid: user.id, company_id: user.company_id, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC' }, JWT_SECRET, { expiresIn: '8h' });
+
+    let tz = (user.timezone || 'UTC')
+    const clientTz = String(req.body?.client_timezone || '').trim()
+    if ((!tz || tz === 'UTC') && clientTz && clientTz.toUpperCase() !== 'UTC') {
+      tz = setEmployeeTimezone(user.email, user.company_id, clientTz) || tz
+    }
+
+    const token = jwt.sign({ sub: user.email, email: user.email, role: effectiveRole, uid: user.id, company_id: user.company_id, full_name: user.full_name, country: user.country || '', timezone: tz || 'UTC' }, JWT_SECRET, { expiresIn: '8h' });
     try {
       if (user.role === 'employee') {
         appendAudit('employee_web_login', { email, ip: req.ip, ua: req.headers['user-agent'] }, user.company_id);
       }
     } catch {}
-    res.json({ token, user: { id: user.id, email: user.email, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC', role: effectiveRole } });
+    res.json({ token, user: { id: user.id, email: user.email, full_name: user.full_name, country: user.country || '', timezone: tz || 'UTC', role: effectiveRole } });
   } catch (e) {
     console.error('[auth:login] error:', e);
     res.status(500).json({ error: 'Login failed' });
@@ -662,6 +721,32 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
   }
 });
 
+app.post('/api/employees/timezone', requireRole(['manager', 'company_admin']), (req, res) => {
+  try {
+    const { email, timezone } = req.body || {}
+    if (!email) return res.status(400).json({ error: 'Email is required' })
+    if (!timezone || !String(timezone).trim()) return res.status(400).json({ error: 'Timezone is required' })
+
+    const company_id = req.user?.company_id
+    const targetEmail = String(email).trim().toLowerCase()
+
+    const allUsers = readUsers()
+    const target = allUsers.find(u => u.role === 'employee' && String(u.email || '').toLowerCase() === targetEmail)
+    if (!target || target.company_id != company_id) return res.status(404).json({ error: 'Employee not found' })
+
+    if (req.user?.role === 'manager') {
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id)
+      if (!teamEmails.includes(target.email)) return res.status(403).json({ error: 'Forbidden: not your team' })
+    }
+
+    const tz = setEmployeeTimezone(target.email, company_id, timezone)
+    appendAudit('employee_timezone_updated', { actorId: req.user?.uid || req.user?.sub, employeeEmail: target.email, timezone: tz }, company_id)
+    res.json({ ok: true, email: target.email, timezone: tz })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update timezone' })
+  }
+})
+
 // ---- Super Admin: Manager creation ----
 app.post('/api/admin/managers', requireRole(['company_admin']), (req, res) => {
   try {
@@ -793,6 +878,14 @@ app.get('/api/admin/audit-logs', requireRole(['company_admin']), (req, res) => {
     const { managerId, employeeId } = req.query || {};
     if (managerId) logs = logs.filter(l => l.details?.actorId === managerId);
     if (employeeId) logs = logs.filter(l => l.details?.employeeId === employeeId);
+    const viewerTz = req.user?.timezone || 'UTC'
+    logs = logs.map(l => {
+      const subject = l?.details?.employeeId || l?.details?.employeeEmail || l?.details?.employee_id || null
+      const tz = subject ? getEmployeeTimezone(subject, company_id) : viewerTz
+      const ms = l?.ts ? Date.parse(l.ts) : null
+      const ts_local = ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null
+      return { ...l, timezone: tz, ts_local }
+    })
     res.json({ logs });
   } catch (e) {
     console.error('[admin:audit_logs] error:', e);
@@ -807,11 +900,23 @@ app.get('/api/employees', requireRole(['manager', 'company_admin']), (req, res) 
     // Filter by company
     const users = allUsers.filter(u => u.company_id == company_id);
 
+    const enrich = (u) => {
+      const tz = u?.timezone || getEmployeeTimezone(u?.email, company_id)
+      const createdAt = u?.createdAt || u?.created_at || null
+      const ms = createdAt ? Date.parse(createdAt) : null
+      return {
+        ...u,
+        timezone: tz,
+        createdAt_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null,
+        createdAt_utc: createdAt,
+      }
+    }
+
     const role = req.user?.role;
     if (role === 'manager') {
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id);
       const teamUsers = users.filter(u => u.role === 'employee' && teamEmails.includes(u.email));
-      return res.json({ users: teamUsers });
+      return res.json({ users: teamUsers.map(enrich) });
     }
     // Super Admin: return ALL employees in company
     // Currently, `users` contains all users in company. We should return all employees for stats?
@@ -823,7 +928,7 @@ app.get('/api/employees', requireRole(['manager', 'company_admin']), (req, res) 
     
     // Fix: Return all employees of the company for super_admin
     const companyEmployees = users.filter(u => u.role === 'employee');
-    res.json({ users: companyEmployees });
+    res.json({ users: companyEmployees.map(enrich) });
   } catch {
     res.json({ users: [] });
   }
@@ -910,35 +1015,29 @@ app.post('/api/admin/employees/password', requireRole(['manager', 'company_admin
 
 app.post('/api/requests', requireRole(['employee']), (req, res) => {
   try {
-    const { date, start_time, end_time, reason } = req.body;
+    const { date, start_time, end_time, reason, timezone } = req.body;
     const { company_id, uid } = req.user;
 
     // Basic Validation
     if (!date || !start_time || !end_time || !reason) {
       return res.status(400).json({ error: 'All fields are required' });
     }
-    
-    // Validate Dates
-    const start = new Date(`${date}T${start_time}`);
-    const end = new Date(`${date}T${end_time}`);
-    if (end <= start) return res.status(400).json({ error: 'End time must be after start time' });
 
-    // Check Overlaps (Simple check against existing sessions)
-    const sessions = getWorkSessions(uid, date); // Need to implement this helper or use existing logic
-    // For now, assume no overlap check complexity or read sessions from file
-    // Actually getWorkSessions is not imported or defined in sqlite.js exports above?
-    // I added it to imports, let's assume it works or I need to implement it in sqlite.js?
-    // Wait, getWorkSessions is NOT in sqlite.js exports in my previous step! 
-    // I need to add it to sqlite.js exports first. 
-    // Or I can read all sessions and filter.
-    
-    // For this iteration, let's create the request directly.
+    const tz = String(timezone || req.user?.timezone || 'UTC').trim() || 'UTC'
+    const startMs = parseLocalDateTimeToUtcMs(date, start_time, tz)
+    const endMs = parseLocalDateTimeToUtcMs(date, end_time, tz)
+    if (startMs == null || endMs == null) return res.status(400).json({ error: 'Invalid date or time' })
+    if (endMs <= startMs) return res.status(400).json({ error: 'End time must be after start time' });
+
     const request = createTimeRequest({
       company_id,
       employee_id: uid,
       date,
       start_time,
       end_time,
+      timezone: tz,
+      start_utc: toIsoZ(startMs),
+      end_utc: toIsoZ(endMs),
       reason
     });
 
@@ -952,9 +1051,35 @@ app.post('/api/requests', requireRole(['employee']), (req, res) => {
 app.get('/api/requests', requireRole(['manager', 'super_admin', 'employee']), (req, res) => {
   try {
     const { company_id, role, uid } = req.user;
+
+    const allLoginUsers = (() => {
+      try { return listAllUsers().filter(u => u.company_id == company_id) } catch { return [] }
+    })()
+    const emailById = (id) => {
+      const row = allLoginUsers.find(u => u.id == id)
+      return row?.email || null
+    }
+    const enrich = (r) => {
+      const employee_email = emailById(r.employee_id) || null
+      const tz = String(r.timezone || (employee_email ? getEmployeeTimezone(employee_email, company_id) : req.user?.timezone) || 'UTC').trim() || 'UTC'
+      const startUtc = r.start_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(r.date, r.start_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      const endUtc = r.end_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(r.date, r.end_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      const start_local = startUtc ? formatLocalDateTime(Date.parse(startUtc), tz, { withSeconds: true }) : null
+      const end_local = endUtc ? formatLocalDateTime(Date.parse(endUtc), tz, { withSeconds: true }) : null
+      const created_at_local = r.created_at ? formatLocalDateTime(Date.parse(r.created_at), tz, { withSeconds: true }) : null
+      const action_at_local = r.action_at ? formatLocalDateTime(Date.parse(r.action_at), tz, { withSeconds: true }) : null
+      return { ...r, employee_email, timezone: tz, start_utc: startUtc, end_utc: endUtc, start_local, end_local, created_at_local, action_at_local }
+    }
+
     if (role === 'employee') {
       const requests = getTimeRequests(company_id, uid);
-      return res.json({ requests });
+      return res.json({ requests: requests.map(enrich) });
     }
     // Managers/Admins see pending requests for their team
     // For simplicity, super_admin sees all company requests
@@ -969,7 +1094,7 @@ app.get('/api/requests', requireRole(['manager', 'super_admin', 'employee']), (r
     }
     
     // Filter pending only? Or all? Let's return all sorted.
-    res.json({ requests });
+    res.json({ requests: requests.map(enrich) });
   } catch (e) {
     res.status(500).json({ error: 'Failed to fetch requests' });
   }
@@ -1002,36 +1127,41 @@ app.post('/api/requests/:id/:action', requireRole(['manager', 'super_admin']), (
     const updated = updateTimeRequestStatus(id, newStatus, uid);
 
     if (newStatus === 'approved') {
-       // Create manual work session
-       // We need to insert into work_sessions
-       // Logic similar to 'stop' but manual
-       // We need to read sessions file, append, write.
-       const sessionsPath = path.join(dataPath, 'work_sessions.json'); // legacy path used in server.js?
-       // server.js uses 'work_sessions.json' in 'saveSession' function? 
-       // I need to check how sessions are stored. 
-       // Line 57: const sessionsFile = path.join(dataPath, 'work_sessions.json');
-       
-       const sessions = JSON.parse(fs.readFileSync(path.join(process.cwd(), DATA_DIR, 'work_sessions.json'), 'utf-8'));
-       const session = {
-         userId: request.employee_id, // Note: server uses userId (email usually) or id?
-         // In server.js, work_sessions use 'userId' which is email or ID?
-         // Let's check 'work:start' event. 
-         // socket.data.userId is usually email?
-         // But here we have ID. We need to look up email.
-         startTime: new Date(`${request.date}T${request.start_time}`).getTime(),
-         endTime: new Date(`${request.date}T${request.end_time}`).getTime(),
-         type: 'manual',
-         company_id,
-         approved_by: uid
-       };
-       
-       // Need email for userId field if that's what's used
-       const user = readUsers().find(u => u.id == request.employee_id);
-       if (user) {
-         session.userId = user.email; // Consistent with other sessions
-         sessions.push(session);
-         fs.writeFileSync(path.join(process.cwd(), DATA_DIR, 'work_sessions.json'), JSON.stringify(sessions, null, 2));
-       }
+      const byId = readUsers().find(u => u.id == request.employee_id) || null
+      const employeeEmail = byId?.email || (() => {
+        try { return listAllUsers().find(u => u.company_id == company_id && u.id == request.employee_id)?.email || null } catch { return null }
+      })()
+
+      const tz = String(request.timezone || (employeeEmail ? getEmployeeTimezone(employeeEmail, company_id) : 'UTC')).trim() || 'UTC'
+      const startUtc = request.start_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(request.date, request.start_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      const endUtc = request.end_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(request.date, request.end_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+
+      if (employeeEmail && startUtc && endUtc) {
+        const sessions = readSessions()
+        const startMs = Date.parse(startUtc)
+        const record = {
+          id: `${employeeEmail}-manual-${request.id}`,
+          employeeId: employeeEmail,
+          company_id,
+          startedAt: startUtc,
+          endedAt: endUtc,
+          isActive: false,
+          idleSeconds: 0,
+          lastHeartbeatAt: endUtc,
+          date: localDateKey(startMs, tz),
+          type: 'manual',
+          approved_by: uid,
+          request_id: Number(request.id)
+        }
+        sessions.push(record)
+        writeSessions(sessions)
+      }
     }
     
     // Send Email
@@ -1382,38 +1512,59 @@ app.get('/api/employee/dashboard-summary', requireRole(['employee']), (req, res)
     const company_id = req.user?.company_id;
     const sessions = readSessions().filter(s => s.employeeId === email && s.company_id == company_id);
     const approvedManual = getTimeRequests(company_id, req.user?.uid).filter(r => r.status === 'approved' && r.employee_id == req.user?.uid);
-    const userTimezone = (() => {
-      try {
-        const all = readUsers();
-        const u = all.find(x => x.email === email);
-        return u?.timezone || 'UTC';
-      } catch { return 'UTC'; }
-    })();
+    const userTimezone = getEmployeeTimezone(email, company_id) || req.user?.timezone || 'UTC'
 
-    const now = new Date();
-    const dayStr = todayStr();
-    const weekStartMs = new Date(now.getTime() - 7*24*60*60*1000).getTime();
-    const monthStartMs = new Date(now.getTime() - 30*24*60*60*1000).getTime();
+    const nowMs = Date.now()
+    const todayKey = localDateKey(nowMs, userTimezone)
+    const keysBack = (days) => {
+      const set = new Set()
+      for (let i = 0; i < days; i += 1) {
+        set.add(localDateKey(nowMs - i * 24 * 60 * 60 * 1000, userTimezone))
+      }
+      return set
+    }
+    const weekKeys = keysBack(7)
+    const monthKeys = keysBack(30)
 
     const calcSeconds = (arr) => arr.reduce((sum, s) => {
       const startMs = new Date(s.startedAt).getTime();
-      const endMs = s.endedAt ? new Date(s.endedAt).getTime() : now.getTime();
+      const endMs = s.endedAt ? new Date(s.endedAt).getTime() : nowMs;
       const active = Math.max(0, Math.floor((endMs - startMs)/1000));
       const idle = s.idleSeconds || 0;
       return sum + Math.max(0, active - idle);
     }, 0);
 
-    const daySeconds = calcSeconds(sessions.filter(s => s.date === dayStr));
-    const weekSeconds = calcSeconds(sessions.filter(s => new Date(s.startedAt).getTime() >= weekStartMs));
-    const monthSeconds = calcSeconds(sessions.filter(s => new Date(s.startedAt).getTime() >= monthStartMs));
+    const daySeconds = calcSeconds(sessions.filter(s => {
+      const st = Date.parse(s.startedAt)
+      return localDateKey(st, userTimezone) === todayKey
+    }))
+    const weekSeconds = calcSeconds(sessions.filter(s => {
+      const st = Date.parse(s.startedAt)
+      return weekKeys.has(localDateKey(st, userTimezone))
+    }))
+    const monthSeconds = calcSeconds(sessions.filter(s => {
+      const st = Date.parse(s.startedAt)
+      return monthKeys.has(localDateKey(st, userTimezone))
+    }))
 
     const manualSeconds = approvedManual.reduce((sum, r) => {
-      try {
-        const start = new Date(`${r.date}T${r.start_time}`);
-        const end = new Date(`${r.date}T${r.end_time}`);
-        const dur = Math.max(0, Math.floor((end.getTime() - start.getTime())/1000));
-        return sum + dur;
-      } catch { return sum; }
+      const tz = String(r.timezone || userTimezone || 'UTC').trim() || 'UTC'
+      const startUtc = r.start_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(r.date, r.start_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      const endUtc = r.end_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(r.date, r.end_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      if (!startUtc || !endUtc) return sum
+      const st = Date.parse(startUtc)
+      const en = Date.parse(endUtc)
+      const dur = Math.max(0, Math.floor((en - st) / 1000))
+      if (weekKeys.has(localDateKey(st, tz)) || monthKeys.has(localDateKey(st, tz)) || localDateKey(st, tz) === todayKey) {
+        return sum + dur
+      }
+      return sum
     }, 0);
 
     const toHours = (secs) => Number((secs/3600).toFixed(1));
@@ -1423,12 +1574,12 @@ app.get('/api/employee/dashboard-summary', requireRole(['employee']), (req, res)
 
     const recent_sessions = sessions.slice().sort((a,b)=> (a.startedAt < b.startedAt?1:-1)).slice(0,5).map(s => {
       const startMs = new Date(s.startedAt).getTime();
-      const endMs = s.endedAt ? new Date(s.endedAt).getTime() : now.getTime();
+      const endMs = s.endedAt ? new Date(s.endedAt).getTime() : nowMs;
       const active = Math.max(0, Math.floor((endMs - startMs)/1000));
       const idle = s.idleSeconds || 0;
       const ratio = active ? (1 - Math.min(idle/active, 1)) : 0;
       const status = ratio >= 0.8 ? 'productive' : ratio >= 0.6 ? 'neutral' : 'unproductive';
-      return { start_time: s.startedAt, end_time: s.endedAt, duration: active, idle_time: idle, productivity_status: status };
+      return { start_time_utc: s.startedAt, end_time_utc: s.endedAt, start_time_local: formatLocalDateTime(startMs, userTimezone, { withSeconds: true }), end_time_local: s.endedAt ? formatLocalDateTime(Date.parse(s.endedAt), userTimezone, { withSeconds: true }) : null, duration: active, idle_time: idle, productivity_status: status, timezone: userTimezone };
     });
 
     res.json({ daily_hours, weekly_hours, monthly_hours, productivity_score: Math.round(Math.min(100, Math.max(0, (daily_hours/8)*100))), recent_sessions, timezone: userTimezone });
@@ -1445,8 +1596,9 @@ app.get('/api/employee/activity-timeline', requireRole(['employee']), (req, res)
     const company_id = req.user?.company_id;
     const { start_date, end_date, type } = req.query || {};
     const sessions = readSessions().filter(s => s.employeeId === email && s.company_id == company_id);
-    const startMs = start_date ? new Date(`${start_date}T00:00:00Z`).getTime() : null;
-    const endMs = end_date ? new Date(`${end_date}T23:59:59Z`).getTime() : null;
+    const userTimezone = getEmployeeTimezone(email, company_id) || req.user?.timezone || 'UTC'
+    const startMs = start_date ? parseLocalDateTimeToUtcMs(start_date, '00:00:00', userTimezone) : null;
+    const endMs = end_date ? parseLocalDateTimeToUtcMs(end_date, '23:59:59', userTimezone) : null;
     const inRange = sessions.filter(s => {
       const t = new Date(s.startedAt).getTime();
       if (startMs && t < startMs) return false;
@@ -1460,26 +1612,43 @@ app.get('/api/employee/activity-timeline', requireRole(['employee']), (req, res)
       const idle = s.idleSeconds || 0;
       const ratio = active ? (1 - Math.min(idle/active, 1)) : 0;
       const status = ratio >= 0.8 ? 'productive' : ratio >= 0.6 ? 'neutral' : 'unproductive';
-      return { id: s.id, type: 'tracked_session', start_time: s.startedAt, end_time: s.endedAt, duration: active, idle_time: idle, productivity_status: status, applications: [], screenshots: 0, manual_entry: null };
+      return { id: s.id, type: 'tracked_session', start_time: s.startedAt, end_time: s.endedAt, start_time_local: formatLocalDateTime(st, userTimezone, { withSeconds: true }), end_time_local: s.endedAt ? formatLocalDateTime(Date.parse(s.endedAt), userTimezone, { withSeconds: true }) : null, duration: active, idle_time: idle, productivity_status: status, applications: [], screenshots: 0, manual_entry: null, timezone: userTimezone };
     });
 
     const requests = getTimeRequests(company_id, req.user?.uid);
-    const manualAct = requests.map(r => ({
-      id: `manual_${r.id}`,
-      type: 'manual_entry',
-      start_time: `${r.date}T${r.start_time}`,
-      end_time: `${r.date}T${r.end_time}`,
-      duration: Math.max(0, Math.floor((new Date(`${r.date}T${r.end_time}`).getTime() - new Date(`${r.date}T${r.start_time}`).getTime())/1000)),
-      idle_time: 0,
-      productivity_status: r.status === 'approved' ? 'productive' : (r.status === 'rejected' ? 'unproductive' : 'neutral'),
-      manual_entry: { description: r.reason || '', status: r.status },
-      applications: [],
-      screenshots: 0
-    }));
+    const manualAct = requests.map(r => {
+      const tz = String(r.timezone || userTimezone || 'UTC').trim() || 'UTC'
+      const startUtc = r.start_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(r.date, r.start_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      const endUtc = r.end_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(r.date, r.end_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      const st = startUtc ? Date.parse(startUtc) : null
+      const en = endUtc ? Date.parse(endUtc) : null
+      const duration = (st != null && en != null) ? Math.max(0, Math.floor((en - st) / 1000)) : 0
+      return {
+        id: `manual_${r.id}`,
+        type: 'manual_entry',
+        start_time: startUtc,
+        end_time: endUtc,
+        start_time_local: st != null ? formatLocalDateTime(st, tz, { withSeconds: true }) : null,
+        end_time_local: en != null ? formatLocalDateTime(en, tz, { withSeconds: true }) : null,
+        duration,
+        idle_time: 0,
+        productivity_status: r.status === 'approved' ? 'productive' : (r.status === 'rejected' ? 'unproductive' : 'neutral'),
+        manual_entry: { description: r.reason || '', status: r.status },
+        applications: [],
+        screenshots: 0,
+        timezone: tz
+      }
+    });
 
     activities = activities.concat(manualAct).sort((a,b)=> (a.start_time < b.start_time ? 1 : -1));
     if (type && type !== 'all') activities = activities.filter(a => a.type === type);
-    res.json({ activities, timezone: 'UTC' });
+    res.json({ activities, timezone: userTimezone });
   } catch (e) {
     console.error('[employee:activity] error:', e);
     res.status(500).json({ error: 'Failed to load activity' });
@@ -1593,11 +1762,17 @@ app.put('/api/user/profile', requireRole(['manager', 'super_admin']), (req, res)
 app.get('/api/employee/reports', requireRole(['employee']), (req, res) => {
   try {
     const email = req.user?.sub;
+    const company_id = req.user?.company_id
+    const tz = getEmployeeTimezone(email, company_id) || req.user?.timezone || 'UTC'
     const idxFile = path.join(dataPath, 'reports.index.json');
     let index = [];
     try { index = JSON.parse(fs.readFileSync(idxFile, 'utf-8')); } catch { index = []; }
     const mine = index.filter(r => r.email === email).sort((a,b)=> (a.created_at < b.created_at ? 1 : -1));
-    res.json({ reports: mine });
+    const out = mine.map(r => {
+      const ms = r?.created_at ? Date.parse(r.created_at) : null
+      return { ...r, timezone: tz, created_at_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null }
+    })
+    res.json({ reports: out });
   } catch (e) {
     res.status(500).json({ error: 'Failed to load reports' });
   }
@@ -1609,9 +1784,10 @@ app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) 
     const { report_type, start_date, end_date, format } = req.body || {};
     const email = req.user?.sub;
     const company_id = req.user?.company_id;
+    const tz = getEmployeeTimezone(email, company_id) || req.user?.timezone || 'UTC'
     const sessions = readSessions().filter(s => s.employeeId === email && s.company_id == company_id);
-    const startMs = start_date ? new Date(`${start_date}T00:00:00Z`).getTime() : null;
-    const endMs = end_date ? new Date(`${end_date}T23:59:59Z`).getTime() : null;
+    const startMs = start_date ? parseLocalDateTimeToUtcMs(start_date, '00:00:00', tz) : null;
+    const endMs = end_date ? parseLocalDateTimeToUtcMs(end_date, '23:59:59', tz) : null;
     const inRange = sessions.filter(s => {
       const t = new Date(s.startedAt).getTime();
       if (startMs && t < startMs) return false;
@@ -1619,14 +1795,23 @@ app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) 
       return true;
     });
 
-    const rows = [['Start','End','DurationSeconds','IdleSeconds','NetActiveSeconds']];
+    const rows = [['StartLocal','EndLocal','StartUTC','EndUTC','Timezone','DurationSeconds','IdleSeconds','NetActiveSeconds']];
     for (const s of inRange) {
       const st = new Date(s.startedAt).getTime();
       const en = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
       const active = Math.max(0, Math.floor((en - st)/1000));
       const idle = s.idleSeconds || 0;
       const net = Math.max(0, active - idle);
-      rows.push([s.startedAt, s.endedAt || '', String(active), String(idle), String(net)]);
+      rows.push([
+        formatLocalDateTime(st, tz, { withSeconds: true }),
+        s.endedAt ? formatLocalDateTime(Date.parse(s.endedAt), tz, { withSeconds: true }) : '',
+        s.startedAt,
+        s.endedAt || '',
+        tz,
+        String(active),
+        String(idle),
+        String(net)
+      ]);
     }
 
     const csv = rows.map(r => r.join(',')).join('\n');
@@ -1728,10 +1913,22 @@ app.get('/api/work/summary/today', requireRole(['manager', 'company_admin']), (r
     const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
     const companySessions = sessions.filter(s => companyUserEmails.has(s.employeeId));
 
-    const today = todayStr();
+    const nowMs = Date.now()
+    const tzByEmail = {}
+    const todayKeyByEmail = {}
+    for (const email of companyUserEmails) {
+      const tz = getEmployeeTimezone(email, company_id) || 'UTC'
+      tzByEmail[email] = tz
+      todayKeyByEmail[email] = localDateKey(nowMs, tz)
+    }
+
     const byEmp = {};
-    for (const s of companySessions.filter(x => x.date === today)) {
+    for (const s of companySessions) {
       const k = s.employeeId;
+      const tz = tzByEmail[k] || 'UTC'
+      const st = Date.parse(s.startedAt)
+      if (!st) continue
+      if (localDateKey(st, tz) !== todayKeyByEmail[k]) continue
       if (!byEmp[k]) byEmp[k] = [];
       byEmp[k].push(s);
     }
@@ -1746,6 +1943,7 @@ app.get('/api/work/summary/today', requireRole(['manager', 'company_admin']), (r
       let totalIdleSeconds = 0;
       let loginTimes = [];
       let logoutTimes = [];
+      const tz = tzByEmail[employeeId] || 'UTC'
       for (const s of arr) {
         const start = new Date(s.startedAt).getTime();
         const end = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
@@ -1755,9 +1953,11 @@ app.get('/api/work/summary/today', requireRole(['manager', 'company_admin']), (r
         if (s.endedAt) logoutTimes.push(s.endedAt);
       }
       const netActiveSeconds = Math.max(0, totalActiveSeconds - totalIdleSeconds);
-      return { employeeId, loginTimes, logoutTimes, totalActiveSeconds, totalIdleSeconds, netActiveSeconds };
+      const loginTimes_local = loginTimes.map(t => formatLocalDateTime(Date.parse(t), tz, { withSeconds: true }))
+      const logoutTimes_local = logoutTimes.map(t => formatLocalDateTime(Date.parse(t), tz, { withSeconds: true }))
+      return { employeeId, timezone: tz, today_local_date: todayKeyByEmail[employeeId], loginTimes, logoutTimes, loginTimes_local, logoutTimes_local, totalActiveSeconds, totalIdleSeconds, netActiveSeconds };
     });
-    res.json({ today: today, employees: result });
+    res.json({ today_utc: todayStr(), employees: result });
   } catch (e) {
     console.error('[work:summary] error:', e);
     res.status(500).json({ error: 'Summary failed' });
@@ -1775,20 +1975,35 @@ app.get('/api/work/sessions/today', requireRole(['manager', 'company_admin']), (
     const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
     const companySessions = sessions.filter(s => companyUserEmails.has(s.employeeId));
 
-    const today = todayStr();
+    const nowMs = Date.now()
+    const tzByEmail = {}
+    const todayKeyByEmail = {}
+    for (const email of companyUserEmails) {
+      const tz = getEmployeeTimezone(email, company_id) || 'UTC'
+      tzByEmail[email] = tz
+      todayKeyByEmail[email] = localDateKey(nowMs, tz)
+    }
+
     const byEmp = {};
-    for (const s of companySessions.filter(x => x.date === today)) {
+    for (const s of companySessions) {
       const k = s.employeeId;
-      if (!byEmp[k]) byEmp[k] = [];
+      const tz = tzByEmail[k] || 'UTC'
       const startMs = new Date(s.startedAt).getTime();
+      if (!startMs) continue
+      if (localDateKey(startMs, tz) !== todayKeyByEmail[k]) continue
       const endMs = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
       const activeSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
       const idleSeconds = s.idleSeconds || 0;
       const netActiveSeconds = Math.max(0, activeSeconds - idleSeconds);
+      if (!byEmp[k]) byEmp[k] = [];
       byEmp[k].push({
         id: s.id,
         startedAt: s.startedAt,
         endedAt: s.endedAt,
+        startedAt_local: formatLocalDateTime(startMs, tz, { withSeconds: true }),
+        endedAt_local: s.endedAt ? formatLocalDateTime(Date.parse(s.endedAt), tz, { withSeconds: true }) : null,
+        timezone: tz,
+        today_local_date: todayKeyByEmail[k],
         isActive: !!s.isActive,
         activeSeconds,
         idleSeconds,
@@ -1801,7 +2016,7 @@ app.get('/api/work/sessions/today', requireRole(['manager', 'company_admin']), (
       entries = entries.filter(([employeeId]) => teamEmails.includes(employeeId));
     }
     const result = entries.map(([employeeId, sessions]) => ({ employeeId, sessions }));
-    res.json({ today, employees: result });
+    res.json({ today_utc: todayStr(), employees: result });
   } catch (e) {
     console.error('[work:sessions] error:', e);
     res.status(500).json({ error: 'Sessions fetch failed' });
@@ -1933,6 +2148,11 @@ app.get('/api/uploads/list', requireRole(['manager', 'company_admin']), async (r
     }
     // Super Admin: sees all company items (no extra filter needed)
     
+    items = items.map(it => {
+      const tz = getEmployeeTimezone(it.employeeId, company_id) || 'UTC'
+      const ms = it.ts ? Date.parse(it.ts) : null
+      return { ...it, timezone: tz, ts_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null }
+    })
     res.json({ files: items });
   } catch (err) {
     console.error('[upload:list] error:', err);
@@ -1965,14 +2185,29 @@ app.get('/api/uploads/query', requireRole(['manager', 'company_admin']), async (
     if (employeeId) {
       meta = meta.filter(m => String(m.employeeId).toLowerCase() === String(employeeId).toLowerCase());
     }
-    // Filter by date range (ISO)
-    const fromMs = from ? new Date(from).getTime() : null;
-    const toMs = to ? new Date(to).getTime() : null;
+    const tzForRange = employeeId ? getEmployeeTimezone(employeeId, company_id) : null
+    const parseMaybeDate = (ds, isEnd) => {
+      if (!ds) return null
+      const s = String(ds)
+      if (tzForRange && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const t = isEnd ? '23:59:59' : '00:00:00'
+        return parseLocalDateTimeToUtcMs(s, t, tzForRange)
+      }
+      const ms = new Date(s).getTime()
+      return Number.isFinite(ms) ? ms : null
+    }
+    const fromMs = parseMaybeDate(from, false)
+    const toMs = parseMaybeDate(to, true)
     if (fromMs) meta = meta.filter(m => new Date(m.ts).getTime() >= fromMs);
     if (toMs) meta = meta.filter(m => new Date(m.ts).getTime() <= toMs);
     // Sort by time ascending
     meta.sort((a, b) => (a.ts > b.ts ? 1 : -1));
-    res.json({ files: meta });
+    const out = meta.map(m => {
+      const tz = getEmployeeTimezone(m.employeeId, company_id) || 'UTC'
+      const ms = m.ts ? Date.parse(m.ts) : null
+      return { ...m, timezone: tz, ts_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null }
+    })
+    res.json({ files: out });
   } catch (err) {
     console.error('[upload:query] error:', err);
     res.status(500).json({ error: 'Query failed' });
@@ -1991,19 +2226,30 @@ app.get('/api/work/sessions/range', requireRole(['manager', 'super_admin']), (re
     const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
     const companySessions = sessions.filter(s => companyUserEmails.has(s.employeeId));
 
+    const email = employeeId ? String(employeeId).trim() : null
+    const tz = email ? getEmployeeTimezone(email, company_id) : null
     const fromStr = from ? String(from).slice(0,10) : null;
     const toStr = to ? String(to).slice(0,10) : null;
+    const fromMs = (email && tz && fromStr && /^\d{4}-\d{2}-\d{2}$/.test(fromStr)) ? parseLocalDateTimeToUtcMs(fromStr, '00:00:00', tz) : null
+    const toMs = (email && tz && toStr && /^\d{4}-\d{2}-\d{2}$/.test(toStr)) ? parseLocalDateTimeToUtcMs(toStr, '23:59:59', tz) : null
     const inRange = companySessions.filter(s => {
-      const d = s.date;
-      if (fromStr && d < fromStr) return false;
-      if (toStr && d > toStr) return false;
+      const st = new Date(s.startedAt).getTime()
+      if (!Number.isFinite(st)) return false
+      if (email && String(s.employeeId).toLowerCase() !== String(email).toLowerCase()) return false
+      if (fromMs != null && st < fromMs) return false
+      if (toMs != null && st > toMs) return false
+      if (!email) {
+        const d = s.date;
+        if (fromStr && d < fromStr) return false;
+        if (toStr && d > toStr) return false;
+      }
       return true;
     });
     const byEmp = {};
     for (const s of inRange) {
       const k = s.employeeId;
-      if (employeeId && String(k).toLowerCase() !== String(employeeId).toLowerCase()) continue;
       if (!byEmp[k]) byEmp[k] = [];
+      const tzEmp = getEmployeeTimezone(k, company_id) || 'UTC'
       const startMs = new Date(s.startedAt).getTime();
       const endMs = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
       const activeSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
@@ -2012,8 +2258,12 @@ app.get('/api/work/sessions/range', requireRole(['manager', 'super_admin']), (re
       byEmp[k].push({
         id: s.id,
         date: s.date,
+        date_local: localDateKey(startMs, tzEmp),
         startedAt: s.startedAt,
         endedAt: s.endedAt,
+        startedAt_local: formatLocalDateTime(startMs, tzEmp, { withSeconds: true }),
+        endedAt_local: s.endedAt ? formatLocalDateTime(Date.parse(s.endedAt), tzEmp, { withSeconds: true }) : null,
+        timezone: tzEmp,
         isActive: !!s.isActive,
         activeSeconds,
         idleSeconds,
@@ -2058,9 +2308,11 @@ app.get('/api/activity/recent', requireRole(['manager', 'company_admin']), (req,
     
     const result = entries.map(([employeeId, records]) => {
       const sorted = records.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+      const tz = getEmployeeTimezone(employeeId, company_id) || 'UTC'
       return {
         employeeId,
-        latest: sorted.slice(0, 3).map(r => ({ file: r.file, ts: r.ts })),
+        timezone: tz,
+        latest: sorted.slice(0, 3).map(r => ({ file: r.file, ts: r.ts, ts_local: r.ts ? formatLocalDateTime(Date.parse(r.ts), tz, { withSeconds: true }) : null })),
         count: records.length
       };
     });
@@ -2289,15 +2541,16 @@ try {
     });
 
     app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/downloads')) return next();
+      const isDownloadsRoot = req.path === '/downloads' || req.path === '/downloads/'
+      if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || (req.path.startsWith('/downloads') && !isDownloadsRoot)) return next();
       // If we are serving static files, send index.html
       if (fs.existsSync(path.join(process.cwd(), 'web', 'dist', 'index.html'))) {
          res.sendFile(path.join(process.cwd(), 'web', 'dist', 'index.html'));
       } else {
-         // If no static build, and we are hitting backend port with frontend route, we should redirect or inform user?
-         // Ideally, the email link should point to the FRONTEND port in dev.
-         // But let's support it via redirect if possible? 
-         // Or just return 404 with message.
+         if (isDownloadsRoot) {
+           const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+           return res.redirect(`${frontendUrl}/downloads`);
+         }
          next();
       }
     });

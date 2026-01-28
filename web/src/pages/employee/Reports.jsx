@@ -247,7 +247,7 @@ export default function EmployeeReports() {
                         {formatDate(report.start_date)} - {formatDate(report.end_date)} • {report.format?.toUpperCase()}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-500">
-                        Generated {formatDate(report.created_at)} • {formatFileSize(report.file_size)}
+                        Generated {report.created_at_local || formatDate(report.created_at)} • {formatFileSize(report.file_size)}
                       </p>
                     </div>
                   </div>

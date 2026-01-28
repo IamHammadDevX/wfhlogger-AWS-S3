@@ -134,6 +134,7 @@ class TimeTrackerApp:
         self.live_thread = None
         self.capture_interval_seconds = SCREENSHOT_INTERVAL_SECONDS
         self.backend_url = DEFAULT_BACKEND_URL
+        self.effective_timezone = 'UTC'
 
         # Build UI Container
         self.container = ttk.Frame(self.root)
@@ -335,7 +336,12 @@ class TimeTrackerApp:
             return
 
         try:
-            resp = requests.post(f'{self.backend_url}/api/auth/login', json={'email': email, 'password': password, 'role': 'employee'}, timeout=10)
+            client_tz = self._detect_system_timezone()
+            resp = requests.post(
+                f'{self.backend_url}/api/auth/login',
+                json={'email': email, 'password': password, 'role': 'employee', 'client_timezone': client_tz},
+                timeout=10
+            )
             
             if resp.status_code == 401:
                 messagebox.showerror('Login Failed', 'Incorrect email or password.')
@@ -347,6 +353,7 @@ class TimeTrackerApp:
             resp.raise_for_status()
             data = resp.json()
             self.token = data.get('token')
+            self.effective_timezone = (data.get('user') or {}).get('timezone') or self._parse_jwt(self.token).get('timezone') or client_tz
         except requests.exceptions.ConnectionError:
             messagebox.showerror('Connection Error', 'Could not connect to the server. Please check your internet connection or server URL.')
             return
@@ -458,7 +465,8 @@ class TimeTrackerApp:
                     'date': d,
                     'start_time': s,
                     'end_time': e,
-                    'reason': r
+                    'reason': r,
+                    'timezone': self.effective_timezone
                 }, headers=headers)
                 if resp.status_code == 200:
                     messagebox.showinfo('Success', 'Request submitted successfully')
@@ -579,9 +587,38 @@ class TimeTrackerApp:
             data = { 'employeeId': self.email.get() }
             headers = { 'Authorization': f'Bearer {self.token}' }
             requests.post(f'{self.backend_url}/api/uploads/screenshot', files=files, data=data, headers=headers, timeout=30)
-            self.last_upload_var.set(time.strftime('%H:%M'))
+            self.last_upload_var.set(self._format_hhmm_in_effective_tz(datetime.now(timezone.utc)))
         except:
             self.last_upload_var.set("Failed")
+
+    def _detect_system_timezone(self):
+        try:
+            off = datetime.now().astimezone().utcoffset()
+            if off is None:
+                return 'UTC'
+            mins = int(off.total_seconds() // 60)
+            sign = '+' if mins >= 0 else '-'
+            mins = abs(mins)
+            return f"UTC{sign}{mins // 60:02d}:{mins % 60:02d}"
+        except Exception:
+            return 'UTC'
+
+    def _format_hhmm_in_effective_tz(self, dt_utc):
+        try:
+            tz = str(self.effective_timezone or 'UTC').strip()
+            if tz.upper() == 'UTC':
+                return dt_utc.strftime('%H:%M')
+            import re
+            m = re.match(r'^UTC([+-])(\d{1,2})(?::(\d{2}))?$', tz.replace('−', '-').replace('–', '-').replace('—', '-'), re.I)
+            if not m:
+                return datetime.now().strftime('%H:%M')
+            sign = 1 if m.group(1) == '+' else -1
+            hh = int(m.group(2))
+            mm = int(m.group(3) or 0)
+            delta = timedelta(minutes=sign * (hh * 60 + mm))
+            return (dt_utc + delta).strftime('%H:%M')
+        except Exception:
+            return datetime.now().strftime('%H:%M')
 
     def _send_live_frame(self, small_jpeg):
         if not self.sio or not self.sio.connected or not self.live_view_active: return
