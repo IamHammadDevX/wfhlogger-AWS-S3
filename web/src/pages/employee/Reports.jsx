@@ -249,6 +249,9 @@ export default function EmployeeReports() {
                       <p className="text-xs text-slate-500 dark:text-slate-500">
                         Generated {report.created_at_local || formatDate(report.created_at)} • {formatFileSize(report.file_size)}
                       </p>
+                      {report.timezone && (
+                        <p className="text-xs text-slate-500 dark:text-slate-500">Timezone: {report.timezone}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

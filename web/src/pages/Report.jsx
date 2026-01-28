@@ -143,7 +143,14 @@ export default function Report() {
         {/* Sessions Table */}
         <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-            <h3 className="font-bold text-slate-900 dark:text-white">Work Sessions ({sessions.length})</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 dark:text-white">Work Sessions ({sessions.length})</h3>
+              {!!selectedEmployee && sessions.length > 0 && (
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Timezone: {sessions[0]?.timezone || 'Local'}
+                </span>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
@@ -164,26 +171,28 @@ export default function Report() {
                     const startTime = s.startedAt || s.startTime
                     const endTime = s.endedAt || s.endTime
                     
-                    const st = startTime ? new Date(startTime) : null
-                    const en = endTime ? new Date(endTime) : null
+                    const stLocal = s.startedAt_local
+                    const enLocal = s.endedAt_local
+                    const startUtc = s.startedAt ? new Date(s.startedAt) : null
+                    const endUtc = s.endedAt ? new Date(s.endedAt) : null
                     
                     // Handle active sessions: calculate duration from start to now
                     const now = new Date()
-                    const durMinutes = st 
-                      ? Math.round(((en || now) - st) / 1000 / 60) 
+                    const durMinutes = startUtc 
+                      ? Math.round(((endUtc || now) - startUtc) / 1000 / 60) 
                       : 0
                     
                     return (
                       <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{s.employee || selectedEmployee}</td>
                         <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                          {st ? st.toLocaleString() : 'Unknown'}
+                          {stLocal || 'Unknown'}
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                          {en ? en.toLocaleString() : <span className="text-green-600 dark:text-green-400 font-medium">Active (Ongoing)</span>}
+                          {enLocal || <span className="text-green-600 dark:text-green-400 font-medium">Active (Ongoing)</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                          {st ? `${Math.floor(durMinutes/60)}h ${durMinutes%60}m` : '-'}
+                          {stLocal ? `${Math.floor(durMinutes/60)}h ${durMinutes%60}m` : '-'}
                         </td>
                       </tr>
                     )
@@ -213,7 +222,7 @@ export default function Report() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
                     <div className="w-full">
                       <div className="text-xs text-white font-medium truncate">{f.employeeId}</div>
-                      <div className="text-[10px] text-slate-300">{new Date(f.ts).toLocaleString()}</div>
+                      <div className="text-[10px] text-slate-300">{f.ts_local || new Date(f.ts).toLocaleString()} • {f.timezone}</div>
                     </div>
                   </div>
                 </div>

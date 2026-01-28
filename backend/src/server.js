@@ -1827,9 +1827,11 @@ app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) 
       end_date: end_date || '',
       format: (format || 'csv'),
       download_url: `${req.protocol}://${req.get('host')}/reports/${fname}`,
-      created_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
       file_size,
-      email
+    email,
+    timezone: tz,
+    created_at_local: formatLocalDateTime(Date.now(), tz, { withSeconds: true })
     };
     index.push(record);
     fs.writeFileSync(idxFile, JSON.stringify(index, null, 2));
@@ -2217,7 +2219,7 @@ app.get('/api/uploads/query', requireRole(['manager', 'company_admin']), async (
 });
 
 // Sessions by date range with per-session details
-app.get('/api/work/sessions/range', requireRole(['manager', 'super_admin']), (req, res) => {
+app.get('/api/work/sessions/range', requireRole(['manager', 'company_admin', 'super_admin']), (req, res) => {
   try {
     const { employeeId, from, to } = req.query || {};
     const sessions = readSessions();
