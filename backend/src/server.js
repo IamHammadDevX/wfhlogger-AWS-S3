@@ -2747,16 +2747,15 @@ httpServer.listen(PORT, () => {
 // Query current online employees (role-scoped)
 app.get('/api/presence/online', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
-    let users = Array.from(onlineEmployees);
     const company_id = req.user?.company_id;
-    const allUsers = readUsers();
-    
-    // Strict Company Filter for ALL roles
-    users = users.filter(email => {
-      const u = allUsers.find(au => au.email === email);
-      return u && u.company_id == company_id;
+    const ttlMs = Number(process.env.PRESENCE_TTL_MS || 120000);
+    const now = Date.now();
+    const sessions = readSessions().filter(s => s.company_id == company_id && s.isActive);
+    const recent = sessions.filter(s => {
+      const last = s.lastHeartbeatAt ? Date.parse(s.lastHeartbeatAt) : (s.startedAt ? Date.parse(s.startedAt) : 0);
+      return last && (now - last) <= ttlMs;
     });
-
+    let users = Array.from(new Set(recent.map(s => s.employeeId)));
     if (req.user?.role === 'manager') {
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id);
       users = users.filter(u => teamEmails.includes(u));
