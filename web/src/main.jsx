@@ -38,22 +38,28 @@ import EmployeeLayout from './components/EmployeeLayout.jsx'
 
 function ProtectedRoute({ children, allowedRoles }) {
   const token = localStorage.getItem('token')
+  const location = useLocation()
   if (!token) {
     return <Navigate to="/login" replace />
   }
 
   try {
     const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    const effectiveRole = (payload.role === 'super_admin' && payload.company_id != null) ? 'company_admin' : payload.role
     
     if (allowedRoles) {
-      if (!allowedRoles.includes(payload.role)) {
-        const fallback = payload.role === 'super_admin' ? '/platform' : (payload.role === 'employee' ? '/employee/dashboard' : '/dashboard')
+      if (!allowedRoles.includes(effectiveRole)) {
+        const fallback = effectiveRole === 'super_admin' ? '/platform' : (effectiveRole === 'employee' ? '/employee/dashboard' : '/dashboard')
         return <Navigate to={fallback} replace />
       }
     }
 
+    if (effectiveRole === 'super_admin' && !location.pathname.startsWith('/platform')) {
+      return <Navigate to="/platform" replace />
+    }
+
     // Use EmployeeLayout for employee role, regular Layout for others
-    if (payload.role === 'employee') {
+    if (effectiveRole === 'employee') {
       return <EmployeeLayout>{children}</EmployeeLayout>
     }
   } catch (e) {
@@ -78,12 +84,12 @@ function AppRoutes() {
       <Route path="/docs" element={<Docs />} />
       
       {/* Protected Routes wrapped in Layout */}
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/live" element={<ProtectedRoute><LiveView /></ProtectedRoute>} />
-      <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
-      <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
-      <Route path="/hours" element={<ProtectedRoute><WorkHours /></ProtectedRoute>} />
-      <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><Dashboard /></ProtectedRoute>} />
+      <Route path="/live" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><LiveView /></ProtectedRoute>} />
+      <Route path="/report" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><Report /></ProtectedRoute>} />
+      <Route path="/activity" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><Activity /></ProtectedRoute>} />
+      <Route path="/hours" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><WorkHours /></ProtectedRoute>} />
+      <Route path="/requests" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><Requests /></ProtectedRoute>} />
       <Route path="/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><Setup /></ProtectedRoute>} />
       <Route path="/downloads" element={<ProtectedRoute><Downloads /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['company_admin']}><Admin /></ProtectedRoute>} />

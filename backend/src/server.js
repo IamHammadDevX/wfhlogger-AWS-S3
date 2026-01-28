@@ -333,8 +333,7 @@ app.post('/api/auth/signup', (req, res) => {
     // Create Company
     const company = createCompany({ name: companyName });
     
-    // Create Admin User (Super Admin role) linked to company - The first user is the Owner
-    const user = createUser({ email, full_name: fullName, country, timezone, password, role: 'super_admin', company_id: company.id });
+    const user = createUser({ email, full_name: fullName, country, timezone, password, role: 'company_admin', company_id: company.id });
     
     // Create Default Team (Organization) linked to company
     createOrganization({ name: `${companyName}`, managerId: user.id, company_id: company.id });
