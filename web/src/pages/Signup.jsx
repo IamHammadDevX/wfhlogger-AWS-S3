@@ -2,6 +2,7 @@ import React from 'react'
 import { useState } from 'react'
 import axios from 'axios'
 import { Link } from 'react-router-dom'
+import { TextField, CountrySelect, TimezoneSelect } from '../components/FormControls.jsx'
 
 export default function Signup() {
   const [companyName, setCompanyName] = useState('')
@@ -52,74 +53,16 @@ export default function Signup() {
             </div>
           )}
           
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Company Name</label>
-              <input 
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                placeholder="Acme Corp" 
-                value={companyName} 
-                onChange={e=>setCompanyName(e.target.value)} 
-                required
-              />
-            </div>
+          <div className="space-y-4 scroll-smooth">
+            <TextField label="Company Name" value={companyName} onChange={e=>setCompanyName(e.target.value)} placeholder="Acme Corp" required />
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Full Name</label>
-              <input 
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                placeholder="John Doe" 
-                value={fullName} 
-                onChange={e=>setFullName(e.target.value)} 
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Country</label>
-              <select className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" value={country} onChange={e=>setCountry(e.target.value)} required>
-                <option>United States</option>
-                <option>India</option>
-                <option>United Kingdom</option>
-                <option>Canada</option>
-                <option>Australia</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Timezone</label>
-              <select className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" value={timezone} onChange={e=>setTimezone(e.target.value)} required>
-                <option>UTC</option>
-                <option>America/New_York</option>
-                <option>Europe/London</option>
-                <option>Asia/Kolkata</option>
-                <option>Asia/Dubai</option>
-              </select>
-            </div>
+            <TextField label="Full Name" value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="John Doe" required />
+            <CountrySelect value={country} onChange={e=>setCountry(e.target.value)} required />
+            <TimezoneSelect value={timezone} onChange={e=>setTimezone(e.target.value)} required />
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Admin Email</label>
-              <input 
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                placeholder="you@company.com" 
-                value={email} 
-                onChange={e=>setEmail(e.target.value)} 
-                type="email"
-                autoComplete="email" 
-                required
-              />
-            </div>
+            <TextField label="Admin Email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@company.com" required type="email" autoComplete="email" />
             
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Password</label>
-              <input 
-                type="password" 
-                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                placeholder="Create a strong password" 
-                value={password} 
-                onChange={e=>setPassword(e.target.value)} 
-                autoComplete="new-password" 
-                required
-              />
-            </div>
+            <TextField label="Password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Create a strong password" required type="password" autoComplete="new-password" />
           </div>
 
           <button 

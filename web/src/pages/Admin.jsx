@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
+import { TextField, CountrySelect, TimezoneSelect, DateField } from '../components/FormControls.jsx'
 
 export default function Admin() {
   const [email, setEmail] = useState('manager@example.com')
@@ -168,43 +169,13 @@ export default function Admin() {
           <form className="space-y-4" onSubmit={submit}>
             {error && <div className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">{error}</div>}
             {msg && <div className="text-blue-700 dark:text-blue-400 text-sm bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">{msg}</div>}
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Full Name</label>
-                <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" placeholder="John Doe" value={name} onChange={e=>setName(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Country</label>
-                <select className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" value={country} onChange={e=>setCountry(e.target.value)}>
-                  <option>United States</option>
-                  <option>India</option>
-                  <option>United Kingdom</option>
-                  <option>Canada</option>
-                  <option>Australia</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Timezone</label>
-                <select className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" value={timezone} onChange={e=>setTimezone(e.target.value)}>
-                  <option>UTC</option>
-                  <option>America/New_York</option>
-                  <option>Europe/London</option>
-                  <option>Asia/Kolkata</option>
-                  <option>Asia/Dubai</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Email</label>
-                <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" placeholder="manager@example.com" value={email} onChange={e=>setEmail(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Password</label>
-                <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" type="password" placeholder="Secret" value={password} onChange={e=>setPassword(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Team Name</label>
-                <input className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" placeholder="Engineering" value={orgName} onChange={e=>setOrgName(e.target.value)} />
-              </div>
+            <div className="space-y-3 scroll-smooth">
+              <TextField label="Full Name" value={name} onChange={e=>setName(e.target.value)} placeholder="John Doe" />
+              <CountrySelect value={country} onChange={e=>setCountry(e.target.value)} />
+              <TimezoneSelect value={timezone} onChange={e=>setTimezone(e.target.value)} />
+              <TextField label="Email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="manager@example.com" />
+              <TextField label="Password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Secret" type="password" />
+              <TextField label="Team Name" value={orgName} onChange={e=>setOrgName(e.target.value)} placeholder="Engineering" />
             </div>
             <button className="w-full px-4 py-2.5 bg-slate-900 dark:bg-slate-700 text-white font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-600 transition-colors shadow-sm" type="submit">Create Account</button>
           </form>
@@ -217,14 +188,8 @@ export default function Admin() {
           
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">From Date</label>
-                <input type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors" value={cleanupFrom} onChange={e=>setCleanupFrom(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">To Date</label>
-                <input type="date" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors" value={cleanupTo} onChange={e=>setCleanupTo(e.target.value)} />
-              </div>
+              <DateField label="From Date" value={cleanupFrom} onChange={e=>setCleanupFrom(e.target.value)} />
+              <DateField label="To Date" value={cleanupTo} onChange={e=>setCleanupTo(e.target.value)} />
             </div>
             <button className="w-full px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors shadow-sm" onClick={cleanupScreenshots}>
               Delete Screenshots

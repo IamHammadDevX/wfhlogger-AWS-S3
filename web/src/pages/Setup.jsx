@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useCredits } from '../CreditsContext.jsx'
 import { resolveApiBase } from '../api.js'
+import { TextField, CountrySelect, TimezoneSelect } from '../components/FormControls.jsx'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -126,58 +127,11 @@ export default function Setup() {
             <div className="text-sm text-slate-600 dark:text-slate-300">Available Credits: <span className="font-semibold">{credits}</span></div>
           </div>
           {inviteMsg && <div className={`mb-4 p-3 text-sm rounded-lg ${inviteMsg.startsWith('Error') ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>{inviteMsg}</div>}
-          <form onSubmit={invite} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
-              <input 
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                value={inviteName} 
-                onChange={e=>setInviteName(e.target.value)} 
-                placeholder="Jane Doe" 
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Country</label>
-              <select 
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                value={inviteCountry}
-                onChange={e=>setInviteCountry(e.target.value)}
-                required
-              >
-                <option>United States</option>
-                <option>India</option>
-                <option>United Kingdom</option>
-                <option>Canada</option>
-                <option>Australia</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Timezone</label>
-              <select 
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                value={inviteTimezone}
-                onChange={e=>setInviteTimezone(e.target.value)}
-                required
-              >
-                <option>UTC</option>
-                <option>America/New_York</option>
-                <option>Europe/London</option>
-                <option>Asia/Kolkata</option>
-                <option>Asia/Dubai</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Employee Email</label>
-              <input 
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                value={inviteEmail} 
-                onChange={e=>setInviteEmail(e.target.value)} 
-                placeholder="employee@company.com" 
-                type="email"
-                required
-              />
-            </div>
+          <form onSubmit={invite} className="space-y-4 scroll-smooth">
+            <TextField label="Full Name" value={inviteName} onChange={e=>setInviteName(e.target.value)} placeholder="Jane Doe" required />
+            <CountrySelect value={inviteCountry} onChange={e=>setInviteCountry(e.target.value)} required />
+            <TimezoneSelect value={inviteTimezone} onChange={e=>setInviteTimezone(e.target.value)} required />
+            <TextField label="Employee Email" value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="employee@company.com" type="email" required />
             <button 
               className="px-6 py-2.5 bg-slate-900 dark:bg-slate-700 text-white font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-600 transition-colors shadow-sm"
             >
