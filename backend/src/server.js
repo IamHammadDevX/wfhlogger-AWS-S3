@@ -583,7 +583,7 @@ app.get('/api/team', requireRole(['manager', 'super_admin', 'company_admin']), (
 });
 
 // Employees
-app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) => {
+app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res) => {
   const { email, name, country, timezone, managerId: bodyManagerId, password } = req.body || {};
   if (!email) return res.status(400).json({ error: 'Email is required' });
   if (!name || !String(name).trim()) return res.status(400).json({ error: 'Full name is required' });
@@ -616,7 +616,7 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
     const company = getCompanyById(company_id);
     if (company && (company.credits || 0) < 1) {
       // Send email to admin?
-      const admin = listManagers(company_id).find(u => u.role === 'super_admin') || { email: req.user.email };
+      const admin = listManagers(company_id).find(u => u.role === 'company_admin') || listManagers(company_id).find(u => u.role === 'super_admin') || { email: req.user.email };
       sendCreationBlocked(admin.email);
       return res.status(402).json({ error: 'Insufficient credits. Please add credits to your account.' });
     }
@@ -642,7 +642,7 @@ app.post('/api/employees', requireRole(['manager', 'super_admin']), (req, res) =
     try {
        const loginUrl = `${process.env.APP_URL || 'http://localhost:4000'}`;
        // 1. To Company Admin
-       const admin = listManagers(company_id).find(u => u.role === 'super_admin');
+       const admin = listManagers(company_id).find(u => u.role === 'company_admin') || listManagers(company_id).find(u => u.role === 'super_admin');
        // 2. To Assigned Manager (if any)
        let manager = null;
        if (managerId) {
@@ -1047,19 +1047,18 @@ app.post('/api/requests', requireRole(['employee']), (req, res) => {
   }
 });
 
-app.get('/api/requests', requireRole(['manager', 'super_admin', 'employee']), (req, res) => {
+app.get('/api/requests', requireRole(['manager', 'company_admin', 'employee']), (req, res) => {
   try {
     const { company_id, role, uid } = req.user;
 
     const allLoginUsers = (() => {
       try { return listAllUsers().filter(u => u.company_id == company_id) } catch { return [] }
     })()
-    const emailById = (id) => {
-      const row = allLoginUsers.find(u => u.id == id)
-      return row?.email || null
-    }
+    const userById = (id) => allLoginUsers.find(u => u.id == id) || null
     const enrich = (r) => {
-      const employee_email = emailById(r.employee_id) || null
+      const userRow = userById(r.employee_id)
+      const employee_email = userRow?.email || null
+      const employee_name = userRow?.full_name || userRow?.name || null
       const tz = String(r.timezone || (employee_email ? getEmployeeTimezone(employee_email, company_id) : req.user?.timezone) || 'UTC').trim() || 'UTC'
       const startUtc = r.start_utc || (() => {
         const ms = parseLocalDateTimeToUtcMs(r.date, r.start_time, tz)
@@ -1073,16 +1072,14 @@ app.get('/api/requests', requireRole(['manager', 'super_admin', 'employee']), (r
       const end_local = endUtc ? formatLocalDateTime(Date.parse(endUtc), tz, { withSeconds: true }) : null
       const created_at_local = r.created_at ? formatLocalDateTime(Date.parse(r.created_at), tz, { withSeconds: true }) : null
       const action_at_local = r.action_at ? formatLocalDateTime(Date.parse(r.action_at), tz, { withSeconds: true }) : null
-      return { ...r, employee_email, timezone: tz, start_utc: startUtc, end_utc: endUtc, start_local, end_local, created_at_local, action_at_local }
+      return { ...r, employee_email, employee_name, timezone: tz, start_utc: startUtc, end_utc: endUtc, start_local, end_local, created_at_local, action_at_local }
     }
 
     if (role === 'employee') {
       const requests = getTimeRequests(company_id, uid);
       return res.json({ requests: requests.map(enrich) });
     }
-    // Managers/Admins see pending requests for their team
-    // For simplicity, super_admin sees all company requests
-    // Manager sees only their team? Need to filter by team.
+    // Managers/Admins see company requests; managers are restricted to their team
     let requests = getTimeRequests(company_id);
     if (role === 'manager') {
       const teamEmails = getTeamEmailsForManager(uid, company_id);
@@ -1099,7 +1096,7 @@ app.get('/api/requests', requireRole(['manager', 'super_admin', 'employee']), (r
   }
 });
 
-app.post('/api/requests/:id/:action', requireRole(['manager', 'super_admin']), (req, res) => {
+app.post('/api/requests/:id/:action', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     const { id, action } = req.params; // action: approve or reject
     const { company_id, uid } = req.user;

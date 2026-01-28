@@ -17,7 +17,8 @@ export default function Requests() {
     const token = localStorage.getItem('token')
     try {
         const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-        setRole(payload.role)
+        const raw = payload.role
+        setRole((raw === 'super_admin' && payload.company_id != null) ? 'company_admin' : raw)
     } catch {}
   }, [])
 
@@ -63,11 +64,11 @@ export default function Requests() {
           <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
             <tr>
               <th className="px-6 py-3">Date</th>
-              {(role === 'manager' || role === 'super_admin') && <th className="px-6 py-3">Employee</th>}
+              {(role === 'manager' || role === 'company_admin') && <th className="px-6 py-3">Employee</th>}
               <th className="px-6 py-3">Time Range</th>
               <th className="px-6 py-3">Reason</th>
               <th className="px-6 py-3">Status</th>
-              {(role === 'manager' || role === 'super_admin') && <th className="px-6 py-3">Actions</th>}
+              {(role === 'manager' || role === 'company_admin') && <th className="px-6 py-3">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -77,7 +78,12 @@ export default function Requests() {
               requests.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                   <td className="px-6 py-3">{r.date}</td>
-                  {(role === 'manager' || role === 'super_admin') && <td className="px-6 py-3">{r.employee_id}</td>}
+                  {(role === 'manager' || role === 'company_admin') && (
+                    <td className="px-6 py-3">
+                      <div className="font-medium text-slate-900 dark:text-slate-100">{r.employee_name || 'Employee'}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{r.employee_email || r.employee_id}</div>
+                    </td>
+                  )}
                   <td className="px-6 py-3">{r.start_time} - {r.end_time}</td>
                   <td className="px-6 py-3">{r.reason}</td>
                   <td className="px-6 py-3">
@@ -88,7 +94,7 @@ export default function Requests() {
                       {r.status}
                     </span>
                   </td>
-                  {(role === 'manager' || role === 'super_admin') && (
+                  {(role === 'manager' || role === 'company_admin') && (
                     <td className="px-6 py-3">
                       {r.status === 'pending' && (
                         <div className="flex gap-2">

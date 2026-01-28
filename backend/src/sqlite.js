@@ -279,18 +279,18 @@ export function listCompanies() {
 
 export function listUsersByCompany(company_id) {
   if (db) {
-    return db.prepare('SELECT id, email, role, country, timezone, company_id FROM users WHERE company_id = ?').all(company_id)
+    return db.prepare('SELECT id, email, role, full_name, country, timezone, company_id FROM users WHERE company_id = ?').all(company_id)
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
-  return arr.filter(u => u.company_id == company_id).map(u => ({ id: u.id, email: u.email, role: u.role, country: u.country, timezone: u.timezone, company_id: u.company_id }))
+  return arr.filter(u => u.company_id == company_id).map(u => ({ id: u.id, email: u.email, role: u.role, full_name: u.full_name, country: u.country, timezone: u.timezone, company_id: u.company_id }))
 }
 
 export function listAllUsers() {
   if (db) {
-    return db.prepare('SELECT id, email, role, country, timezone, company_id FROM users').all()
+    return db.prepare('SELECT id, email, role, full_name, country, timezone, company_id FROM users').all()
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
-  return arr.map(u => ({ id: u.id, email: u.email, role: u.role, country: u.country, timezone: u.timezone, company_id: u.company_id }))
+  return arr.map(u => ({ id: u.id, email: u.email, role: u.role, full_name: u.full_name, country: u.country, timezone: u.timezone, company_id: u.company_id }))
 }
 
 export function createCompany({ name }) {
