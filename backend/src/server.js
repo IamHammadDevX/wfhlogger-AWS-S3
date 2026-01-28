@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
@@ -2305,6 +2305,75 @@ try {
 } catch (e) {
   console.warn('[server] Unable to configure static frontend serving:', e?.message || e);
 }
+
+app.post('/api/admin/reset-all', requireRole(['super_admin']), (req, res) => {
+  try {
+    const keepEmail = process.env.SUPERADMIN_EMAIL || 'admin@example.com'
+    const keepPass = process.env.SUPERADMIN_PASSWORD || 'admin123'
+    if (db) {
+      db.transaction(() => {
+        db.prepare('DELETE FROM organizations').run()
+        db.prepare('DELETE FROM companies').run()
+        db.prepare('DELETE FROM employee_creds').run()
+        db.prepare('DELETE FROM manager_creds').run()
+        db.prepare('DELETE FROM transactions').run()
+        db.prepare('DELETE FROM invoices').run()
+        db.prepare('DELETE FROM time_requests').run()
+        db.prepare('DELETE FROM password_reset_tokens').run()
+        db.prepare('DELETE FROM users WHERE lower(email) != lower(?)').run(keepEmail)
+      })()
+      const u = getUserByEmail(keepEmail)
+      if (!u) createUser({ email: keepEmail, password: keepPass, role: 'super_admin' })
+    } else {
+      const ufile = path.resolve(process.cwd(), DATA_DIR, 'users.sqlite.json')
+      const ofile = path.resolve(process.cwd(), DATA_DIR, 'organizations.sqlite.json')
+      const cfile = path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json')
+      const ecred = path.resolve(process.cwd(), DATA_DIR, 'employee_creds.sqlite.json')
+      const mcred = path.resolve(process.cwd(), DATA_DIR, 'manager_creds.sqlite.json')
+      const txfile = path.resolve(process.cwd(), DATA_DIR, 'transactions.sqlite.json')
+      const invfile = path.resolve(process.cwd(), DATA_DIR, 'invoices.sqlite.json')
+      const reqfile = path.resolve(process.cwd(), DATA_DIR, 'time_requests.sqlite.json')
+      const rtokens = path.resolve(process.cwd(), DATA_DIR, 'reset_tokens.sqlite.json')
+      const legacyUsers = usersFile
+      const legacyOrg = orgFile
+      const intervals = intervalsFile
+      const sessions = sessionsFile
+      const audits = auditFile
+      const reportsIdx = path.join(dataPath, 'reports.index.json')
+      const keep = getUserByEmail(keepEmail)
+      let arr = []
+      try { arr = JSON.parse(fs.readFileSync(ufile, 'utf-8')) } catch {}
+      arr = arr.filter(x => String(x.email).toLowerCase() === String(keepEmail).toLowerCase())
+      if (!arr.length) {
+        createUser({ email: keepEmail, password: keepPass, role: 'super_admin' })
+        try { arr = JSON.parse(fs.readFileSync(ufile, 'utf-8')) } catch { arr = [] }
+        arr = arr.filter(x => String(x.email).toLowerCase() === String(keepEmail).toLowerCase())
+      }
+      fs.writeFileSync(ufile, JSON.stringify(arr, null, 2))
+      fs.writeFileSync(ofile, '[]')
+      fs.writeFileSync(cfile, '[]')
+      fs.writeFileSync(ecred, '[]')
+      fs.writeFileSync(mcred, '[]')
+      fs.writeFileSync(txfile, '[]')
+      fs.writeFileSync(invfile, '[]')
+      fs.writeFileSync(reqfile, '[]')
+      fs.writeFileSync(rtokens, '[]')
+      fs.writeFileSync(legacyUsers, '[]')
+      fs.writeFileSync(legacyOrg, JSON.stringify({ name: '', createdAt: null }, null, 2))
+      fs.writeFileSync(intervals, '{}')
+      fs.writeFileSync(sessions, '[]')
+      fs.writeFileSync(audits, '[]')
+      fs.writeFileSync(reportsIdx, '[]')
+      try {
+        const meta = metaFile
+        fs.writeFileSync(meta, '[]')
+      } catch {}
+    }
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: 'Reset failed' })
+  }
+})
 
 
 // ---------- BEGIN: compatibility proxy to support hardcoded :4000 frontend ----------
