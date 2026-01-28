@@ -2023,8 +2023,12 @@ app.get('/api/work/sessions/today', requireRole(['manager', 'company_admin']), (
 app.post('/api/uploads/screenshot', requireRole(['employee']), upload.single('screenshot'), async (req, res) => {
   try {
     const fileRelPath = path.relative(process.cwd(), req.file.path);
-    const employeeId = (req.body && (req.body.employeeId || req.body.email)) || 'unknown';
-    const company_id = req.user?.company_id;
+    const tokenEmail = req.user?.sub || req.user?.email || null
+    const employeeId = tokenEmail || (req.body && (req.body.employeeId || req.body.email)) || 'unknown';
+    const company_id = req.user?.company_id || (() => {
+      if (!tokenEmail) return null
+      try { return getUserByEmail(tokenEmail)?.company_id || null } catch { return null }
+    })();
     const record = { file: fileRelPath.replace(/\\/g, '/'), employeeId, company_id, ts: new Date().toISOString() };
     // Append metadata to uploads/index.json (simple dev store)
     try {
@@ -2039,11 +2043,8 @@ app.post('/api/uploads/screenshot', requireRole(['employee']), upload.single('sc
     // Mark employee as online upon receiving a screenshot (helps Live View selection)
     if (employeeId && employeeId !== 'unknown') {
       onlineEmployees.add(employeeId);
-      // Broadcast to company room if we have context, or global fallback
       if (company_id) {
         io.to(`company:${company_id}`).emit('presence:online', { userId: employeeId });
-      } else {
-        io.emit('presence:online', { userId: employeeId });
       }
     }
 
@@ -2339,8 +2340,14 @@ io.use((socket, next) => {
     // attach to socket for downstream usage (production: trust only verified token)
     socket.data.userId = payload?.email || payload?.userId; // email identifier (employees/managers)
     socket.data.uid = payload?.uid || null; // numeric/uuid id (managers)
-    socket.data.role = payload?.role || 'employee';
-    socket.data.company_id = payload?.company_id || null;
+    let role = payload?.role || 'employee'
+    let company_id = payload?.company_id || null
+    if (!company_id && socket.data.userId) {
+      try { company_id = getUserByEmail(socket.data.userId)?.company_id || null } catch {}
+    }
+    if (role === 'super_admin' && company_id != null) role = 'company_admin'
+    socket.data.role = role
+    socket.data.company_id = company_id
     next();
   } catch (err) {
     console.warn('[socket] auth failed:', err.message);
@@ -2369,12 +2376,8 @@ io.on('connection', (socket) => {
   // Track presence: employees
   if (role === 'employee' && userId) {
     onlineEmployees.add(userId);
-    // Broadcast only to company room
     if (company_id) {
       io.to(`company:${company_id}`).emit('presence:online', { userId });
-    } else {
-      // Legacy fallback
-      io.emit('presence:online', { userId });
     }
   }
 
@@ -2466,8 +2469,6 @@ socket.on('live_view:frame', ({ employeeId, frameBase64, ts }) => {
       const cid = socket.data.company_id;
       if (cid) {
         io.to(`company:${cid}`).emit('presence:offline', { userId });
-      } else {
-        io.emit('presence:offline', { userId });
       }
       liveStreamOn.set(userId, false);
       io.to(viewersRoom(userId)).emit('live_view:terminate', { by: userId, reason: 'offline' });

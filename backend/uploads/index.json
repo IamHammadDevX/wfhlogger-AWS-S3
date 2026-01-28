@@ -250,5 +250,35 @@
     "employeeId": "robert@apl.com",
     "company_id": 1,
     "ts": "2026-01-28T20:40:42.404Z"
+  },
+  {
+    "file": "uploads/2026-01-28T20-45-41-360Z-screenshot.jpg",
+    "employeeId": "robert@apl.com",
+    "company_id": 1,
+    "ts": "2026-01-28T20:45:41.385Z"
+  },
+  {
+    "file": "uploads/2026-01-28T20-50-41-776Z-screenshot.jpg",
+    "employeeId": "robert@apl.com",
+    "company_id": 1,
+    "ts": "2026-01-28T20:50:41.811Z"
+  },
+  {
+    "file": "uploads/2026-01-28T20-55-41-838Z-screenshot.jpg",
+    "employeeId": "robert@apl.com",
+    "company_id": 1,
+    "ts": "2026-01-28T20:55:41.860Z"
+  },
+  {
+    "file": "uploads/2026-01-28T21-00-42-124Z-screenshot.jpg",
+    "employeeId": "robert@apl.com",
+    "company_id": 1,
+    "ts": "2026-01-28T21:00:42.146Z"
+  },
+  {
+    "file": "uploads/2026-01-28T21-05-43-312Z-screenshot.jpg",
+    "employeeId": "robert@apl.com",
+    "company_id": 1,
+    "ts": "2026-01-28T21:05:43.763Z"
   }
 ]

@@ -67,9 +67,9 @@ export default function LiveView() {
     
     s.on('presence:list', ({ users }) => {
       let list = Array.isArray(users) ? users : []
-      if (role === 'manager' && allEmployees.length) {
-        const teamSet = new Set(allEmployees.map(e => e.email))
-        list = list.filter(u => teamSet.has(u))
+      if ((role === 'manager' || role === 'company_admin') && allEmployees.length) {
+        const allowedSet = new Set(allEmployees.map(e => e.email))
+        list = list.filter(u => allowedSet.has(u))
       }
       setOnlineEmployees(list)
       // If previously selected employee is online, keep them. Otherwise select first available if none selected
@@ -77,9 +77,9 @@ export default function LiveView() {
     })
     
     s.on('presence:online', ({ userId }) => {
-      if (role === 'manager' && allEmployees.length) {
-        const teamSet = new Set(allEmployees.map(e => e.email))
-        if (!teamSet.has(userId)) return
+      if ((role === 'manager' || role === 'company_admin') && allEmployees.length) {
+        const allowedSet = new Set(allEmployees.map(e => e.email))
+        if (!allowedSet.has(userId)) return
       }
       setOnlineEmployees(prev => Array.from(new Set([userId, ...prev])))
       
@@ -112,6 +112,7 @@ export default function LiveView() {
   useEffect(() => {
     const token = localStorage.getItem('token')
     const headers = { Authorization: `Bearer ${token}` }
+    let decoded = null
     resolveApiBase().then((BASE)=>{
       axios.get(`${BASE}/api/employees`, { headers }).then(r => setAllEmployees(r.data?.users || [])).catch(()=>{})
       axios.get(`${BASE}/api/presence/online`, { headers }).then(r => {
@@ -120,14 +121,12 @@ export default function LiveView() {
         setFilteredOnline(list)
       }).catch(()=>{})
     })
-    let role = ''
-    try { const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); role = payload?.role } catch {}
-    setRole(role || '')
-    if (role === 'super_admin') {
-      resolveApiBase().then((BASE)=>{
-        axios.get(`${BASE}/api/admin/managers`, { headers }).then(r => setManagers(r.data?.managers || [])).catch(()=>{})
-      })
+    let r = ''
+    try { decoded = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch {}
+    if (decoded) {
+      r = (decoded.role === 'super_admin' && decoded.company_id != null) ? 'company_admin' : decoded.role
     }
+    setRole(r || '')
   }, [])
 
   useEffect(() => {
@@ -140,6 +139,12 @@ export default function LiveView() {
     const filtered = onlineEmployees.filter(e => team.includes(e))
     setFilteredOnline(filtered)
   }, [selectedManager, onlineEmployees, allEmployees, managers])
+
+  useEffect(() => {
+    if ((role !== 'manager' && role !== 'company_admin') || !allEmployees.length) return
+    const allowedSet = new Set(allEmployees.map(e => e.email))
+    setOnlineEmployees(prev => prev.filter(u => allowedSet.has(u)))
+  }, [role, allEmployees])
 
   useEffect(() => {
     if (employeeId) {
