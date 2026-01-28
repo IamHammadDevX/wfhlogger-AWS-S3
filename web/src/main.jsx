@@ -1,8 +1,10 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import './index.css'
 import './api.js'
+import axios from 'axios'
+import { resolveApiBase } from './api.js'
 import { ThemeProvider } from './ThemeContext.jsx'
 import { CreditsProvider } from './CreditsContext.jsx'
 import Login from './pages/Login.jsx'
@@ -82,6 +84,63 @@ function RoleElement({ employee, managerOrAdmin }) {
   }
 }
 
+function TenantGuard({ children }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [ready, setReady] = React.useState(false)
+
+  React.useEffect(() => {
+    const enforce = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return navigate('/login', { replace: true })
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+        const role = (payload.role === 'super_admin' && payload.company_id != null) ? 'company_admin' : payload.role
+        if (role === 'super_admin') { setReady(true); return }
+        const segs = location.pathname.split('/').filter(Boolean)
+        const currentSlug = segs[0] || ''
+        const base = await resolveApiBase()
+        const { data } = await axios.get(`${base}/api/company/slug`, { headers: { Authorization: `Bearer ${token}` } })
+        const expected = data?.slug || ''
+        if (!currentSlug || currentSlug !== expected) {
+          const tail = '/' + segs.slice(1).join('/')
+          navigate(`/${expected}${tail}`, { replace: true })
+          return
+        }
+        setReady(true)
+      } catch {
+        navigate('/login', { replace: true })
+      }
+    }
+    enforce()
+  }, [location.pathname, navigate])
+
+  if (!ready) return null
+  return children
+}
+
+function RedirectToTenant({ path }) {
+  const navigate = useNavigate()
+  React.useEffect(() => {
+    const go = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return navigate('/login', { replace: true })
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+        const role = (payload.role === 'super_admin' && payload.company_id != null) ? 'company_admin' : payload.role
+        if (role === 'super_admin') { navigate('/platform', { replace: true }); return }
+        const base = await resolveApiBase()
+        const { data } = await axios.get(`${base}/api/company/slug`, { headers: { Authorization: `Bearer ${token}` } })
+        const expected = data?.slug || ''
+        navigate(`/${expected}${path}`, { replace: true })
+      } catch {
+        navigate('/login', { replace: true })
+      }
+    }
+    go()
+  }, [navigate, path])
+  return null
+}
 function AppRoutes() {
   return (
     <Routes>
@@ -99,27 +158,27 @@ function AppRoutes() {
       {/* Protected Routes wrapped in Layout */}
       <Route path="/dashboard" element={
         <ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}>
-          <RoleElement employee={<EmployeeDashboard />} managerOrAdmin={<Dashboard />} />
+          <RedirectToTenant path="/dashboard" />
         </ProtectedRoute>
       } />
-      <Route path="/live" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><LiveView /></ProtectedRoute>} />
+      <Route path="/live" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><RedirectToTenant path="/live" /></ProtectedRoute>} />
       <Route path="/report" element={
         <ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}>
-          <RoleElement employee={<EmployeeReports />} managerOrAdmin={<Report />} />
+          <RedirectToTenant path="/report" />
         </ProtectedRoute>
       } />
       <Route path="/activity" element={
         <ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}>
-          <RoleElement employee={<EmployeeActivity />} managerOrAdmin={<Activity />} />
+          <RedirectToTenant path="/activity" />
         </ProtectedRoute>
       } />
-      <Route path="/hours" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><WorkHours /></ProtectedRoute>} />
-      <Route path="/requests" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><Requests /></ProtectedRoute>} />
-      <Route path="/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><Setup /></ProtectedRoute>} />
-      <Route path="/downloads" element={<ProtectedRoute><Downloads /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute allowedRoles={['company_admin']}><Admin /></ProtectedRoute>} />
-      <Route path="/billing" element={<ProtectedRoute allowedRoles={['company_admin']}><Billing /></ProtectedRoute>} />
-      <Route path="/company" element={<ProtectedRoute allowedRoles={['company_admin']}><CompanyProfile /></ProtectedRoute>} />
+      <Route path="/hours" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><RedirectToTenant path="/hours" /></ProtectedRoute>} />
+      <Route path="/requests" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><RedirectToTenant path="/requests" /></ProtectedRoute>} />
+      <Route path="/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><RedirectToTenant path="/setup" /></ProtectedRoute>} />
+      <Route path="/downloads" element={<ProtectedRoute><RedirectToTenant path="/downloads" /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['company_admin']}><RedirectToTenant path="/admin" /></ProtectedRoute>} />
+      <Route path="/billing" element={<ProtectedRoute allowedRoles={['company_admin']}><RedirectToTenant path="/billing" /></ProtectedRoute>} />
+      <Route path="/company" element={<ProtectedRoute allowedRoles={['company_admin']}><RedirectToTenant path="/company" /></ProtectedRoute>} />
       <Route path="/platform" element={<ProtectedRoute allowedRoles={['super_admin']}><SADashboard /></ProtectedRoute>} />
       <Route path="/platform/companies" element={<ProtectedRoute allowedRoles={['super_admin']}><SACompanies /></ProtectedRoute>} />
       <Route path="/platform/revenue" element={<ProtectedRoute allowedRoles={['super_admin']}><SARevenue /></ProtectedRoute>} />
@@ -130,6 +189,31 @@ function AppRoutes() {
       <Route path="/employee/activity" element={<Navigate to="/activity" replace />} />
       <Route path="/employee/reports" element={<Navigate to="/report" replace />} />
       <Route path="/employee/profile" element={<Navigate to="/profile" replace />} />
+      
+      {/* Tenant-scoped routes */}
+      <Route path="/:companySlug/dashboard" element={
+        <ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}>
+          <TenantGuard>
+            <RoleElement employee={<EmployeeDashboard />} managerOrAdmin={<Dashboard />} />
+          </TenantGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/:companySlug/live" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><TenantGuard><LiveView /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/report" element={
+        <ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}>
+          <TenantGuard>
+            <RoleElement employee={<EmployeeReports />} managerOrAdmin={<Report />} />
+          </TenantGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/:companySlug/activity" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><TenantGuard><RoleElement employee={<EmployeeActivity />} managerOrAdmin={<Activity />} /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/hours" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><TenantGuard><WorkHours /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/requests" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><TenantGuard><Requests /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><TenantGuard><Setup /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/downloads" element={<ProtectedRoute><TenantGuard><Downloads /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/admin" element={<ProtectedRoute allowedRoles={['company_admin']}><TenantGuard><Admin /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/billing" element={<ProtectedRoute allowedRoles={['company_admin']}><TenantGuard><Billing /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/company" element={<ProtectedRoute allowedRoles={['company_admin']}><TenantGuard><CompanyProfile /></TenantGuard></ProtectedRoute>} />
     </Routes>
   )
 }

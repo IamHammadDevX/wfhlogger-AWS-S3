@@ -24,13 +24,19 @@ export default function Login() {
         window.location.href = redirect
         return
       }
-      if (payload.role === 'employee') {
-        window.location.href = '/dashboard'
-      } else if (payload.role === 'super_admin') {
+      const roleEff = (payload.role === 'super_admin' && payload.company_id != null) ? 'company_admin' : payload.role
+      if (roleEff === 'super_admin') {
         window.location.href = '/platform'
-      } else {
-        window.location.href = '/dashboard'
+        return
       }
+      axios.get('/api/company/slug', { headers: { Authorization: `Bearer ${token}` } })
+        .then(({ data }) => {
+          const slug = data?.slug || ''
+          window.location.href = `/${slug}/dashboard`
+        })
+        .catch(() => {
+          window.location.href = '/dashboard'
+        })
     } catch (e) {
       try { window.history.replaceState({}, '', '/login') } catch {}
       setError('Login failed: invalid desktop login token.')
@@ -50,12 +56,17 @@ export default function Login() {
       localStorage.setItem('token', resp.data.token)
       try {
         const payload = JSON.parse(atob(resp.data.token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-        if (payload.role === 'employee') {
-          window.location.href = '/dashboard'
-        } else if (payload.role === 'super_admin') {
+        const roleEff = (payload.role === 'super_admin' && payload.company_id != null) ? 'company_admin' : payload.role
+        if (roleEff === 'super_admin') {
           window.location.href = '/platform'
         } else {
-          window.location.href = '/dashboard'
+          try {
+            const { data } = await axios.get('/api/company/slug', { headers: { Authorization: `Bearer ${resp.data.token}` } })
+            const slug = data?.slug || ''
+            window.location.href = `/${slug}/dashboard`
+          } catch {
+            window.location.href = '/dashboard'
+          }
         }
       } catch {
         window.location.href = '/dashboard'

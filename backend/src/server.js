@@ -183,6 +183,18 @@ function appendAudit(type, details, company_id){
   }
 }
 
+function slugifyName(name) {
+  try {
+    return String(name || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  } catch {
+    return 'company'
+  }
+}
+
 // Multer storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -582,6 +594,19 @@ app.get('/api/team', requireRole(['manager', 'super_admin', 'company_admin']), (
     return res.json({ team: null });
   }
 });
+
+// Company slug by token
+app.get('/api/company/slug', requireRole(['employee', 'manager', 'company_admin', 'super_admin']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const company = getCompanyById(company_id)
+    if (!company) return res.status(404).json({ error: 'Company not found' })
+    const slug = slugifyName(company.name)
+    res.json({ slug })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to resolve slug' })
+  }
+})
 
 // Employees
 app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res) => {
