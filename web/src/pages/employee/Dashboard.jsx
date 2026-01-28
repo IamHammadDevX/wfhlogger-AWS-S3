@@ -39,7 +39,7 @@ export default function EmployeeDashboard() {
   }
 
   const formatTime = (isoString) => {
-    if (!isoString) return 'N/A'
+    if (!isoString) return null
     try {
       return new Date(isoString).toLocaleString('en-US', { timeZone: timezone })
     } catch {
@@ -171,7 +171,7 @@ export default function EmployeeDashboard() {
                     </div>
                     <div>
                       <p className="font-medium text-slate-900 dark:text-white">
-                        {formatTime(session.start_time)}
+                        {session.start_time_local || formatTime(session.start_time_utc) || 'Recent work session'}
                       </p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
                         Duration: {formatDuration(session.duration)}

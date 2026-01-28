@@ -73,20 +73,21 @@ export default function EmployeeSidebar({ isOpen, setIsOpen }) {
             <div className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Personal
             </div>
-            <NavItem to="/employee/dashboard" icon={Icons.Dashboard} label="My Dashboard" />
-            <NavItem to="/employee/activity" icon={Icons.Activity} label="My Activity" />
-            <NavItem to="/employee/reports" icon={Icons.Reports} label="My Reports" />
+            <NavItem to="/dashboard" icon={Icons.Dashboard} label="My Dashboard" />
+            <NavItem to="/activity" icon={Icons.Activity} label="My Activity" />
+            <NavItem to="/report" icon={Icons.Reports} label="My Reports" />
             
             <div className="px-3 mb-2 mt-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Account
             </div>
-            <NavItem to="/employee/profile" icon={Icons.Profile} label="Profile Settings" />
+            <NavItem to="/profile" icon={Icons.Profile} label="Profile Settings" />
           </div>
 
           {/* User Info */}
           <div className="p-4 border-t border-slate-100 dark:border-slate-700">
-            <div className="text-sm text-slate-600 dark:text-slate-400 truncate mb-3">
-              {userEmail}
+            <div className="px-3 py-2 mb-2">
+              <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{user.name}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</div>
             </div>
             <div className="flex items-center justify-between mb-3">
               <button

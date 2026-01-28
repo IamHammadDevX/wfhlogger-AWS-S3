@@ -5,7 +5,8 @@ import base64
 import threading
 import requests
 import socketio
-from urllib.parse import urlencode
+import webbrowser
+from urllib.parse import urlencode, urlparse
 from datetime import datetime, timezone, timedelta
 
 try:
@@ -182,6 +183,8 @@ class TimeTrackerApp:
         self.login_btn = ttk.Button(form_frame, text="Continue", style='Primary.TButton', command=self.login)
         self.login_btn.pack(fill=tk.X)
 
+        ttk.Button(form_frame, text="Open Web Login", style='Ghost.TButton', command=self.open_web_login).pack(fill=tk.X, pady=(10, 0))
+
         # Footer
         ttk.Label(self.current_frame, text="v1.0.0 • Secure Client", style='Muted.TLabel', font=('Segoe UI', 8)).pack(side=tk.BOTTOM, pady=10)
 
@@ -244,6 +247,8 @@ class TimeTrackerApp:
         # Request Missed Time
         ttk.Button(hero, text="Request Missed Time", style='Ghost.TButton', command=self.request_time).pack(pady=(0, 5))
 
+        ttk.Button(hero, text="View Dashboard in Web", style='Ghost.TButton', command=self.open_web_dashboard).pack(pady=(0, 5))
+
         # 3. Footer Stats
         footer = ttk.Frame(self.current_frame, style='Surface.TFrame', padding=15)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
@@ -265,6 +270,37 @@ class TimeTrackerApp:
             self.stop_tracking()
         else:
             self.start_tracking()
+
+    def _get_frontend_base(self):
+        env_url = os.environ.get('FRONTEND_URL', '').strip()
+        if env_url:
+            return env_url.rstrip('/')
+        try:
+            parsed = urlparse(self.backend_url)
+            if parsed.hostname in ('localhost', '127.0.0.1'):
+                return 'http://localhost:5173'
+            if parsed.scheme and parsed.hostname:
+                return f'{parsed.scheme}://{parsed.hostname}'
+        except Exception:
+            pass
+        return 'http://localhost:5173'
+
+    def open_web_login(self):
+        url = f"{self._get_frontend_base()}/login"
+        try:
+            webbrowser.open(url)
+        except Exception:
+            messagebox.showerror('Error', f'Unable to open browser for {url}')
+
+    def open_web_dashboard(self):
+        if not self.token:
+            return self.open_web_login()
+        qs = urlencode({'token': self.token})
+        url = f"{self._get_frontend_base()}/login?{qs}"
+        try:
+            webbrowser.open(url)
+        except Exception:
+            messagebox.showerror('Error', f'Unable to open browser for {url}')
 
     def start_tracking(self):
         self.tracking = True

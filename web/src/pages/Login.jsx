@@ -1,14 +1,41 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 export default function Login() {
+  const routerLocation = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState('company_admin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(routerLocation.search)
+    const token = params.get('token')
+    if (!token) return
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+      localStorage.setItem('token', token)
+      window.history.replaceState({}, '', '/login')
+      const redirect = params.get('redirect')
+      if (redirect && redirect.startsWith('/')) {
+        window.location.href = redirect
+        return
+      }
+      if (payload.role === 'employee') {
+        window.location.href = '/dashboard'
+      } else if (payload.role === 'super_admin') {
+        window.location.href = '/platform'
+      } else {
+        window.location.href = '/dashboard'
+      }
+    } catch (e) {
+      try { window.history.replaceState({}, '', '/login') } catch {}
+      setError('Login failed: invalid desktop login token.')
+    }
+  }, [routerLocation.search])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -24,14 +51,14 @@ export default function Login() {
       try {
         const payload = JSON.parse(atob(resp.data.token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
         if (payload.role === 'employee') {
-          location.href = '/employee/dashboard'
+          window.location.href = '/dashboard'
         } else if (payload.role === 'super_admin') {
-          location.href = '/platform'
+          window.location.href = '/platform'
         } else {
-          location.href = '/dashboard'
+          window.location.href = '/dashboard'
         }
       } catch {
-        location.href = '/dashboard'
+        window.location.href = '/dashboard'
       }
     } catch (err) {
       if (err.response && err.response.status === 401) {
