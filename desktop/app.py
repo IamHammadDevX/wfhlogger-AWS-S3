@@ -303,6 +303,18 @@ class TimeTrackerApp:
             messagebox.showerror('Error', f'Unable to open browser for {url}')
 
     def start_tracking(self):
+        try:
+            headers = { 'Authorization': f'Bearer {self.token}' }
+            r = requests.get(f'{self.backend_url}/api/drive/status', headers=headers, timeout=5)
+            if not r.json().get('connected'):
+                sr = requests.get(f'{self.backend_url}/api/drive/oauth/start', headers=headers, timeout=5)
+                u = (sr.json() or {}).get('url')
+                if u: webbrowser.open(u)
+                messagebox.showinfo('Connect Drive', 'Please connect Google Drive to start tracking.')
+                return
+        except Exception:
+            messagebox.showerror('Drive Required', 'Google Drive connection required.')
+            return
         self.tracking = True
         self._stop_event.clear()
         
@@ -620,9 +632,8 @@ class TimeTrackerApp:
     def _upload_screenshot(self, jpeg_bytes):
         try:
             files = { 'screenshot': ('screenshot.jpg', jpeg_bytes, 'image/jpeg') }
-            data = { 'employeeId': self.email.get() }
             headers = { 'Authorization': f'Bearer {self.token}' }
-            requests.post(f'{self.backend_url}/api/uploads/screenshot', files=files, data=data, headers=headers, timeout=30)
+            requests.post(f'{self.backend_url}/api/uploads/drive', files=files, headers=headers, timeout=30)
             self.last_upload_var.set(self._format_hhmm_in_effective_tz(datetime.now(timezone.utc)))
         except:
             self.last_upload_var.set("Failed")

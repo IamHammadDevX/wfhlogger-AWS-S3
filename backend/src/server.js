@@ -19,6 +19,8 @@ import bcrypt from 'bcryptjs';
 import { createStripeCheckoutSession, verifyStripeWebhookAndExtract } from './payments/stripe.js';
 import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning } from './email.js';
 import cron from 'node-cron';
+import crypto from 'crypto';
+import { Readable } from 'stream';
 
 const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -27,6 +29,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
 const DATA_DIR = process.env.DATA_DIR || 'data';
 const PAYMENT_PROVIDER = (process.env.PAYMENT_PROVIDER || 'stripe').toLowerCase();
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
+const DRIVE_TOKEN_KEY = process.env.DRIVE_TOKEN_KEY || '';
 
 // Ensure upload directory exists (relative to current working dir)
 const uploadPath = path.resolve(process.cwd(), UPLOAD_DIR);
@@ -49,6 +55,12 @@ if (!fs.existsSync(usersFile)) fs.writeFileSync(usersFile, '[]');
 if (!fs.existsSync(intervalsFile)) fs.writeFileSync(intervalsFile, '{}');
 if (!fs.existsSync(sessionsFile)) fs.writeFileSync(sessionsFile, '[]');
 if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
+const driveTokensFile = path.join(dataPath, 'drive_tokens.json');
+const folderCacheFile = path.join(dataPath, 'drive_folder_cache.json');
+const screenshotsDriveFile = path.join(dataPath, 'screenshots.drive.json');
+if (!fs.existsSync(driveTokensFile)) fs.writeFileSync(driveTokensFile, '[]');
+if (!fs.existsSync(folderCacheFile)) fs.writeFileSync(folderCacheFile, '[]');
+if (!fs.existsSync(screenshotsDriveFile)) fs.writeFileSync(screenshotsDriveFile, '[]');
   const transactionsFile = path.join(dataPath, 'transactions.sqlite.json');
   if (!fs.existsSync(transactionsFile)) fs.writeFileSync(transactionsFile, '[]');
 
@@ -161,6 +173,63 @@ function setEmployeeTimezone(email, companyId, timezone) {
   } catch {}
   return tz
 }
+function readJSON(file) { try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch { return []; } }
+function writeJSON(file, obj) { fs.writeFileSync(file, JSON.stringify(obj, null, 2)); }
+function aeadEncrypt(plaintext) {
+  const iv = crypto.randomBytes(12);
+  const key = crypto.createHash('sha256').update(DRIVE_TOKEN_KEY).digest();
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const enc = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, enc]).toString('base64');
+}
+function aeadDecrypt(b64) {
+  const buf = Buffer.from(b64, 'base64');
+  const iv = buf.slice(0, 12);
+  const tag = buf.slice(12, 28);
+  const enc = buf.slice(28);
+  const key = crypto.createHash('sha256').update(DRIVE_TOKEN_KEY).digest();
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
+  return dec.toString('utf8');
+}
+async function googleTokenFromRefresh(refreshToken) {
+  const body = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    client_secret: GOOGLE_CLIENT_SECRET,
+    refresh_token: refreshToken,
+    grant_type: 'refresh_token'
+  });
+  const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+  if (!r.ok) throw new Error('token_refresh_failed');
+  const j = await r.json();
+  return j.access_token;
+}
+async function driveCreateOrFindFolder(accessToken, name, parentId) {
+  const q = `name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder'${parentId ? ` and '${parentId}' in parents` : ''}`;
+  const sr = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const sj = await sr.json();
+  if (Array.isArray(sj.files) && sj.files.length > 0) return sj.files[0].id;
+  const md = { name, mimeType: 'application/vnd.google-apps.folder', parents: parentId ? [parentId] : undefined };
+  const cr = await fetch('https://www.googleapis.com/drive/v3/files', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(md) });
+  const cj = await cr.json();
+  return cj.id;
+}
+async function driveMultipartUpload(accessToken, name, parents, mime, bytes) {
+  const metadata = { name, parents };
+  const boundary = 'foo_bar_baz_' + Date.now();
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`),
+    Buffer.from(JSON.stringify(metadata)),
+    Buffer.from(`\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`),
+    bytes,
+    Buffer.from(`\r\n--${boundary}--`)
+  ]);
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
+  const j = await r.json();
+  return j.id;
+}
 function getTeamEmailsForManager(managerKey, companyId){
   const users = readUsers();
   // Accept either manager numeric id or email; resolve both forms
@@ -192,6 +261,83 @@ function slugifyName(name) {
       .replace(/^-+|-+$/g, '')
   } catch {
     return 'company'
+  }
+}
+
+function signPreviewToken(payloadObj) {
+  const payload = Buffer.from(JSON.stringify(payloadObj), 'utf8').toString('base64url')
+  const sig = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('base64url')
+  return `${payload}.${sig}`
+}
+function verifyPreviewToken(token) {
+  try {
+    const parts = String(token || '').split('.')
+    if (parts.length !== 2) return null
+    const [payload, sig] = parts
+    const expSig = crypto.createHmac('sha256', JWT_SECRET).update(payload).digest('base64url')
+    const a = Buffer.from(sig)
+    const b = Buffer.from(expSig)
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null
+    const obj = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    if (!obj?.exp || Date.now() > Number(obj.exp)) return null
+    return obj
+  } catch {
+    return null
+  }
+}
+
+function safeDriveFolderName(name) {
+  const s = String(name || '').trim()
+  const cleaned = s.replace(/[\\/]/g, '-').replace(/\s+/g, ' ').trim()
+  return cleaned.slice(0, 120) || 'Unknown'
+}
+
+function getManagerDisplayNameForEmployee(employeeEmail, companyId) {
+  try {
+    let mid = null
+    try {
+      const emp = getUserByEmail(employeeEmail)
+      mid = emp?.managerId || emp?.manager_id || emp?.manager || null
+    } catch {}
+    if (!mid) {
+      try {
+        const arr = readUsers()
+        const rec = arr.find(u => String(u.email || '').toLowerCase() === String(employeeEmail).toLowerCase() && u.company_id == companyId)
+        mid = rec?.managerId || null
+      } catch {}
+    }
+    if (!mid) return 'Unassigned'
+    const allSql = listAllUsers().filter(u => u.company_id == companyId)
+    const midStr = String(mid).trim().toLowerCase()
+    let mgr = allSql.find(u => String(u.id || '').trim().toLowerCase() === midStr) ||
+      allSql.find(u => String(u.uid || '').trim().toLowerCase() === midStr) ||
+      allSql.find(u => String(u.email || '').trim().toLowerCase() === midStr)
+    if (!mgr) {
+      try {
+        const arr = readUsers()
+        const rec = arr.find(u => (String(u.id || '').trim().toLowerCase() === midStr || String(u.email || '').trim().toLowerCase() === midStr) && u.company_id == companyId)
+        if (rec) mgr = { full_name: rec.name || rec.email, email: rec.email }
+      } catch {}
+    }
+    return safeDriveFolderName(mgr?.full_name || mgr?.name || mgr?.email || String(mid))
+  } catch {
+    return 'Unassigned'
+  }
+}
+
+function getEmployeeDisplayName(employeeEmail) {
+  try {
+    let u = null
+    try { u = getUserByEmail(employeeEmail) } catch {}
+    if (u?.full_name || u?.name) return safeDriveFolderName(u?.full_name || u?.name)
+    try {
+      const arr = readUsers()
+      const rec = arr.find(x => String(x.email || '').toLowerCase() === String(employeeEmail).toLowerCase())
+      if (rec?.name) return safeDriveFolderName(rec.name)
+    } catch {}
+    return safeDriveFolderName(u?.email || employeeEmail)
+  } catch {
+    return safeDriveFolderName(employeeEmail)
   }
 }
 
@@ -607,6 +753,165 @@ app.get('/api/company/slug', requireRole(['employee', 'manager', 'company_admin'
     res.status(500).json({ error: 'Failed to resolve slug' })
   }
 })
+app.get('/api/drive/status', requireRole(['employee']), (req, res) => {
+  try {
+    const tokens = readJSON(driveTokensFile);
+    const found = tokens.find(t => t.employee_id === req.user?.sub && t.company_id == req.user?.company_id);
+    res.json({ connected: !!found && !!found.enc_refresh_token });
+  } catch {
+    res.json({ connected: false });
+  }
+});
+app.get('/api/drive/oauth/start', requireRole(['employee']), (req, res) => {
+  try {
+    const state = Buffer.from(JSON.stringify({ email: req.user?.sub, company_id: req.user?.company_id })).toString('base64url');
+    const u = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    u.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+    u.searchParams.set('redirect_uri', GOOGLE_REDIRECT_URI);
+    u.searchParams.set('response_type', 'code');
+    u.searchParams.set('access_type', 'offline');
+    u.searchParams.set('prompt', 'consent');
+    u.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.file');
+    u.searchParams.set('state', state);
+    res.json({ url: u.toString() });
+  } catch {
+    res.status(500).json({ error: 'failed_start' });
+  }
+});
+
+async function handleGoogleDriveOAuthCallback(req, res) {
+  try {
+    const { code, state } = req.query || {};
+    if (!code || !state) return res.status(400).send('error');
+    const parsed = JSON.parse(Buffer.from(String(state), 'base64url').toString('utf8'));
+    const body = new URLSearchParams({
+      code: String(code),
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      redirect_uri: GOOGLE_REDIRECT_URI,
+      grant_type: 'authorization_code'
+    });
+    const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    const j = await r.json();
+    const refresh = j.refresh_token || '';
+    if (!refresh) return res.status(400).send('error');
+    const tokens = readJSON(driveTokensFile);
+    const idx = tokens.findIndex(t => t.employee_id === parsed.email && t.company_id == parsed.company_id);
+    const enc = aeadEncrypt(refresh);
+    const record = { employee_id: parsed.email, company_id: parsed.company_id, enc_refresh_token: enc, scope: 'drive.file', status: 'connected', updated_at: new Date().toISOString() };
+    if (idx >= 0) { tokens[idx] = { ...tokens[idx], ...record }; } else { tokens.push({ ...record, created_at: new Date().toISOString() }); }
+    writeJSON(driveTokensFile, tokens);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(
+      `<!doctype html><html><head><meta charset="utf-8"/><title>Drive Connected</title></head><body style="font-family:system-ui;margin:40px;line-height:1.5;">
+      <h2>Google Drive connected</h2>
+      <p>You can close this window and return to the TimeTracker desktop app.</p>
+      </body></html>`
+    );
+  } catch {
+    res.status(500).send('error');
+  }
+}
+
+// Main callback route (recommended)
+app.get('/api/drive/oauth/callback', handleGoogleDriveOAuthCallback);
+// Backward-compatible callback route (matches env examples / older config)
+app.get('/api/auth/google/callback', handleGoogleDriveOAuthCallback);
+app.post('/api/uploads/drive', requireRole(['employee']), multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }).single('screenshot'), async (req, res) => {
+  try {
+    const company_id = req.user?.company_id;
+    const employee_id = req.user?.sub;
+    const tokens = readJSON(driveTokensFile);
+    const t = tokens.find(x => x.employee_id === employee_id && x.company_id == company_id);
+    if (!t?.enc_refresh_token) return res.status(403).json({ error: 'drive_not_connected' });
+    const refresh = aeadDecrypt(t.enc_refresh_token);
+    const access = await googleTokenFromRefresh(refresh);
+    const now = new Date();
+    const yyyy = String(now.getUTCFullYear());
+    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(now.getUTCDate()).padStart(2, '0');
+    const hh = String(now.getUTCHours()).padStart(2, '0');
+    const mn = String(now.getUTCMinutes()).padStart(2, '0');
+    const baseId = await driveCreateOrFindFolder(access, 'TimeTracker', null);
+    const company = getCompanyById(company_id)
+    const companyName = safeDriveFolderName(company?.name || String(company_id))
+    const managerName = getManagerDisplayNameForEmployee(employee_id, company_id)
+    const employeeName = getEmployeeDisplayName(employee_id)
+    const compId = await driveCreateOrFindFolder(access, companyName, baseId);
+    const mgrId = await driveCreateOrFindFolder(access, managerName, compId);
+    const empId = await driveCreateOrFindFolder(access, employeeName, mgrId);
+    const yearId = await driveCreateOrFindFolder(access, yyyy, empId);
+    const monId = await driveCreateOrFindFolder(access, mm, yearId);
+    const dayId = await driveCreateOrFindFolder(access, `${yyyy}-${mm}-${dd}`, monId);
+    const name = `screenshot_${hh}-${mn}.jpg`;
+    const fileId = await driveMultipartUpload(access, name, [dayId], 'image/jpeg', req.file?.buffer || Buffer.alloc(0));
+    const meta = readJSON(screenshotsDriveFile);
+    let manager_id = null
+    try {
+      const emp = getUserByEmail(employee_id)
+      manager_id = emp?.managerId || emp?.manager_id || emp?.manager || null
+    } catch {}
+    meta.push({ company_id, manager_id, employee_id, drive_file_id: fileId, captured_at: now.toISOString() });
+    writeJSON(screenshotsDriveFile, meta);
+    res.json({ ok: true, drive_file_id: fileId, captured_at: now.toISOString() });
+  } catch (e) {
+    res.status(500).json({ error: 'upload_failed' });
+  }
+});
+app.get('/api/uploads/preview/:fileId', async (req, res) => {
+  try {
+    const fileId = String(req.params.fileId);
+    const meta = readJSON(screenshotsDriveFile);
+    const m = meta.find(x => x.drive_file_id === fileId);
+    if (!m) return res.status(404).end();
+    let user = null
+    try {
+      const auth = req.headers.authorization || ''
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+      if (token) user = jwt.verify(token, JWT_SECRET)
+    } catch {}
+    if (!user && req.query?.pt) {
+      const pt = verifyPreviewToken(req.query.pt)
+      if (pt && pt.fileId === fileId) {
+        user = { sub: pt.sub, role: pt.role, uid: pt.uid || null, company_id: pt.company_id }
+      }
+    }
+    if (!user) return res.status(401).json({ error: 'Unauthorized' })
+    const role = user?.role
+    const company_id = user?.company_id
+    if (role === 'super_admin') return res.status(403).end();
+    if (m.company_id != company_id) return res.status(403).end();
+    if (role === 'employee' && m.employee_id !== user?.sub) return res.status(403).end();
+    if (role === 'manager') {
+      const teamEmails = getTeamEmailsForManager(user?.uid || user?.sub, company_id);
+      if (!teamEmails.includes(m.employee_id)) return res.status(403).end();
+    }
+    const tokens = readJSON(driveTokensFile);
+    const t = tokens.find(x => x.employee_id === m.employee_id && x.company_id == m.company_id);
+    if (!t?.enc_refresh_token) return res.status(403).end();
+    const refresh = aeadDecrypt(t.enc_refresh_token);
+    const access = await googleTokenFromRefresh(refresh);
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${access}` } });
+    if (!r.ok) {
+      try { console.error('[drive:preview] fetch failed', { status: r.status, fileId }); } catch {}
+      return res.status(500).end();
+    }
+    res.setHeader('Content-Type', r.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Content-Disposition', 'inline');
+    if (!r.body) return res.status(500).end();
+    try {
+      const nodeStream = Readable.fromWeb(r.body);
+      nodeStream.on('error', () => { try { res.end(); } catch {} });
+      nodeStream.pipe(res);
+    } catch {
+      const ab = await r.arrayBuffer();
+      res.end(Buffer.from(ab));
+    }
+  } catch (e) {
+    try { console.error('[drive:preview] error', e?.message || e); } catch {}
+    res.status(500).end();
+  }
+});
 
 // Employees
 app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res) => {
@@ -2150,39 +2455,30 @@ app.post('/api/uploads/cleanup', requireRole(['super_admin']), (req, res) => {
 // List uploaded screenshots (development helper)
 app.get('/api/uploads/list', requireRole(['manager', 'company_admin']), async (req, res) => {
   try {
-    const files = fs.readdirSync(uploadPath).filter(f => /\.(jpg|jpeg|png)$/i.test(f)).sort();
-    let meta = [];
-    try { meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8')); } catch {}
-    
     const company_id = req.user?.company_id;
-    const allUsers = readUsers();
-    const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
-
-    let items = files.map(f => {
-      const rel = `uploads/${f}`;
-      const m = meta.find(x => x.file === rel);
-      let ts = m?.ts;
-      if (!ts) {
-        try { ts = fs.statSync(path.join(uploadPath, f)).mtime.toISOString(); } catch {}
-      }
-      return { file: rel, ts, employeeId: m?.employeeId };
-    });
-    
-    // Filter by company
-    items = items.filter(it => it.employeeId && companyUserEmails.has(it.employeeId));
+    let items = readJSON(screenshotsDriveFile).filter(x => x.company_id == company_id);
 
     if (req.user?.role === 'manager') {
-      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
-      items = items.filter(it => it.employeeId && teamEmails.includes(it.employeeId));
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id);
+      items = items.filter(it => it.employee_id && teamEmails.includes(it.employee_id));
     }
-    // Super Admin: sees all company items (no extra filter needed)
-    
-    items = items.map(it => {
-      const tz = getEmployeeTimezone(it.employeeId, company_id) || 'UTC'
-      const ms = it.ts ? Date.parse(it.ts) : null
-      return { ...it, timezone: tz, ts_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null }
+
+    items.sort((a, b) => (a.captured_at < b.captured_at ? 1 : -1))
+    const now = Date.now()
+    const out = items.map(it => {
+      const tz = getEmployeeTimezone(it.employee_id, company_id) || 'UTC'
+      const ms = it.captured_at ? Date.parse(it.captured_at) : null
+      const pt = signPreviewToken({ fileId: it.drive_file_id, sub: req.user?.sub, role: req.user?.role, uid: req.user?.uid || null, company_id, exp: now + 600_000 })
+      return {
+        employeeId: it.employee_id,
+        ts: it.captured_at,
+        timezone: tz,
+        ts_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null,
+        drive_file_id: it.drive_file_id,
+        preview_url: `/api/uploads/preview/${it.drive_file_id}?pt=${pt}`
+      }
     })
-    res.json({ files: items });
+    res.json({ files: out });
   } catch (err) {
     console.error('[upload:list] error:', err);
     res.status(500).json({ error: 'List failed' });
@@ -2193,26 +2489,18 @@ app.get('/api/uploads/list', requireRole(['manager', 'company_admin']), async (r
 app.get('/api/uploads/query', requireRole(['manager', 'company_admin']), async (req, res) => {
   try {
     const { employeeId, from, to } = req.query || {};
-    let meta = [];
-    try { meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8')); } catch {}
-    
-    // Filter by company
     const company_id = req.user?.company_id;
-    const allUsers = readUsers();
-    const companyUserEmails = new Set(allUsers.filter(u => u.company_id == company_id).map(u => u.email));
-    meta = meta.filter(m => m.employeeId && companyUserEmails.has(m.employeeId));
+    let meta = readJSON(screenshotsDriveFile).filter(x => x.company_id == company_id);
 
     // Manager scoping to team
     if (req.user?.role === 'manager') {
-      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
-      meta = meta.filter(m => m.employeeId && teamEmails.includes(m.employeeId));
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id);
+      meta = meta.filter(m => m.employee_id && teamEmails.includes(m.employee_id));
     }
-    
-    // Super Admin: Sees ALL by default (already scoped to company above).
     
     // Filter by employee
     if (employeeId) {
-      meta = meta.filter(m => String(m.employeeId).toLowerCase() === String(employeeId).toLowerCase());
+      meta = meta.filter(m => String(m.employee_id).toLowerCase() === String(employeeId).toLowerCase());
     }
     const tzForRange = employeeId ? getEmployeeTimezone(employeeId, company_id) : null
     const parseMaybeDate = (ds, isEnd) => {
@@ -2227,14 +2515,23 @@ app.get('/api/uploads/query', requireRole(['manager', 'company_admin']), async (
     }
     const fromMs = parseMaybeDate(from, false)
     const toMs = parseMaybeDate(to, true)
-    if (fromMs) meta = meta.filter(m => new Date(m.ts).getTime() >= fromMs);
-    if (toMs) meta = meta.filter(m => new Date(m.ts).getTime() <= toMs);
+    if (fromMs) meta = meta.filter(m => new Date(m.captured_at).getTime() >= fromMs);
+    if (toMs) meta = meta.filter(m => new Date(m.captured_at).getTime() <= toMs);
     // Sort by time ascending
-    meta.sort((a, b) => (a.ts > b.ts ? 1 : -1));
+    meta.sort((a, b) => (a.captured_at > b.captured_at ? 1 : -1));
+    const now = Date.now()
     const out = meta.map(m => {
-      const tz = getEmployeeTimezone(m.employeeId, company_id) || 'UTC'
-      const ms = m.ts ? Date.parse(m.ts) : null
-      return { ...m, timezone: tz, ts_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null }
+      const tz = getEmployeeTimezone(m.employee_id, company_id) || 'UTC'
+      const ms = m.captured_at ? Date.parse(m.captured_at) : null
+      const pt = signPreviewToken({ fileId: m.drive_file_id, sub: req.user?.sub, role: req.user?.role, uid: req.user?.uid || null, company_id, exp: now + 600_000 })
+      return {
+        employeeId: m.employee_id,
+        ts: m.captured_at,
+        timezone: tz,
+        ts_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null,
+        drive_file_id: m.drive_file_id,
+        preview_url: `/api/uploads/preview/${m.drive_file_id}?pt=${pt}`
+      }
     })
     res.json({ files: out });
   } catch (err) {
@@ -2367,7 +2664,7 @@ io.use((socket, next) => {
     const authToken = socket.handshake.auth?.token || null;
     const qpToken = socket.handshake.query?.token || null; // fallback if needed
     const token = headerToken || authToken || qpToken;
-    if (!token) return next();
+    if (!token) return next(new Error('Unauthorized'));
     const payload = jwt.verify(token, JWT_SECRET);
     // attach to socket for downstream usage (production: trust only verified token)
     socket.data.userId = payload?.email || payload?.userId; // email identifier (employees/managers)
@@ -2382,8 +2679,14 @@ io.use((socket, next) => {
     socket.data.company_id = company_id
     next();
   } catch (err) {
-    console.warn('[socket] auth failed:', err.message);
-    next();
+    try {
+      if (String(err?.message || '').toLowerCase().includes('invalid signature')) {
+        console.warn('[socket] auth failed: invalid signature (token likely issued under a different JWT_SECRET)')
+      } else {
+        console.warn('[socket] auth failed:', err.message);
+      }
+    } catch {}
+    next(new Error('Unauthorized'));
   }
 });
 

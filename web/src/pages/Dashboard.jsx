@@ -166,11 +166,16 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {filteredFiles.map((f, i) => (
+              {filteredFiles.map((f, i) => {
+                const src = f.preview_url
+                  ? (f.preview_url.startsWith('http') ? f.preview_url : `${API}${f.preview_url}`)
+                  : (f.drive_file_id || f.fileId || f.id) ? `${API}/api/uploads/preview/${f.drive_file_id || f.fileId || f.id}` : ''
+                if (!src) return null
+                return (
                 <div key={i} className="group relative aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
                   <img 
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                    src={`${API}/${f.file}`} 
+                    src={src}
                     alt="Screenshot" 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
@@ -179,7 +184,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </div>
