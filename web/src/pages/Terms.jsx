@@ -1,58 +1,94 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { PublicShell } from '../components/public/PublicShell.jsx'
+import { LegalPage, H2 } from '../components/legal/LegalPage.jsx'
 
 export default function Terms() {
+  const updatedAt = 'January 29, 2026'
+  const toc = [
+    { id: 'agreement', label: 'Agreement' },
+    { id: 'accounts', label: 'Accounts' },
+    { id: 'acceptable-use', label: 'Acceptable Use' },
+    { id: 'subscriptions', label: 'Subscriptions & Billing' },
+    { id: 'data', label: 'Customer Data' },
+    { id: 'ip', label: 'Intellectual Property' },
+    { id: 'termination', label: 'Termination' },
+    { id: 'disclaimers', label: 'Disclaimers' },
+    { id: 'liability', label: 'Limitation of Liability' },
+    { id: 'changes', label: 'Changes' },
+    { id: 'contact', label: 'Contact' },
+  ]
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-slate-900 tracking-tight">TimeTracker</span>
-          </Link>
-        </div>
-      </nav>
+    <PublicShell
+      title="Terms of Service"
+      subtitle="These terms govern use of TimeTracker by companies, administrators, managers, and employees."
+    >
+      <LegalPage updatedAt={updatedAt} toc={toc}>
+        <H2 id="agreement">Agreement</H2>
+        <p>
+          By accessing or using TimeTracker (the “Service”), you agree to these Terms. If you are using the Service on behalf of an
+          organization, you represent you have authority to bind that organization.
+        </p>
 
-      <main className="max-w-4xl mx-auto px-6 py-16">
-        <h1 className="text-4xl font-bold text-slate-900 mb-8">Terms of Service</h1>
-        <div className="prose prose-slate max-w-none text-slate-600">
-          <p className="text-lg leading-relaxed mb-6">Last updated: January 26, 2026</p>
-          
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">1. Acceptance of Terms</h2>
-          <p>By accessing or using Time Tracker System ("the Service"), you agree to be bound by these Terms. If you disagree with any part of the terms, you may not access the Service.</p>
+        <H2 id="accounts">Accounts</H2>
+        <ul>
+          <li>You must provide accurate account information and keep it up to date.</li>
+          <li>You are responsible for maintaining the confidentiality of credentials.</li>
+          <li>Admins are responsible for configuring roles and access for their organization.</li>
+        </ul>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">2. Use License</h2>
-          <p>We grant you a limited, non-exclusive, non-transferable license to use the Service for your internal business purposes, subject to these Terms. You agree not to:</p>
-          <ul className="list-disc pl-5 space-y-2 mb-6">
-            <li>Modify, copy, or reverse engineer the Service.</li>
-            <li>Use the Service for any illegal or unauthorized purpose.</li>
-            <li>Attempt to bypass any security measures of the Service.</li>
-          </ul>
+        <H2 id="acceptable-use">Acceptable Use</H2>
+        <ul>
+          <li>Do not attempt to disrupt the Service or bypass security controls.</li>
+          <li>Do not upload malware or use the Service for unlawful purposes.</li>
+          <li>Use monitoring features in compliance with applicable laws and workplace policies.</li>
+        </ul>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">3. Accounts</h2>
-          <p>When you create an account with us, you must provide accurate and complete information. You are responsible for safeguarding the password that you use to access the Service and for any activities or actions under your password.</p>
+        <H2 id="subscriptions">Subscriptions & Billing</H2>
+        <p>
+          Paid features may require a subscription or credits. Billing terms, pricing, and usage rules may vary by plan. You authorize us
+          (and our payment processors) to charge the applicable fees.
+        </p>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">4. Subscriptions and Payments</h2>
-          <p>Some parts of the Service are billed on a subscription basis ("Billing"). You will be billed in advance on a recurring and periodic basis ("Billing Cycle"). Billing cycles are set on a monthly basis.</p>
-          <p>We use third-party payment processors (e.g., Razorpay) to handle payments. By making a payment, you agree to their terms and conditions.</p>
+        <H2 id="data">Customer Data</H2>
+        <p>
+          Customer Data includes information submitted to the Service and the output generated through use of the Service (e.g., time logs and
+          reports). Customers control configuration, retention, and access for their organization.
+        </p>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">5. Termination</h2>
-          <p>We may terminate or suspend access to our Service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.</p>
+        <H2 id="ip">Intellectual Property</H2>
+        <p>
+          TimeTracker and its software, documentation, and branding are owned by us and protected by intellectual property laws. These Terms do
+          not grant you ownership rights.
+        </p>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">6. Limitation of Liability</h2>
-          <p>In no event shall Time Tracker System, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.</p>
-        </div>
-      </main>
-      
-      <footer className="bg-slate-900 text-slate-400 py-12">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p>&copy; 2026 Time Tracker System. All rights reserved.</p>
-        </div>
-      </footer>
-    </div>
+        <H2 id="termination">Termination</H2>
+        <p>
+          We may suspend or terminate access if you breach these Terms or if we reasonably believe continued use poses a security, legal, or
+          operational risk.
+        </p>
+
+        <H2 id="disclaimers">Disclaimers</H2>
+        <p>
+          The Service is provided “as is” and “as available.” We do not warrant that the Service will be uninterrupted or error-free.
+        </p>
+
+        <H2 id="liability">Limitation of Liability</H2>
+        <p>
+          To the maximum extent permitted by law, we will not be liable for indirect, incidental, special, consequential, or punitive damages,
+          or for any loss of profits, data, or goodwill.
+        </p>
+
+        <H2 id="changes">Changes</H2>
+        <p>
+          We may update these Terms from time to time. Material changes will be communicated through the Service or by other reasonable means.
+        </p>
+
+        <H2 id="contact">Contact</H2>
+        <p>
+          Questions about these Terms can be sent to <a href="mailto:legal@timetracker.com">legal@timetracker.com</a>.
+        </p>
+      </LegalPage>
+    </PublicShell>
   )
 }

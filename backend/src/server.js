@@ -597,6 +597,62 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
+const supportRate = new Map()
+function checkRate(key, limit, windowMs) {
+  const now = Date.now()
+  const cur = supportRate.get(key)
+  if (!cur || now - cur.start > windowMs) {
+    supportRate.set(key, { start: now, count: 1 })
+    return { ok: true }
+  }
+  if (cur.count >= limit) {
+    const retryAfterMs = windowMs - (now - cur.start)
+    return { ok: false, retryAfterMs }
+  }
+  cur.count += 1
+  return { ok: true }
+}
+
+app.post('/api/support/request', async (req, res) => {
+  try {
+    const ipKey = String(req.headers['x-forwarded-for'] || req.ip || 'unknown').split(',')[0].trim() || 'unknown'
+    const rl = checkRate(`support:${ipKey}`, 5, 60_000)
+    if (!rl.ok) {
+      res.setHeader('Retry-After', String(Math.ceil((rl.retryAfterMs || 60_000) / 1000)))
+      return res.status(429).json({ error: 'Too many requests. Please try again shortly.' })
+    }
+
+    const { type, name, email, subject, message, userId, companyId } = req.body || {}
+    const t = String(type || '').trim().toLowerCase()
+    if (t !== 'contact' && t !== 'support') return res.status(400).json({ error: 'Invalid type' })
+    const n = String(name || '').trim()
+    const e = String(email || '').trim()
+    const s = String(subject || '').trim()
+    const m = String(message || '').trim()
+    if (!n || !e || !s || !m) return res.status(400).json({ error: 'All fields are required' })
+    if (s.length > 200) return res.status(400).json({ error: 'Subject is too long' })
+    if (m.length > 8000) return res.status(400).json({ error: 'Message is too long' })
+
+    const requestId = crypto.randomUUID()
+    const supportEmail = process.env.SUPPORT_EMAIL || process.env.EMAIL_USER
+    const prefix = t === 'support' ? 'Support Request' : 'Contact Request'
+    const decoratedSubject = `${prefix}: ${s}`
+    const decoratedMessage = `${m}\n\n---\nRequest ID: ${requestId}\nType: ${t}\nFrom IP: ${ipKey}\nUser ID: ${userId || ''}\nCompany ID: ${companyId || ''}`
+
+    if (supportEmail) {
+      await sendContactFormEmail(supportEmail, { name: n, email: e, subject: decoratedSubject, message: decoratedMessage })
+    } else {
+      console.warn('[support] No SUPPORT_EMAIL/EMAIL_USER configured to receive messages.')
+    }
+
+    try { appendAudit('support_request_created', { requestId, type: t, email: e, subject: s }, companyId || null) } catch {}
+    return res.json({ ok: true, requestId })
+  } catch (err) {
+    console.error('[support:request] error:', err)
+    return res.status(500).json({ error: 'Failed to send message' })
+  }
+})
+
 // Simple auth middleware
 function requireRole(roles = []) {
   return (req, res, next) => {

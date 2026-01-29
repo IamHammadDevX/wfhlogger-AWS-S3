@@ -1,61 +1,92 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { PublicShell } from '../components/public/PublicShell.jsx'
+import { LegalPage, H2 } from '../components/legal/LegalPage.jsx'
 
 export default function Privacy() {
+  const updatedAt = 'January 29, 2026'
+  const toc = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'data-we-collect', label: 'Information We Collect' },
+    { id: 'how-we-use', label: 'How We Use Data' },
+    { id: 'screenshots', label: 'Screenshots & Activity' },
+    { id: 'sharing', label: 'Sharing & Disclosure' },
+    { id: 'security', label: 'Security' },
+    { id: 'retention', label: 'Retention' },
+    { id: 'your-rights', label: 'Your Rights' },
+    { id: 'contact', label: 'Contact' },
+  ]
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-slate-900 tracking-tight">TimeTracker</span>
-          </Link>
-        </div>
-      </nav>
+    <PublicShell
+      title="Privacy Policy"
+      subtitle="This policy explains what information we collect, how it’s used, and the choices available to you."
+    >
+      <LegalPage updatedAt={updatedAt} toc={toc}>
+        <H2 id="overview">Overview</H2>
+        <p>
+          TimeTracker is a workforce time tracking and reporting platform. Our customers (companies) use TimeTracker to manage employee
+          time entries, work sessions, and reporting.
+        </p>
+        <p>
+          This policy covers information processed when you visit our website, use our web app, or use the desktop tracker.
+        </p>
 
-      <main className="max-w-4xl mx-auto px-6 py-16">
-        <h1 className="text-4xl font-bold text-slate-900 mb-8">Privacy Policy</h1>
-        <div className="prose prose-slate max-w-none text-slate-600">
-          <p className="text-lg leading-relaxed mb-6">Last updated: January 26, 2026</p>
-          
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">1. Information We Collect</h2>
-          <p>We collect information you provide directly to us, such as when you create an account, subscribe, or contact customer support. This may include your name, email address, company name, and payment information.</p>
-          <p>When you use our services, we automatically collect data about your usage, including:</p>
-          <ul className="list-disc pl-5 space-y-2 mb-6">
-            <li><strong>Activity Data:</strong> Timestamps of work sessions, idle time durations, and application usage logs.</li>
-            <li><strong>Screenshots:</strong> Automated screen captures taken at random intervals during active work sessions (only when tracking is enabled).</li>
-            <li><strong>Device Information:</strong> IP address, browser type, operating system, and device identifiers.</li>
-          </ul>
+        <H2 id="data-we-collect">Information We Collect</H2>
+        <ul>
+          <li><strong>Account data:</strong> name, email, password (stored as a hash), role, and company/tenant identifiers.</li>
+          <li><strong>Work data:</strong> work sessions, activity logs, timestamps, and reporting metadata.</li>
+          <li><strong>Device and usage data:</strong> IP address, browser/device type, and basic diagnostic logs.</li>
+          <li><strong>Support data:</strong> messages you send to Support/Contact and related metadata (e.g., submission time).</li>
+        </ul>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">2. How We Use Your Information</h2>
-          <p>We use the collected information to:</p>
-          <ul className="list-disc pl-5 space-y-2 mb-6">
-            <li>Provide, maintain, and improve our services.</li>
-            <li>Process transactions and send related information, including confirmations and invoices.</li>
-            <li>Generate productivity reports for your organization.</li>
-            <li>Detect, investigate, and prevent fraudulent transactions and other illegal activities.</li>
-          </ul>
+        <H2 id="how-we-use">How We Use Data</H2>
+        <ul>
+          <li>Provide and operate the service, including authentication, reporting, and admin features.</li>
+          <li>Maintain safety and prevent abuse, fraud, or unauthorized access.</li>
+          <li>Improve product reliability, performance, and usability.</li>
+          <li>Respond to questions and support requests.</li>
+        </ul>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">3. Data Security</h2>
-          <p>We implement appropriate technical and organizational measures to protect your personal data against unauthorized access, alteration, disclosure, or destruction. However, no internet transmission is completely secure, and we cannot guarantee absolute security.</p>
+        <H2 id="screenshots">Screenshots & Activity</H2>
+        <p>
+          If enabled by your company’s configuration, the desktop tracker may capture screenshots and upload them to storage associated with
+          your organization’s workflow. Screenshots are intended to support transparency and auditability of tracked sessions.
+        </p>
+        <p>
+          Companies are responsible for informing their employees about the monitoring configuration, obtaining any required consent, and
+          setting appropriate retention periods.
+        </p>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">4. Data Retention</h2>
-          <p>We retain your personal information only for as long as is necessary for the purposes set out in this Privacy Policy. Screenshots and activity logs are retained according to your organization's subscription plan settings.</p>
+        <H2 id="sharing">Sharing & Disclosure</H2>
+        <ul>
+          <li><strong>Within your company:</strong> administrators and authorized managers may view work data as permitted by role-based access.</li>
+          <li><strong>Service providers:</strong> we may use infrastructure and email providers to operate the service.</li>
+          <li><strong>Legal:</strong> we may disclose information if required by law or to protect rights and safety.</li>
+        </ul>
 
-          <h2 className="text-2xl font-semibold text-slate-800 mt-10 mb-4">5. Contact Us</h2>
-          <p>If you have any questions about this Privacy Policy, please contact us at <a href="mailto:privacy@timetracker.com" className="text-blue-600 hover:underline">privacy@timetracker.com</a>.</p>
-        </div>
-      </main>
-      
-      <footer className="bg-slate-900 text-slate-400 py-12">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p>&copy; 2026 Time Tracker System. All rights reserved.</p>
-        </div>
-      </footer>
-    </div>
+        <H2 id="security">Security</H2>
+        <p>
+          We use reasonable technical and organizational safeguards to protect information. No method of transmission or storage is fully
+          secure; therefore we cannot guarantee absolute security.
+        </p>
+
+        <H2 id="retention">Retention</H2>
+        <p>
+          Retention depends on company configuration and operational needs. We retain support submissions as needed to respond and improve
+          service. Company admins should configure retention in line with their policies.
+        </p>
+
+        <H2 id="your-rights">Your Rights</H2>
+        <p>
+          Depending on your location, you may have rights to access, correct, delete, or export certain personal information. If you are an
+          employee user, your company may control certain data processing; in that case, contact your company administrator first.
+        </p>
+
+        <H2 id="contact">Contact</H2>
+        <p>
+          Privacy questions can be sent to <a href="mailto:privacy@timetracker.com">privacy@timetracker.com</a>.
+        </p>
+      </LegalPage>
+    </PublicShell>
   )
 }
