@@ -1206,16 +1206,101 @@ app.get('/api/admin/audit-logs', requireRole(['company_admin']), (req, res) => {
     // Strict Company Filter
     logs = logs.filter(l => l.company_id == company_id);
 
-    const { managerId, employeeId } = req.query || {};
-    if (managerId) logs = logs.filter(l => l.details?.actorId === managerId);
-    if (employeeId) logs = logs.filter(l => l.details?.employeeId === employeeId);
+    const { managerId, employeeId, actor, employee, type, from, to } = req.query || {};
+    const actorQ = String(actor || managerId || '').trim();
+    const employeeQ = String(employee || employeeId || '').trim();
+    const typeQ = String(type || '').trim();
+
+    const fromMs = from ? new Date(String(from)).getTime() : null
+    const toMs = to ? new Date(String(to)).getTime() : null
+    if (Number.isFinite(fromMs)) logs = logs.filter(l => (l?.ts ? Date.parse(l.ts) : 0) >= fromMs)
+    if (Number.isFinite(toMs)) logs = logs.filter(l => (l?.ts ? Date.parse(l.ts) : 0) <= toMs)
+    if (typeQ) logs = logs.filter(l => String(l.type || '').toLowerCase() === typeQ.toLowerCase())
+    if (actorQ) logs = logs.filter(l => {
+      const v = l?.details?.actorId ?? l?.details?.actor ?? l?.details?.email ?? ''
+      return String(v).toLowerCase().includes(actorQ.toLowerCase())
+    })
+    if (employeeQ) logs = logs.filter(l => {
+      const v = l?.details?.employeeId ?? l?.details?.employeeEmail ?? l?.details?.employee_id ?? ''
+      return String(v).toLowerCase().includes(employeeQ.toLowerCase())
+    })
+
+    const company = getCompanyById(company_id)
+    const usersSql = listAllUsers().filter(u => u.company_id == company_id)
+    const usersJson = readUsers().filter(u => u.company_id == company_id)
+    const findUser = (key) => {
+      const s = String(key || '').trim()
+      if (!s) return null
+      const sl = s.toLowerCase()
+      return usersSql.find(u => String(u.id || '').toLowerCase() === sl || String(u.uid || '').toLowerCase() === sl || String(u.email || '').toLowerCase() === sl) ||
+        usersJson.find(u => String(u.id || '').toLowerCase() === sl || String(u.managerId || '').toLowerCase() === sl || String(u.email || '').toLowerCase() === sl) ||
+        null
+    }
+    const asActor = (u) => {
+      if (!u) return null
+      return {
+        id: u.id ?? u.uid ?? null,
+        email: u.email || null,
+        name: u.full_name || u.name || null,
+        role: u.role || null,
+      }
+    }
+    const asTargetEmployee = (u) => {
+      if (!u) return null
+      return {
+        email: u.email || null,
+        name: u.full_name || u.name || null,
+        managerId: u.managerId || u.manager_id || null,
+      }
+    }
+    const getEmployeeKey = (details) => {
+      return details?.employeeEmail || details?.employeeId || details?.employee_id || details?.employee || null
+    }
+    const getActorKey = (details) => {
+      return details?.actorEmail || details?.actorId || details?.actor || details?.email || null
+    }
+    const buildSummary = (l, actorUser, targetUser) => {
+      const d = l?.details || {}
+      const actorName = actorUser?.full_name || actorUser?.name || actorUser?.email || String(getActorKey(d) || 'Actor')
+      const targetName = targetUser?.full_name || targetUser?.name || targetUser?.email || String(getEmployeeKey(d) || 'Employee')
+      switch (String(l?.type || '')) {
+        case 'employee_timezone_updated':
+          return `${actorName} updated ${targetName} timezone to ${d.timezone || 'UTC'}`
+        case 'interval_set':
+          return `${actorName} set capture interval for ${targetName} to ${d.intervalMinutes || '?'}m`
+        case 'company_profile_updated':
+          return `${actorName} updated company profile`
+        case 'live_view_start':
+          return `${actorName} started live view for ${targetName}`
+        case 'rbac_forbidden':
+          return `Forbidden request to ${d.method || ''} ${d.path || ''}`.trim()
+        case 'rbac_invalid_token':
+          return `Invalid token on ${d.method || ''} ${d.path || ''}`.trim()
+        default:
+          if (String(l?.type || '').startsWith('request_')) {
+            const s = String(l.type).replace('request_', '')
+            return `${actorName} set request ${d.requestId || ''} to ${s}`.trim()
+          }
+          return String(l?.type || 'Audit event')
+      }
+    }
     const viewerTz = req.user?.timezone || 'UTC'
     logs = logs.map(l => {
       const subject = l?.details?.employeeId || l?.details?.employeeEmail || l?.details?.employee_id || null
       const tz = subject ? getEmployeeTimezone(subject, company_id) : viewerTz
       const ms = l?.ts ? Date.parse(l.ts) : null
       const ts_local = ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null
-      return { ...l, timezone: tz, ts_local }
+      const actorUser = findUser(getActorKey(l?.details || {}))
+      const targetUser = findUser(getEmployeeKey(l?.details || {}))
+      return {
+        ...l,
+        timezone: tz,
+        ts_local,
+        company: { id: company_id, name: company?.name || null, slug: company?.slug || null },
+        actor: asActor(actorUser),
+        targetEmployee: asTargetEmployee(targetUser),
+        summary: buildSummary(l, actorUser, targetUser),
+      }
     })
     res.json({ logs });
   } catch (e) {
