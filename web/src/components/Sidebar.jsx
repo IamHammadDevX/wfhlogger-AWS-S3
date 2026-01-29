@@ -42,7 +42,9 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       const token = localStorage.getItem('token')
       if (!token) return { name: '', email: '' }
       const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-      return { name: payload?.full_name || payload?.name || 'User', email: payload?.email || '' }
+      const rawRole = payload?.role || ''
+      const name = payload?.full_name || payload?.name || (rawRole === 'super_admin' ? 'Super Admin' : 'User')
+      return { name, email: payload?.email || '' }
     } catch {
       return { name: '', email: '' }
     }
