@@ -20,6 +20,7 @@ import LiveView from './pages/LiveView.jsx'
 import Report from './pages/Report.jsx'
 import Activity from './pages/Activity.jsx'
 import Setup from './pages/Setup.jsx'
+import TimeTracking from './pages/TimeTracking.jsx'
 import Downloads from './pages/Downloads.jsx'
 import Home from './pages/Home.jsx'
 import Admin from './pages/Admin.jsx'
@@ -174,6 +175,7 @@ function AppRoutes() {
       } />
       <Route path="/requests" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><RedirectToTenant path="/requests" /></ProtectedRoute>} />
       <Route path="/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><RedirectToTenant path="/setup" /></ProtectedRoute>} />
+      <Route path="/time-tracking" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><RedirectToTenant path="/time-tracking" /></ProtectedRoute>} />
       <Route path="/downloads" element={<ProtectedRoute><RedirectToTenant path="/downloads" /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['company_admin']}><RedirectToTenant path="/admin" /></ProtectedRoute>} />
       <Route path="/billing" element={<ProtectedRoute allowedRoles={['company_admin']}><RedirectToTenant path="/billing" /></ProtectedRoute>} />
@@ -209,6 +211,7 @@ function AppRoutes() {
       <Route path="/:companySlug/activity" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><TenantGuard><RoleElement employee={<EmployeeActivity />} managerOrAdmin={<Activity />} /></TenantGuard></ProtectedRoute>} />
       <Route path="/:companySlug/requests" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><TenantGuard><Requests /></TenantGuard></ProtectedRoute>} />
       <Route path="/:companySlug/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><TenantGuard><Setup /></TenantGuard></ProtectedRoute>} />
+      <Route path="/:companySlug/time-tracking" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><TenantGuard><TimeTracking /></TenantGuard></ProtectedRoute>} />
       <Route path="/:companySlug/downloads" element={<ProtectedRoute><TenantGuard><Downloads /></TenantGuard></ProtectedRoute>} />
       <Route path="/:companySlug/admin" element={<ProtectedRoute allowedRoles={['company_admin']}><TenantGuard><Admin /></TenantGuard></ProtectedRoute>} />
       <Route path="/:companySlug/billing" element={<ProtectedRoute allowedRoles={['company_admin']}><TenantGuard><Billing /></TenantGuard></ProtectedRoute>} />
