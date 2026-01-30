@@ -3154,6 +3154,71 @@ app.get('/api/platform/metrics', requireRole(['super_admin']), (req, res) => {
   }
 })
 
+app.get('/api/platform/companies', requireRole(['super_admin']), (req, res) => {
+  try {
+    const q = String(req.query?.q || '').trim().toLowerCase()
+    const companies = listCompanies().map(c => ({
+      id: c.id,
+      name: c.name,
+      plan: c.plan || 'free',
+      credits: c.credits || 0,
+      updated_at: c.updated_at || c.created_at || null,
+      created_at: c.created_at || null,
+    }))
+    const filtered = q
+      ? companies.filter(c => String(c.name || '').toLowerCase().includes(q) || String(c.id || '').includes(q))
+      : companies
+    filtered.sort((a, b) => (b.credits || 0) - (a.credits || 0))
+    res.json({ companies: filtered.slice(0, 200) })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load companies' })
+  }
+})
+
+app.get('/api/platform/companies/:company_id/transactions', requireRole(['super_admin']), (req, res) => {
+  try {
+    const company_id = Number(req.params.company_id)
+    const tx = getTransactions(company_id) || []
+    res.json({ history: tx.slice(0, 200) })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load transactions' })
+  }
+})
+
+app.post('/api/platform/companies/:company_id/grant-credits', requireRole(['super_admin']), (req, res) => {
+  try {
+    const company_id = Number(req.params.company_id)
+    const company = getCompanyById(company_id)
+    if (!company) return res.status(404).json({ error: 'Company not found' })
+
+    const raw = req.body || {}
+    const credits = Math.floor(Number(raw.credits))
+    const reason = String(raw.reason || '').trim()
+    if (!Number.isFinite(credits) || credits <= 0) return res.status(400).json({ error: 'Credits must be a positive number' })
+    if (credits > 100000) return res.status(400).json({ error: 'Credits amount too large' })
+
+    const actorEmail = req.user?.email || 'super_admin'
+    const ref = `free:${crypto.randomUUID()}`
+    const desc = `Free credits grant by ${actorEmail}${reason ? `: ${reason}` : ''}`
+
+    const newBalance = creditCompanyWithTransaction({
+      company_id,
+      amount_usd: 0,
+      credits,
+      description: desc,
+      reference_id: ref,
+    })
+
+    try { appendAudit('company_free_credits_granted', { company_id, credits, reason, actorId: req.user?.uid || req.user?.sub, actorEmail }, company_id) } catch {}
+    try { io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance }) } catch {}
+
+    res.json({ ok: true, company_id, balance: newBalance, reference_id: ref })
+  } catch (e) {
+    console.error('[platform:grant-credits] error:', e)
+    res.status(500).json({ error: 'Failed to grant credits' })
+  }
+})
+
 
 // ---------- BEGIN: compatibility proxy to support hardcoded :4000 frontend ----------
 // If the backend starts on a different port than 4000, create a tiny proxy

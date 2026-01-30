@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTheme } from '../ThemeContext'
+import { useCredits } from '../CreditsContext.jsx'
 
 // Icons
 const Icons = {
@@ -24,6 +25,7 @@ const Icons = {
 export default function Sidebar({ isOpen, setIsOpen }) {
   const { pathname } = useLocation()
   const { theme, toggleTheme } = useTheme()
+  const { credits } = useCredits()
   
   const role = useMemo(() => {
     try {
@@ -99,6 +101,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 </div>
                 <NavItem to="/platform" icon={Icons.Dashboard} label="Overview" />
                 <NavItem to="/platform/companies" icon={Icons.Companies} label="Companies" />
+                <NavItem to="/platform/credits" icon={Icons.Revenue} label="Free Credits" />
                 <NavItem to="/platform/revenue" icon={Icons.Revenue} label="Revenue & Finance" />
               </>
             ) : (
@@ -149,6 +152,14 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">{user.name}</div>
               <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</div>
             </div>
+
+            {(role === 'company_admin' || role === 'manager') && (
+              <div className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Credits</div>
+                <div className="mt-0.5 text-sm font-bold text-slate-900 dark:text-white">{Number(credits || 0).toLocaleString()}</div>
+              </div>
+            )}
+
             <button
               onClick={toggleTheme}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
