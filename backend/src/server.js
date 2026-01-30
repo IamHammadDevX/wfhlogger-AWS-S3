@@ -1879,8 +1879,22 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
   }
 });
 // ---- Screen capture interval configuration ----
-// Align with web UI options (include 1 minute)
-const allowedMinutes = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
+const allowedSeconds = [
+  5,
+  15,
+  30,
+  60,
+  120,
+  180,
+  240,
+  300,
+  360,
+  480,
+  600,
+  720,
+  900,
+  1200,
+];
 app.get('/api/capture-interval', requireRole(['employee', 'manager', 'company_admin']), (req, res) => {
   try {
     const intervals = JSON.parse(fs.readFileSync(intervalsFile, 'utf-8'));
@@ -1914,10 +1928,25 @@ app.get('/api/capture-interval', requireRole(['employee', 'manager', 'company_ad
 
 app.post('/api/capture-interval', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
-    const { employeeId, intervalMinutes } = req.body || {};
+    const { employeeId, intervalMinutes, intervalSeconds } = req.body || {};
     if (!employeeId) return res.status(400).json({ error: 'employeeId is required' });
-    const mins = Number(intervalMinutes);
-    if (!allowedMinutes.includes(mins)) return res.status(400).json({ error: `intervalMinutes must be one of ${allowedMinutes.join(', ')}` });
+
+    const secs = (() => {
+      if (intervalSeconds != null && intervalSeconds !== '') {
+        return Number(intervalSeconds)
+      }
+      if (intervalMinutes != null && intervalMinutes !== '') {
+        return Number(intervalMinutes) * 60
+      }
+      return NaN
+    })()
+
+    if (!Number.isFinite(secs) || secs <= 0) {
+      return res.status(400).json({ error: 'intervalSeconds must be a positive number' })
+    }
+    if (!allowedSeconds.includes(secs)) {
+      return res.status(400).json({ error: `intervalSeconds must be one of ${allowedSeconds.join(', ')}` })
+    }
     
     const company_id = req.user?.company_id;
     const allUsers = readUsers();
@@ -1930,12 +1959,11 @@ app.post('/api/capture-interval', requireRole(['manager', 'company_admin']), (re
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub);
       if (!teamEmails.includes(employeeId)) return res.status(403).json({ error: 'Forbidden: not your team' });
     }
-  const secs = mins * 60;
   const intervals = JSON.parse(fs.readFileSync(intervalsFile, 'utf-8'));
   intervals[employeeId] = secs;
   fs.writeFileSync(intervalsFile, JSON.stringify(intervals, null, 2));
   // Audit
-  appendAudit('interval_set', { actorId: req.user?.uid || req.user?.sub, employeeId, intervalMinutes: mins }, company_id);
+  appendAudit('interval_set', { actorId: req.user?.uid || req.user?.sub, employeeId, intervalSeconds: secs }, company_id);
   // Notify the employee in real-time via Socket.IO so their desktop reflects and starts tracking
   try {
     io.to(userRoom(employeeId)).emit('interval:assigned', { employeeId, intervalSeconds: secs });

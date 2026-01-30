@@ -1,12 +1,30 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { useCredits } from '../CreditsContext.jsx'
 import { resolveApiBase } from '../api.js'
 import { TextField, CountrySelect, TimezoneSelect } from '../components/FormControls.jsx'
 import Pagination from '../components/ui/Pagination.jsx'
 import { usePagination } from '../hooks/usePagination.js'
+import { Building2, Clock, RefreshCw, Save, UserPlus, Users } from 'lucide-react'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
+const INTERVAL_OPTIONS = [
+  { seconds: 5, label: '5 sec' },
+  { seconds: 15, label: '15 sec' },
+  { seconds: 30, label: '30 sec' },
+  { seconds: 60, label: '1 min' },
+  { seconds: 120, label: '2 min' },
+  { seconds: 180, label: '3 min' },
+  { seconds: 240, label: '4 min' },
+  { seconds: 300, label: '5 min' },
+  { seconds: 360, label: '6 min' },
+  { seconds: 480, label: '8 min' },
+  { seconds: 600, label: '10 min' },
+  { seconds: 720, label: '12 min' },
+  { seconds: 900, label: '15 min' },
+  { seconds: 1200, label: '20 min' },
+]
 
 export default function Setup() {
   const { refreshCredits } = useCredits()
@@ -17,44 +35,85 @@ export default function Setup() {
   const [inviteName, setInviteName] = useState('')
   const [inviteCountry, setInviteCountry] = useState('United States')
   const [inviteTimezone, setInviteTimezone] = useState('UTC')
-  const [inviteRole, setInviteRole] = useState('employee')
+  const [inviteIntervalSeconds, setInviteIntervalSeconds] = useState(180)
   const [inviteMsg, setInviteMsg] = useState('')
   const [creds, setCreds] = useState([])
   const [teamEmployees, setTeamEmployees] = useState([])
   const [employeeTzDraft, setEmployeeTzDraft] = useState({})
   const [tzSaving, setTzSaving] = useState('')
+  const [intervalDraft, setIntervalDraft] = useState({})
+  const [intervalSaving, setIntervalSaving] = useState('')
   const [credits, setCredits] = useState(0)
+  const [intervalsByEmail, setIntervalsByEmail] = useState({})
 
   const credsPg = usePagination(creds, 10, [creds.length])
   const teamEmployeesPg = usePagination(teamEmployees, 10, [teamEmployees.length])
 
+  const intervalLabelBySeconds = useMemo(() => {
+    const map = new Map()
+    for (const opt of INTERVAL_OPTIONS) map.set(opt.seconds, opt.label)
+    return map
+  }, [])
+
+  const loadAll = async () => {
+    const BASE = await resolveApiBase()
+    API = BASE
+    const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    const [orgRes, balRes, credsRes, employeesRes, intervalsRes] = await Promise.allSettled([
+      axios.get(`${BASE}/api/team`, { headers }).catch(() => axios.get(`${BASE}/api/org`, { headers })),
+      axios.get(`${BASE}/api/billing/balance`, { headers }),
+      axios.get(`${BASE}/api/employees/initial-creds`, { headers }),
+      axios.get(`${BASE}/api/employees`, { headers }),
+      axios.get(`${BASE}/api/capture-intervals`, { headers }),
+    ])
+
+    try {
+      const orgData = orgRes.status === 'fulfilled' ? orgRes.value?.data : null
+      const name = orgData?.team?.name || orgData?.organization?.name
+      if (name) setTeamName(name)
+    } catch {}
+
+    try {
+      const c = balRes.status === 'fulfilled' ? (balRes.value?.data?.credits || 0) : 0
+      setCredits(c)
+    } catch {}
+
+    try {
+      const list = credsRes.status === 'fulfilled' ? (credsRes.value?.data?.creds || []) : []
+      setCreds(list)
+    } catch {}
+
+    try {
+      const users = employeesRes.status === 'fulfilled' ? (employeesRes.value?.data?.users || []) : []
+      setTeamEmployees(users)
+      setEmployeeTzDraft(prev => {
+        const next = { ...prev }
+        for (const u of users) {
+          if (u?.email && next[u.email] == null) next[u.email] = u.timezone || 'UTC'
+        }
+        return next
+      })
+    } catch {}
+
+    try {
+      const intervals = intervalsRes.status === 'fulfilled' ? (intervalsRes.value?.data?.intervals || []) : []
+      const map = {}
+      for (const row of intervals) {
+        if (row?.email) map[row.email] = row.intervalSeconds || null
+      }
+      setIntervalsByEmail(map)
+      setIntervalDraft(prev => {
+        const next = { ...prev }
+        for (const [email, secs] of Object.entries(map)) {
+          if (next[email] == null && secs != null) next[email] = secs
+        }
+        return next
+      })
+    } catch {}
+  }
+
   useEffect(() => {
-    resolveApiBase().then((BASE) => {
-      API = BASE
-      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      axios.get(`${BASE}/api/team`, { headers })
-        .then(r => { if(r.data.team) setTeamName(r.data.team.name) })
-        .catch(() => axios.get(`${BASE}/api/org`, { headers }).then(r => { if(r.data.organization) setTeamName(r.data.organization.name) }))
-      axios.get(`${BASE}/api/billing/balance`, { headers })
-        .then(r => setCredits(r.data?.credits || 0))
-        .catch(()=>{})
-      axios.get(`${BASE}/api/employees/initial-creds`, { headers })
-        .then(r => setCreds(r.data?.creds || []))
-        .catch(()=>{})
-      axios.get(`${BASE}/api/employees`, { headers })
-        .then(r => {
-          const users = r.data?.users || []
-          setTeamEmployees(users)
-          setEmployeeTzDraft(prev => {
-            const next = { ...prev }
-            for (const u of users) {
-              if (u?.email && next[u.email] == null) next[u.email] = u.timezone || 'UTC'
-            }
-            return next
-          })
-        })
-        .catch(()=>{})
-    })
+    loadAll().catch(()=>{})
   }, [])
 
   const saveTeam = async (e) => {
@@ -65,7 +124,7 @@ export default function Setup() {
       // Use /api/org to update organization/company details
       await axios.post(`${API}/api/org`, { name: teamName }, { headers })
       setMsg('Team name updated!')
-    } catch (e) {
+    } catch {
       setMsg('Error saving team.')
     } finally {
       setLoading(false)
@@ -82,28 +141,16 @@ export default function Setup() {
       // Call /api/employees directly to create the user
       const r = await axios.post(`${BASE}/api/employees`, body, { headers })
       const login = r.data?.login
+      await axios.post(`${BASE}/api/capture-interval`, { employeeId: login?.email || inviteEmail, intervalSeconds: Number(inviteIntervalSeconds) }, { headers })
       setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}`)
       setInviteEmail('')
       setInviteName('')
       setInviteCountry('United States')
       setInviteTimezone('UTC')
+      setInviteIntervalSeconds(180)
       try { 
         refreshCredits()
-        const BASE = await resolveApiBase()
-        const bal = await axios.get(`${BASE}/api/billing/balance`, { headers })
-        setCredits(bal.data?.credits || 0)
-        const cr = await axios.get(`${BASE}/api/employees/initial-creds`, { headers })
-        setCreds(cr.data?.creds || [])
-        const team = await axios.get(`${BASE}/api/employees`, { headers })
-        const users = team.data?.users || []
-        setTeamEmployees(users)
-        setEmployeeTzDraft(prev => {
-          const next = { ...prev }
-          for (const u of users) {
-            if (u?.email && next[u.email] == null) next[u.email] = u.timezone || 'UTC'
-          }
-          return next
-        })
+        await loadAll()
       } catch {}
     } catch (e) {
       if (e?.response?.status === 402) {
@@ -114,254 +161,311 @@ export default function Setup() {
     }
   }
 
+  const saveEmployeeTimezone = async (email) => {
+    try {
+      setTzSaving(email)
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      const base = await resolveApiBase()
+      const timezone = employeeTzDraft[email] ?? (teamEmployees.find(u => u.email === email)?.timezone || 'UTC')
+      await axios.post(`${base}/api/employees/timezone`, { email, timezone }, { headers })
+      setTeamEmployees(prev => prev.map(x => x.email === email ? { ...x, timezone } : x))
+    } catch (e) {
+      setInviteMsg(e?.response?.data?.error || 'Failed to update timezone')
+    } finally {
+      setTzSaving('')
+    }
+  }
+
+  const saveEmployeeInterval = async (email) => {
+    try {
+      setIntervalSaving(email)
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      const base = await resolveApiBase()
+      const secs = Number(intervalDraft[email])
+      if (!Number.isFinite(secs) || secs <= 0) {
+        throw new Error('Select a valid interval')
+      }
+      await axios.post(`${base}/api/capture-interval`, { employeeId: email, intervalSeconds: secs }, { headers })
+      setIntervalsByEmail(prev => ({ ...prev, [email]: secs }))
+      setMsg('Monitoring settings saved.')
+    } catch (e) {
+      setInviteMsg(e?.response?.data?.error || e?.message || 'Failed to update interval')
+    } finally {
+      setIntervalSaving('')
+    }
+  }
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Organization Setup</h1>
-        <p className="mt-1 text-slate-500 dark:text-slate-400">Configure your team details.</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Organization Setup</h1>
+          <p className="mt-1 text-slate-500 dark:text-slate-400">Manage your workspace, employees, and monitoring configuration.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => loadAll().catch(()=>{})}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/40"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-        {/* Team Settings */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Team Details</h2>
-          {msg && <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm rounded-lg">{msg}</div>}
-          <form onSubmit={saveTeam} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard icon={Building2} label="Organization" value={teamName || '—'} />
+        <StatCard icon={Users} label="Employees" value={String(teamEmployees.length)} />
+        <StatCard icon={Clock} label="Available credits" value={String(credits)} />
+      </div>
+
+      {msg && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300">
+          {msg}
+        </div>
+      )}
+
+      {inviteMsg && (
+        <div className={`rounded-xl border px-4 py-3 text-sm ${inviteMsg.toLowerCase().includes('error') || inviteMsg.toLowerCase().includes('failed') ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300'}`}>
+          {inviteMsg}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Organization Name</label>
-              <input 
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                value={teamName} 
-                onChange={e=>setTeamName(e.target.value)} 
-                placeholder="Acme Corp" 
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  <Building2 className="w-5 h-5" />
+                </span>
+                <div>
+                  <div className="text-lg font-bold text-slate-900 dark:text-white">Workspace details</div>
+                  <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Update your organization name.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <form onSubmit={saveTeam} className="mt-5 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Organization name</label>
+              <input
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                value={teamName}
+                onChange={e => setTeamName(e.target.value)}
+                placeholder="Acme Corp"
               />
             </div>
-            <button 
-              disabled={loading} 
-              className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors shadow-sm disabled:opacity-70"
+            <button
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-70"
             >
-              {loading ? 'Saving...' : 'Save Changes'}
+              <Save className="w-4 h-4" />
+              {loading ? 'Saving…' : 'Save changes'}
             </button>
           </form>
         </div>
 
-        {/* Add Employee (Direct) */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Add Employee</h2>
-            <div className="text-sm text-slate-600 dark:text-slate-300">Available Credits: <span className="font-semibold">{credits}</span></div>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+              <UserPlus className="w-5 h-5" />
+            </span>
+            <div>
+              <div className="text-lg font-bold text-slate-900 dark:text-white">Provision employee</div>
+              <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Create an employee account and assign capture interval.</div>
+            </div>
           </div>
-          {inviteMsg && <div className={`mb-4 p-3 text-sm rounded-lg ${inviteMsg.startsWith('Error') ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>{inviteMsg}</div>}
-          <form onSubmit={invite} className="space-y-4 scroll-smooth">
-            <TextField label="Full Name" value={inviteName} onChange={e=>setInviteName(e.target.value)} placeholder="Jane Doe" required />
-            <CountrySelect value={inviteCountry} onChange={e=>setInviteCountry(e.target.value)} required />
-            <TimezoneSelect value={inviteTimezone} onChange={e=>setInviteTimezone(e.target.value)} required />
-            <TextField label="Employee Email" value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="employee@company.com" type="email" required />
-            <button 
-              className="px-6 py-2.5 bg-slate-900 dark:bg-slate-700 text-white font-medium rounded-lg hover:bg-slate-800 dark:hover:bg-slate-600 transition-colors shadow-sm"
-            >
-              Create Account
+
+          <form onSubmit={invite} className="mt-5 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <TextField label="Full name" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Jane Doe" required />
+              <TextField label="Employee email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="employee@company.com" type="email" required />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <CountrySelect value={inviteCountry} onChange={e => setInviteCountry(e.target.value)} required />
+              <TimezoneSelect value={inviteTimezone} onChange={e => setInviteTimezone(e.target.value)} required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Screenshot interval</label>
+              <select
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                value={inviteIntervalSeconds}
+                onChange={e => setInviteIntervalSeconds(Number(e.target.value))}
+              >
+                {INTERVAL_OPTIONS.map(o => (
+                  <option key={o.seconds} value={o.seconds}>{o.label}</option>
+                ))}
+              </select>
+              <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Assign how often screenshots will be captured for this employee.</div>
+            </div>
+
+            <button className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600">
+              <UserPlus className="w-4 h-4" />
+              Create account
             </button>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-              A temporary password will be generated automatically.
-            </p>
+            <div className="text-xs text-slate-500 dark:text-slate-400">A temporary password will be generated automatically.</div>
           </form>
         </div>
+      </div>
 
-        {/* Initial Credentials */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Employee Initial Credentials</h2>
-            <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Visible to Managers</span>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-lg font-bold text-slate-900 dark:text-white">Employees</div>
+            <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Manage timezone and screenshot interval per employee.</div>
           </div>
-
-          <div className="sm:hidden space-y-3">
-            {credsPg.total === 0 ? (
-              <div className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No initial credentials yet</div>
-            ) : (
-              credsPg.pageItems.map(c => (
-                <div key={`${c.employee_email}-${c.created_at}`} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/50 dark:bg-slate-900/20">
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100 break-words">{c.employee_email}</div>
-                  <div className="mt-2 grid grid-cols-1 gap-2">
-                    <div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Initial Password</div>
-                      <div className="font-mono text-sm text-slate-800 dark:text-slate-200 break-all">{c.temp_password}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Created</div>
-                      <div className="text-sm text-slate-700 dark:text-slate-300">{new Date(c.created_at).toLocaleString()}</div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="min-w-[640px] w-full text-left text-sm text-slate-600 dark:text-slate-300">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
-                <tr>
-                  <th className="px-4 py-2">Email</th>
-                  <th className="px-4 py-2">Initial Password</th>
-                  <th className="px-4 py-2">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {credsPg.total === 0 ? (
-                  <tr><td colSpan="3" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No initial credentials yet</td></tr>
-                ) : (
-                  credsPg.pageItems.map(c => (
-                    <tr key={`${c.employee_email}-${c.created_at}`} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="px-4 py-2">{c.employee_email}</td>
-                      <td className="px-4 py-2 font-mono">{c.temp_password}</td>
-                      <td className="px-4 py-2">{new Date(c.created_at).toLocaleString()}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-4">
-            <Pagination
-              page={credsPg.page}
-              pageCount={credsPg.pageCount}
-              total={credsPg.total}
-              pageSize={credsPg.pageSize}
-              onPageChange={credsPg.setPage}
-            />
-          </div>
-
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Use these passwords only for first login; advise employees to change their password after login.</p>
         </div>
 
-        {/* My Team Employees */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">My Team Employees</h2>
-            <button className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium" onClick={async()=>{
-              const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-              const base = await resolveApiBase()
-              const r = await axios.get(`${base}/api/employees`, { headers })
-              setTeamEmployees(r.data?.users || [])
-            }}>Refresh</button>
-          </div>
-
-          <div className="sm:hidden space-y-3">
-            {teamEmployeesPg.total === 0 ? (
-              <div className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No employees yet</div>
-            ) : (
-              teamEmployeesPg.pageItems.map(u => (
-                <div key={u.email} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/50 dark:bg-slate-900/20">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100 break-words">{u.email}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">{u.name || '-'}</div>
-                    </div>
-                    <button
-                      disabled={tzSaving === u.email}
-                      className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-70"
-                      onClick={async () => {
-                        try {
-                          setTzSaving(u.email)
-                          const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                          const base = await resolveApiBase()
-                          const timezone = employeeTzDraft[u.email] ?? (u.timezone || 'UTC')
-                          await axios.post(`${base}/api/employees/timezone`, { email: u.email, timezone }, { headers })
-                          setTeamEmployees(prev => prev.map(x => x.email === u.email ? { ...x, timezone } : x))
-                        } catch (e) {
-                          setInviteMsg(e?.response?.data?.error || 'Failed to update timezone')
-                        } finally {
-                          setTzSaving('')
-                        }
-                      }}
-                    >
-                      {tzSaving === u.email ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
-
-                  <div className="mt-3">
-                    <TimezoneSelect
-                      value={employeeTzDraft[u.email] ?? (u.timezone || 'UTC')}
-                      onChange={e => setEmployeeTzDraft(prev => ({ ...prev, [u.email]: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Created: {u.createdAt_local || (u.createdAt ? new Date(u.createdAt).toLocaleString() : '-')}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="min-w-[820px] w-full text-left text-sm text-slate-600 dark:text-slate-300">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
-                <tr>
-                  <th className="px-4 py-2">Email</th>
-                  <th className="px-4 py-2">Name</th>
-                  <th className="px-4 py-2">Timezone</th>
-                  <th className="px-4 py-2">Created</th>
-                  <th className="px-4 py-2">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {teamEmployeesPg.total === 0 ? (
-                  <tr><td colSpan="5" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No employees yet</td></tr>
-                ) : (
-                  teamEmployeesPg.pageItems.map(u => (
-                    <tr key={u.email} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="px-4 py-2">{u.email}</td>
-                      <td className="px-4 py-2">{u.name || '-'}</td>
-                      <td className="px-4 py-2">
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-[980px] w-full text-left text-sm text-slate-600 dark:text-slate-300">
+            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-semibold uppercase text-xs">
+              <tr>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Timezone</th>
+                <th className="px-4 py-3">Screenshot interval</th>
+                <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {teamEmployeesPg.total === 0 ? (
+                <tr><td colSpan="6" className="px-4 py-8 text-center text-slate-400 dark:text-slate-500">No employees yet</td></tr>
+              ) : (
+                teamEmployeesPg.pageItems.map((u) => {
+                  const email = u.email
+                  const intervalValue = intervalDraft[email] ?? intervalsByEmail[email] ?? ''
+                  const intervalText = typeof intervalValue === 'number' ? (intervalLabelBySeconds.get(intervalValue) || `${intervalValue}s`) : ''
+                  return (
+                    <tr key={email} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                      <td className="px-4 py-3 text-slate-900 dark:text-white font-medium">{u.name || '—'}</td>
+                      <td className="px-4 py-3">{email}</td>
+                      <td className="px-4 py-3">
                         <TimezoneSelect
                           label=""
-                          value={employeeTzDraft[u.email] ?? (u.timezone || 'UTC')}
-                          onChange={e => setEmployeeTzDraft(prev => ({ ...prev, [u.email]: e.target.value }))}
+                          value={employeeTzDraft[email] ?? (u.timezone || 'UTC')}
+                          onChange={e => setEmployeeTzDraft(prev => ({ ...prev, [email]: e.target.value }))}
                           required
                         />
                       </td>
-                      <td className="px-4 py-2">{u.createdAt_local || (u.createdAt ? new Date(u.createdAt).toLocaleString() : '-')}</td>
-                      <td className="px-4 py-2">
-                        <button
-                          disabled={tzSaving === u.email}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-70"
-                          onClick={async () => {
-                            try {
-                              setTzSaving(u.email)
-                              const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                              const base = await resolveApiBase()
-                              const timezone = employeeTzDraft[u.email] ?? (u.timezone || 'UTC')
-                              await axios.post(`${base}/api/employees/timezone`, { email: u.email, timezone }, { headers })
-                              setTeamEmployees(prev => prev.map(x => x.email === u.email ? { ...x, timezone } : x))
-                            } catch (e) {
-                              setInviteMsg(e?.response?.data?.error || 'Failed to update timezone')
-                            } finally {
-                              setTzSaving('')
-                            }
-                          }}
-                        >
-                          {tzSaving === u.email ? 'Saving...' : 'Save'}
-                        </button>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <select
+                            className="w-40 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                            value={intervalValue}
+                            onChange={e => {
+                              const v = e.target.value
+                              setIntervalDraft(prev => ({ ...prev, [email]: v === '' ? '' : Number(v) }))
+                            }}
+                          >
+                            <option value="">Select</option>
+                            {INTERVAL_OPTIONS.map(o => (
+                              <option key={o.seconds} value={o.seconds}>{o.label}</option>
+                            ))}
+                          </select>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">{intervalText}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">{u.createdAt_local || (u.createdAt ? new Date(u.createdAt).toLocaleString() : '—')}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={tzSaving === email}
+                            onClick={() => saveEmployeeTimezone(email)}
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-70"
+                          >
+                            {tzSaving === email ? 'Saving…' : 'Save TZ'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={intervalSaving === email}
+                            onClick={() => saveEmployeeInterval(email)}
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-70"
+                          >
+                            {intervalSaving === email ? 'Saving…' : 'Save interval'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-          <div className="mt-4">
-            <Pagination
-              page={teamEmployeesPg.page}
-              pageCount={teamEmployeesPg.pageCount}
-              total={teamEmployeesPg.total}
-              pageSize={teamEmployeesPg.pageSize}
-              onPageChange={teamEmployeesPg.setPage}
-            />
+        <div className="mt-4">
+          <Pagination
+            page={teamEmployeesPg.page}
+            pageCount={teamEmployeesPg.pageCount}
+            total={teamEmployeesPg.total}
+            pageSize={teamEmployeesPg.pageSize}
+            onPageChange={teamEmployeesPg.setPage}
+          />
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-lg font-bold text-slate-900 dark:text-white">Initial credentials</div>
+            <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Use these only for first login.</div>
           </div>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-[760px] w-full text-left text-sm text-slate-600 dark:text-slate-300">
+            <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-semibold uppercase text-xs">
+              <tr>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Initial password</th>
+                <th className="px-4 py-3">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+              {credsPg.total === 0 ? (
+                <tr><td colSpan="3" className="px-4 py-8 text-center text-slate-400 dark:text-slate-500">No initial credentials yet</td></tr>
+              ) : (
+                credsPg.pageItems.map(c => (
+                  <tr key={`${c.employee_email}-${c.created_at}`} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                    <td className="px-4 py-3">{c.employee_email}</td>
+                    <td className="px-4 py-3 font-mono">{c.temp_password}</td>
+                    <td className="px-4 py-3">{new Date(c.created_at).toLocaleString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4">
+          <Pagination
+            page={credsPg.page}
+            pageCount={credsPg.pageCount}
+            total={credsPg.total}
+            pageSize={credsPg.pageSize}
+            onPageChange={credsPg.setPage}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ icon, label, value }) {
+  const Icon = icon
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+          <Icon className="w-5 h-5" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</div>
+          <div className="mt-1 text-sm font-bold text-slate-900 dark:text-white truncate">{value}</div>
         </div>
       </div>
     </div>

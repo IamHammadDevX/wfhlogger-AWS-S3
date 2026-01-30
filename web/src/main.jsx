@@ -19,7 +19,6 @@ import SACredits from './pages/platform/SACredits.jsx'
 import LiveView from './pages/LiveView.jsx'
 import Report from './pages/Report.jsx'
 import Activity from './pages/Activity.jsx'
-import WorkHours from './pages/WorkHours.jsx'
 import Setup from './pages/Setup.jsx'
 import Downloads from './pages/Downloads.jsx'
 import Home from './pages/Home.jsx'
@@ -173,7 +172,6 @@ function AppRoutes() {
           <RedirectToTenant path="/activity" />
         </ProtectedRoute>
       } />
-      <Route path="/hours" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><RedirectToTenant path="/hours" /></ProtectedRoute>} />
       <Route path="/requests" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><RedirectToTenant path="/requests" /></ProtectedRoute>} />
       <Route path="/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><RedirectToTenant path="/setup" /></ProtectedRoute>} />
       <Route path="/downloads" element={<ProtectedRoute><RedirectToTenant path="/downloads" /></ProtectedRoute>} />
@@ -209,7 +207,6 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       <Route path="/:companySlug/activity" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><TenantGuard><RoleElement employee={<EmployeeActivity />} managerOrAdmin={<Activity />} /></TenantGuard></ProtectedRoute>} />
-      <Route path="/:companySlug/hours" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><TenantGuard><WorkHours /></TenantGuard></ProtectedRoute>} />
       <Route path="/:companySlug/requests" element={<ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}><TenantGuard><Requests /></TenantGuard></ProtectedRoute>} />
       <Route path="/:companySlug/setup" element={<ProtectedRoute allowedRoles={['manager', 'company_admin']}><TenantGuard><Setup /></TenantGuard></ProtectedRoute>} />
       <Route path="/:companySlug/downloads" element={<ProtectedRoute><TenantGuard><Downloads /></TenantGuard></ProtectedRoute>} />
