@@ -18,6 +18,8 @@ export default function Report() {
   const [loading, setLoading] = useState(false)
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState(0)
+  const [driveQuota, setDriveQuota] = useState(null)
+  const [quotaLoading, setQuotaLoading] = useState(false)
 
   const sessionsPg = usePagination(sessions, 10, [selectedEmployee, fromDate, toDate, sessions.length])
   const filesPg = usePagination(files, 10, [selectedEmployee, fromDate, toDate, files.length])
@@ -113,6 +115,23 @@ export default function Report() {
     })
   }, [])
 
+  useEffect(() => {
+    const employeeId = String(selectedEmployee || '').trim()
+    if (!employeeId) {
+      setDriveQuota(null)
+      setQuotaLoading(false)
+      return
+    }
+    setQuotaLoading(true)
+    const token = localStorage.getItem('token')
+    const headers = { Authorization: `Bearer ${token}` }
+    resolveApiBase()
+      .then((BASE) => axios.get(`${BASE}/api/drive/quota`, { headers, params: { employeeId } }))
+      .then((r) => setDriveQuota(r.data?.quota || null))
+      .catch(() => setDriveQuota(null))
+      .finally(() => setQuotaLoading(false))
+  }, [selectedEmployee])
+
   const search = async () => {
     setLoading(true)
     try {
@@ -178,6 +197,41 @@ export default function Report() {
     }
   }
 
+  const formatBytes = (bytes) => {
+    const n = Number(bytes)
+    if (!Number.isFinite(n) || n < 0) return '—'
+    const gb = n / (1024 ** 3)
+    if (gb >= 1) return `${gb.toFixed(2)} GB`
+    const mb = n / (1024 ** 2)
+    if (mb >= 1) return `${mb.toFixed(2)} MB`
+    const kb = n / 1024
+    return `${kb.toFixed(2)} KB`
+  }
+
+  const downloadZip = async () => {
+    const employeeId = String(selectedEmployee || '').trim()
+    if (!employeeId) {
+      alert('Must select employee')
+      return
+    }
+    const token = localStorage.getItem('token')
+    const headers = { Authorization: `Bearer ${token}` }
+    const params = { employeeId }
+    if (fromDate) params.from = fromDate
+    if (toDate) params.to = toDate
+    const r = await axios.get(`${API}/api/uploads/zip`, { headers, params, responseType: 'blob' })
+    const safe = employeeId.replace(/[^a-z0-9._-]+/gi, '_')
+    const blob = new Blob([r.data], { type: 'application/zip' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `screenshots_${safe}.zip`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+
   const formatDuration = (seconds) => {
     const s = Math.max(0, Number(seconds) || 0)
     const m = Math.floor(s / 60)
@@ -208,6 +262,17 @@ export default function Report() {
                 <option key={e.email} value={e.email}>{e.email}</option>
               ))}
             </select>
+            {!!selectedEmployee && (
+              <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                {quotaLoading ? 'Loading Drive space…' : (
+                  driveQuota?.connected
+                    ? (driveQuota.remaining_bytes != null && driveQuota.limit_bytes != null
+                      ? `Drive remaining: ${formatBytes(driveQuota.remaining_bytes)} / ${formatBytes(driveQuota.limit_bytes)}`
+                      : 'Drive remaining: Unknown')
+                    : 'Drive: Not connected'
+                )}
+              </div>
+            )}
           </div>
           
           <div className="w-full md:w-1/4">
@@ -236,6 +301,14 @@ export default function Report() {
             className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors shadow-sm disabled:opacity-70"
           >
             {loading ? 'Searching...' : 'Generate Report'}
+          </button>
+
+          <button
+            onClick={downloadZip}
+            className="w-full md:w-auto px-6 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors shadow-sm"
+            type="button"
+          >
+            Download Screenshots ZIP
           </button>
         </div>
       </div>

@@ -24,6 +24,7 @@ export default function Admin() {
   const [filterEmployeeId, setFilterEmployeeId] = useState('')
   const [filterType, setFilterType] = useState('')
   const [employees, setEmployees] = useState([])
+  const [driveQuotas, setDriveQuotas] = useState({})
   const [managerCreds, setManagerCreds] = useState([])
   const [tab, setTab] = useState('managers')
   const [selectedLog, setSelectedLog] = useState(null)
@@ -81,6 +82,22 @@ export default function Admin() {
     } catch {}
   }
 
+  const loadDriveQuotas = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = { Authorization: `Bearer ${token}` }
+      const BASE = await resolveApiBase()
+      const r = await axios.get(`${BASE}/api/drive/quota/list`, { headers })
+      const map = {}
+      for (const q of (r.data?.quotas || [])) {
+        const key = String(q?.employee_id || '').toLowerCase()
+        if (!key) continue
+        map[key] = q
+      }
+      setDriveQuotas(map)
+    } catch {}
+  }
+
   const loadLogs = async () => {
     try {
       const token = localStorage.getItem('token')
@@ -99,13 +116,14 @@ export default function Admin() {
     loadManagers()
     loadLogs()
     loadEmployees()
+    loadDriveQuotas()
     loadManagerCreds()
   }, [])
 
   useEffect(() => {
     const s = getSocket()
     if (!s) return
-    const handler = () => { loadEmployees() }
+    const handler = () => { loadEmployees(); loadDriveQuotas() }
     s.on('employees:updated', handler)
     return () => { try { s.off('employees:updated', handler) } catch {} }
   }, [])
@@ -192,6 +210,17 @@ export default function Admin() {
     if (tone === 'amber') return 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300 border-amber-200 dark:border-amber-900/40'
     if (tone === 'rose') return 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300 border-rose-200 dark:border-rose-900/40'
     return 'bg-slate-50 text-slate-700 dark:bg-slate-900/40 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+  }
+
+  const formatBytes = (bytes) => {
+    const n = Number(bytes)
+    if (!Number.isFinite(n) || n < 0) return '—'
+    const gb = n / (1024 ** 3)
+    if (gb >= 1) return `${gb.toFixed(2)} GB`
+    const mb = n / (1024 ** 2)
+    if (mb >= 1) return `${mb.toFixed(2)} MB`
+    const kb = n / 1024
+    return `${kb.toFixed(2)} KB`
   }
 
   return (
@@ -333,7 +362,7 @@ export default function Admin() {
         <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
             <h3 className="font-bold text-slate-900 dark:text-white">Employees</h3>
-            <button className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white" onClick={loadEmployees} type="button">
+            <button className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white" onClick={()=>{ loadEmployees(); loadDriveQuotas() }} type="button">
               <RefreshCw className="w-4 h-4" />
               Refresh
             </button>
@@ -345,6 +374,7 @@ export default function Admin() {
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Manager</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Drive Remaining</th>
                   <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -354,12 +384,21 @@ export default function Admin() {
                     <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">{u.email}</td>
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{u.name || '-'}</td>
                     <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200 font-mono">{u.managerId || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
+                      {(() => {
+                        const q = driveQuotas[String(u.email || '').toLowerCase()]
+                        if (!q) return '—'
+                        if (!q.connected) return 'Not connected'
+                        if (q.remaining_bytes == null || q.limit_bytes == null) return 'Unknown'
+                        return `${formatBytes(q.remaining_bytes)} / ${formatBytes(q.limit_bytes)}`
+                      })()}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-semibold" onClick={()=>removeEmployee(u.email)} type="button">Remove</button>
                     </td>
                   </tr>
                 ))}
-                {employeesPg.total === 0 && <tr><td colSpan="4" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No employees found.</td></tr>}
+                {employeesPg.total === 0 && <tr><td colSpan="5" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No employees found.</td></tr>}
               </tbody>
             </table>
           </div>

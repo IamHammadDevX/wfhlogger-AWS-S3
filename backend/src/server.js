@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import multer from 'multer';
+import archiver from 'archiver';
 import path from 'path';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
@@ -762,6 +763,84 @@ app.get('/api/drive/status', requireRole(['employee']), (req, res) => {
     res.json({ connected: false });
   }
 });
+
+function listScopedEmployeeEmails(viewer, company_id) {
+  const users = readUsers().filter(u => u.role === 'employee' && u.company_id == company_id)
+  if (viewer?.role === 'manager') {
+    const teamEmails = getTeamEmailsForManager(viewer?.uid || viewer?.sub, company_id)
+    return users.map(u => u.email).filter(e => teamEmails.includes(e))
+  }
+  return users.map(u => u.email)
+}
+
+async function fetchDriveStorageQuota({ company_id, employeeEmail }) {
+  const tokens = readJSON(driveTokensFile)
+  const idx = tokens.findIndex(t => String(t.employee_id || '').toLowerCase() === String(employeeEmail || '').toLowerCase() && t.company_id == company_id)
+  const t = idx >= 0 ? tokens[idx] : null
+  if (!t?.enc_refresh_token) return { connected: false, employee_id: employeeEmail }
+
+  const updatedAtMs = t.quota_updated_at ? Date.parse(t.quota_updated_at) : 0
+  const isFresh = updatedAtMs && (Date.now() - updatedAtMs) < 6 * 60 * 60 * 1000
+  if (isFresh && t.quota_limit_bytes != null && t.quota_usage_bytes != null) {
+    const limit = Number(t.quota_limit_bytes)
+    const used = Number(t.quota_usage_bytes)
+    const remaining = Number.isFinite(limit) ? Math.max(0, limit - used) : null
+    return { connected: true, employee_id: employeeEmail, limit_bytes: limit, used_bytes: used, remaining_bytes: remaining, updated_at: t.quota_updated_at }
+  }
+
+  const refresh = aeadDecrypt(t.enc_refresh_token)
+  const access = await googleTokenFromRefresh(refresh)
+  const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=storageQuota', { headers: { Authorization: `Bearer ${access}` } })
+  const j = await r.json()
+  const limit = j?.storageQuota?.limit != null ? Number(j.storageQuota.limit) : null
+  const used = j?.storageQuota?.usage != null ? Number(j.storageQuota.usage) : null
+  const remaining = (limit != null && used != null) ? Math.max(0, limit - used) : null
+
+  const next = {
+    ...t,
+    quota_limit_bytes: limit,
+    quota_usage_bytes: used,
+    quota_remaining_bytes: remaining,
+    quota_updated_at: new Date().toISOString(),
+  }
+  if (idx >= 0) tokens[idx] = next
+  writeJSON(driveTokensFile, tokens)
+  return { connected: true, employee_id: employeeEmail, limit_bytes: limit, used_bytes: used, remaining_bytes: remaining, updated_at: next.quota_updated_at }
+}
+
+app.get('/api/drive/quota', requireRole(['manager', 'company_admin']), async (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const employeeId = String(req.query?.employeeId || '').trim().toLowerCase()
+    if (!employeeId) return res.status(400).json({ error: 'employeeId is required' })
+
+    const scoped = listScopedEmployeeEmails(req.user, company_id).map(e => String(e).toLowerCase())
+    if (!scoped.includes(employeeId)) return res.status(403).json({ error: 'Forbidden' })
+
+    const out = await fetchDriveStorageQuota({ company_id, employeeEmail: employeeId })
+    res.json({ quota: out })
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch quota' })
+  }
+})
+
+app.get('/api/drive/quota/list', requireRole(['manager', 'company_admin']), async (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const emails = listScopedEmployeeEmails(req.user, company_id).map(e => String(e).trim().toLowerCase()).filter(Boolean)
+    const out = []
+    for (const email of emails) {
+      try {
+        out.push(await fetchDriveStorageQuota({ company_id, employeeEmail: email }))
+      } catch {
+        out.push({ connected: false, employee_id: email })
+      }
+    }
+    res.json({ quotas: out })
+  } catch {
+    res.status(500).json({ error: 'Failed to list quotas' })
+  }
+})
 app.get('/api/drive/oauth/start', requireRole(['employee']), (req, res) => {
   try {
     const state = Buffer.from(JSON.stringify({ email: req.user?.sub, company_id: req.user?.company_id })).toString('base64url');
@@ -771,7 +850,7 @@ app.get('/api/drive/oauth/start', requireRole(['employee']), (req, res) => {
     u.searchParams.set('response_type', 'code');
     u.searchParams.set('access_type', 'offline');
     u.searchParams.set('prompt', 'consent');
-    u.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.file');
+    u.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly');
     u.searchParams.set('state', state);
     res.json({ url: u.toString() });
   } catch {
@@ -2656,6 +2735,97 @@ app.get('/api/uploads/query', requireRole(['manager', 'company_admin']), async (
     res.status(500).json({ error: 'Query failed' });
   }
 });
+
+app.get('/api/uploads/zip', requireRole(['manager', 'company_admin']), async (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const employeeId = String(req.query?.employeeId || '').trim().toLowerCase()
+    if (!employeeId) return res.status(400).json({ error: 'employeeId is required' })
+
+    let meta = readJSON(screenshotsDriveFile).filter(x => x.company_id == company_id)
+    if (req.user?.role === 'manager') {
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id)
+      meta = meta.filter(m => m.employee_id && teamEmails.includes(m.employee_id))
+    }
+    meta = meta.filter(m => String(m.employee_id || '').toLowerCase() === employeeId)
+
+    const tzForRange = getEmployeeTimezone(employeeId, company_id) || null
+    const parseMaybeDate = (ds, isEnd) => {
+      if (!ds) return null
+      const s = String(ds)
+      if (tzForRange && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const t = isEnd ? '23:59:59' : '00:00:00'
+        return parseLocalDateTimeToUtcMs(s, t, tzForRange)
+      }
+      const ms = new Date(s).getTime()
+      return Number.isFinite(ms) ? ms : null
+    }
+    const fromMs = parseMaybeDate(req.query?.from, false)
+    const toMs = parseMaybeDate(req.query?.to, true)
+    if (fromMs) meta = meta.filter(m => new Date(m.captured_at).getTime() >= fromMs)
+    if (toMs) meta = meta.filter(m => new Date(m.captured_at).getTime() <= toMs)
+    meta.sort((a, b) => (a.captured_at > b.captured_at ? 1 : -1))
+
+    let localMeta = []
+    try {
+      const u = JSON.parse(fs.readFileSync(metaFile, 'utf-8'))
+      localMeta = Array.isArray(u) ? u : []
+    } catch {}
+    localMeta = localMeta.filter(m => m.company_id == company_id && String(m.employeeId || '').toLowerCase() === employeeId)
+    if (fromMs) localMeta = localMeta.filter(m => new Date(m.ts).getTime() >= fromMs)
+    if (toMs) localMeta = localMeta.filter(m => new Date(m.ts).getTime() <= toMs)
+    localMeta.sort((a, b) => (a.ts > b.ts ? 1 : -1))
+
+    if (!meta.length && !localMeta.length) return res.status(404).json({ error: 'No screenshots found' })
+
+    const safeName = String(employeeId).replace(/[^a-z0-9._-]+/gi, '_')
+    const zipName = `screenshots_${safeName}.zip`
+    res.setHeader('Content-Type', 'application/zip')
+    res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`)
+    const archive = archiver('zip', { zlib: { level: 9 } })
+    archive.on('error', () => { try { res.status(500).end() } catch {} })
+    archive.pipe(res)
+
+    let driveAccess = null
+    if (meta.length) {
+      try {
+        const tokens = readJSON(driveTokensFile)
+        const t = tokens.find(x => String(x.employee_id || '').toLowerCase() === employeeId && x.company_id == company_id)
+        if (t?.enc_refresh_token) {
+          const refresh = aeadDecrypt(t.enc_refresh_token)
+          driveAccess = await googleTokenFromRefresh(refresh)
+        }
+      } catch {}
+    }
+
+    for (const m of meta) {
+      try {
+        if (!driveAccess) continue
+        const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(m.drive_file_id)}?alt=media`
+        const fr = await fetch(url, { headers: { Authorization: `Bearer ${driveAccess}` } })
+        if (!fr.ok || !fr.body) continue
+        const iso = String(m.captured_at || new Date().toISOString())
+        const name = `drive_${iso.replace(/[:]/g, '-').replace('T', '_').replace('Z', '')}.jpg`
+        archive.append(Readable.fromWeb(fr.body), { name })
+      } catch {}
+    }
+
+    for (const m of localMeta) {
+      try {
+        const fname = path.basename(String(m.file || ''))
+        const abs = path.join(uploadPath, fname)
+        if (!fs.existsSync(abs)) continue
+        const iso = String(m.ts || new Date().toISOString())
+        const name = `local_${iso.replace(/[:]/g, '-').replace('T', '_').replace('Z', '')}_${fname}`
+        archive.append(fs.createReadStream(abs), { name })
+      } catch {}
+    }
+
+    await archive.finalize()
+  } catch (e) {
+    res.status(500).json({ error: 'ZIP failed' })
+  }
+})
 
 // Sessions by date range with per-session details
 app.get('/api/work/sessions/range', requireRole(['manager', 'company_admin', 'super_admin']), (req, res) => {

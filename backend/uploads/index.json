@@ -286,5 +286,11 @@
     "employeeId": "jane@ms.com",
     "company_id": 2,
     "ts": "2026-01-28T21:26:31.132Z"
+  },
+  {
+    "file": "uploads/2026-01-30T20-46-05-881Z-shot.jpg",
+    "employeeId": "empzip1125@example.com",
+    "company_id": 8,
+    "ts": "2026-01-30T20:46:05.890Z"
   }
 ]
