@@ -2742,10 +2742,15 @@ app.get('/api/uploads/zip', requireRole(['manager', 'company_admin']), async (re
     const employeeId = String(req.query?.employeeId || '').trim().toLowerCase()
     if (!employeeId) return res.status(400).json({ error: 'employeeId is required' })
 
+    let teamEmails = null
+    if (req.user?.role === 'manager') {
+      teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id).map(e => String(e).toLowerCase())
+      if (!teamEmails.includes(employeeId)) return res.status(403).json({ error: 'Forbidden' })
+    }
+
     let meta = readJSON(screenshotsDriveFile).filter(x => x.company_id == company_id)
     if (req.user?.role === 'manager') {
-      const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id)
-      meta = meta.filter(m => m.employee_id && teamEmails.includes(m.employee_id))
+      meta = meta.filter(m => m.employee_id && teamEmails.includes(String(m.employee_id).toLowerCase()))
     }
     meta = meta.filter(m => String(m.employee_id || '').toLowerCase() === employeeId)
 
