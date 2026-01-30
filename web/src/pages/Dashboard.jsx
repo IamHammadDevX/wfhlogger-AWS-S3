@@ -3,6 +3,7 @@ import axios from 'axios'
 import { Link } from 'react-router-dom'
 import { resolveApiBase } from '../api.js'
 import { getSocket } from '../socket.js'
+import ImageViewerModal from '../components/ui/ImageViewerModal.jsx'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -15,6 +16,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [managers, setManagers] = useState([])
   const [selectedManager, setSelectedManager] = useState('')
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerIndex, setViewerIndex] = useState(0)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -82,6 +85,32 @@ export default function Dashboard() {
   // Apply manager filter to employees and recent files
   const filteredEmployees = selectedManager ? employees.filter(e => String(e.managerId || '') === String(selectedManager)) : employees
   const filteredFiles = selectedManager ? recentFiles.filter(f => filteredEmployees.map(e=>e.email).includes(f.employeeId)) : recentFiles
+
+  const viewerImages = React.useMemo(() => {
+    return filteredFiles
+      .map((f) => {
+        const src = f.preview_url
+          ? (f.preview_url.startsWith('http') ? f.preview_url : `${API}${f.preview_url}`)
+          : (f.drive_file_id || f.fileId || f.id) ? `${API}/api/uploads/preview/${f.drive_file_id || f.fileId || f.id}` : ''
+        if (!src) return null
+        const ts = f.ts ? new Date(f.ts) : null
+        const caption = [
+          f.employeeId ? `Employee: ${f.employeeId}` : null,
+          ts && !Number.isNaN(ts.getTime()) ? ts.toLocaleString() : null,
+        ].filter(Boolean).join(' · ')
+        return {
+          src,
+          alt: 'Screenshot',
+          caption,
+        }
+      })
+      .filter(Boolean)
+  }, [filteredFiles])
+
+  const openViewer = (idx) => {
+    setViewerIndex(idx)
+    setViewerOpen(true)
+  }
 
   const Stat = ({label, value}) => (
     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
@@ -166,29 +195,41 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {filteredFiles.map((f, i) => {
-                const src = f.preview_url
-                  ? (f.preview_url.startsWith('http') ? f.preview_url : `${API}${f.preview_url}`)
-                  : (f.drive_file_id || f.fileId || f.id) ? `${API}/api/uploads/preview/${f.drive_file_id || f.fileId || f.id}` : ''
-                if (!src) return null
+              {viewerImages.map((img, i) => {
+                if (!img?.src) return null
                 return (
-                <div key={i} className="group relative aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
-                  <img 
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                    src={src}
-                    alt="Screenshot" 
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => openViewer(i)}
+                  className="group relative aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 text-left"
+                >
+                  <img
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    src={img.src}
+                    alt={img.alt}
+                    loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
                     <span className="text-xs text-white font-medium truncate w-full">
-                      {new Date(f.ts || '').toLocaleTimeString()}
+                      {img.caption || ''}
                     </span>
                   </div>
-                </div>
+                </button>
               )})}
             </div>
           )}
         </div>
       </section>
+
+      <ImageViewerModal
+        open={viewerOpen}
+        images={viewerImages}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={() => setViewerOpen(false)}
+        title="Latest Screenshots"
+      />
     </div>
   )
 }

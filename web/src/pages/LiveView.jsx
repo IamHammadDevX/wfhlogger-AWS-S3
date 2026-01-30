@@ -3,6 +3,7 @@ import axios from 'axios'
 import { resolveApiBase } from '../api.js'
 import { getSocket } from '../socket.js'
 import { getApiBase } from '../config.js'
+import ImageViewerModal from '../components/ui/ImageViewerModal.jsx'
 
 let API = getApiBase()
 
@@ -17,8 +18,18 @@ export default function LiveView() {
   const [role, setRole] = useState('')
   const [status, setStatus] = useState('idle') // idle | connecting | active | offline
   const [frames, setFrames] = useState([]) // [{b64, ts}]
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerIndex, setViewerIndex] = useState(0)
   
   const socketRef = useRef(null)
+
+  const viewerImages = React.useMemo(() => {
+    return frames.map((f) => ({
+      src: `data:image/jpeg;base64,${f.b64}`,
+      alt: 'Live frame',
+      caption: f.ts ? new Date(f.ts).toLocaleString() : '',
+    }))
+  }, [frames])
 
   // Restore saved state on mount
   useEffect(() => {
@@ -335,13 +346,18 @@ export default function LiveView() {
           </div>
           <div className="grid grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
             {frames.slice(0, 12).map((f, i) => (
-              <div key={i} className="group relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all bg-slate-100 dark:bg-slate-900">
-                <img className="w-full h-20 object-cover" src={`data:image/jpeg;base64,${f.b64}`} alt="Frame" />
+              <button
+                key={i}
+                type="button"
+                onClick={() => { setViewerIndex(i); setViewerOpen(true) }}
+                className="group relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all bg-slate-100 dark:bg-slate-900 text-left"
+              >
+                <img className="w-full h-20 object-cover" src={`data:image/jpeg;base64,${f.b64}`} alt="Frame" loading="lazy" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
                 <div className="absolute bottom-1 right-1 text-[10px] text-white bg-black/50 px-1 rounded">
                   {new Date(f.ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}
                 </div>
-              </div>
+              </button>
             ))}
             {frames.length === 0 && (
               <div className="col-span-2 py-12 text-center border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-lg">
@@ -351,6 +367,15 @@ export default function LiveView() {
           </div>
         </div>
       </div>
+
+      <ImageViewerModal
+        open={viewerOpen}
+        images={viewerImages}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={() => setViewerOpen(false)}
+        title="Recent Frames"
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import axios from 'axios'
 import { resolveApiBase } from '../api.js'
 import Pagination from '../components/ui/Pagination.jsx'
 import { usePagination } from '../hooks/usePagination.js'
+import ImageViewerModal from '../components/ui/ImageViewerModal.jsx'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -14,9 +15,38 @@ export default function Report() {
   const [files, setFiles] = useState([])
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerIndex, setViewerIndex] = useState(0)
 
   const sessionsPg = usePagination(sessions, 10, [selectedEmployee, fromDate, toDate, sessions.length])
   const filesPg = usePagination(files, 10, [selectedEmployee, fromDate, toDate, files.length])
+
+  const viewerImages = React.useMemo(() => {
+    return files
+      .map((f) => {
+        const src = f.preview_url
+          ? (f.preview_url.startsWith('http') ? f.preview_url : `${API}${f.preview_url}`)
+          : (f.drive_file_id || f.fileId || f.id) ? `${API}/api/uploads/preview/${f.drive_file_id || f.fileId || f.id}` : ''
+        if (!src) return null
+        const caption = [
+          f.employeeId ? `Employee: ${f.employeeId}` : null,
+          f.ts_local || (f.ts ? new Date(f.ts).toLocaleString() : null),
+          f.timezone ? `TZ: ${f.timezone}` : null,
+        ].filter(Boolean).join(' · ')
+        return { src, alt: 'Screenshot', caption }
+      })
+      .filter(Boolean)
+  }, [files])
+
+  const openViewerForFile = (f) => {
+    const id = String(f?.drive_file_id || f?.fileId || f?.id || '')
+    const idx = Math.max(
+      0,
+      viewerImages.findIndex((it) => String(it?.src || '').includes(id))
+    )
+    setViewerIndex(idx)
+    setViewerOpen(true)
+  }
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -224,31 +254,32 @@ export default function Report() {
             <div className="text-center py-8 text-slate-500 dark:text-slate-400">No screenshots found.</div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {filesPg.pageItems.map((f, i) => (
-                <div key={i} className="group relative aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
-                  {(() => {
-                    const src = f.preview_url
-                      ? (f.preview_url.startsWith('http') ? f.preview_url : `${API}${f.preview_url}`)
-                      : (f.drive_file_id || f.fileId || f.id) ? `${API}/api/uploads/preview/${f.drive_file_id || f.fileId || f.id}` : ''
-                    if (!src) return null
-                    return (
-                  <a href={src} target="_blank" rel="noopener noreferrer">
-                    <img 
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                      src={src} 
-                      alt="Evidence" 
-                    />
-                  </a>
-                    )
-                  })()}
+              {filesPg.pageItems.map((f, i) => {
+                const src = f.preview_url
+                  ? (f.preview_url.startsWith('http') ? f.preview_url : `${API}${f.preview_url}`)
+                  : (f.drive_file_id || f.fileId || f.id) ? `${API}/api/uploads/preview/${f.drive_file_id || f.fileId || f.id}` : ''
+                if (!src) return null
+                return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => openViewerForFile(f)}
+                  className="group relative aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 text-left"
+                >
+                  <img
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    src={src}
+                    alt="Evidence"
+                    loading="lazy"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
                     <div className="w-full">
                       <div className="text-xs text-white font-medium truncate">{f.employeeId}</div>
                       <div className="text-[10px] text-slate-300">{f.ts_local || new Date(f.ts).toLocaleString()} • {f.timezone}</div>
                     </div>
                   </div>
-                </div>
-              ))}
+                </button>
+              )})}
             </div>
           )}
           <Pagination
@@ -259,6 +290,15 @@ export default function Report() {
             onPageChange={filesPg.setPage}
           />
         </section>
+
+        <ImageViewerModal
+          open={viewerOpen}
+          images={viewerImages}
+          index={viewerIndex}
+          onIndexChange={setViewerIndex}
+          onClose={() => setViewerOpen(false)}
+          title="Screenshots"
+        />
       </div>
     </div>
   )
