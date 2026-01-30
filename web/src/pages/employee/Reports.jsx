@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { getApiBaseSync } from '../../api.js'
+import Pagination from '../../components/ui/Pagination.jsx'
+import { usePagination } from '../../hooks/usePagination.js'
 
 export default function EmployeeReports() {
   const [reports, setReports] = useState([])
@@ -13,6 +15,8 @@ export default function EmployeeReports() {
   })
   const [reportType, setReportType] = useState('monthly_summary')
   const [format, setFormat] = useState('pdf')
+
+  const reportsPg = usePagination(reports, 10, [reports.length])
 
   useEffect(() => {
     fetchReports()
@@ -229,9 +233,9 @@ export default function EmployeeReports() {
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Report History</h2>
         </div>
         <div className="p-6">
-          {reports.length > 0 ? (
+          {reportsPg.total > 0 ? (
             <div className="space-y-4">
-              {reports.map((report, index) => (
+              {reportsPg.pageItems.map((report, index) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
@@ -272,6 +276,13 @@ export default function EmployeeReports() {
                   </div>
                 </div>
               ))}
+              <Pagination
+                page={reportsPg.page}
+                pageCount={reportsPg.pageCount}
+                total={reportsPg.total}
+                pageSize={reportsPg.pageSize}
+                onPageChange={reportsPg.setPage}
+              />
             </div>
           ) : (
             <div className="text-center py-8">

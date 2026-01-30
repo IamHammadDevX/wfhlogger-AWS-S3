@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
+import Pagination from '../components/ui/Pagination.jsx'
+import { usePagination } from '../hooks/usePagination.js'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 export default function Activity() {
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
+
+  const activityPg = usePagination(activities, 10, [activities.length])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -69,10 +73,10 @@ export default function Activity() {
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
               {loading ? (
                 <tr><td colSpan="5" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">Loading activity...</td></tr>
-              ) : activities.length === 0 ? (
+              ) : activityPg.total === 0 ? (
                 <tr><td colSpan="5" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No activity recorded yet.</td></tr>
               ) : (
-                activities.map((a, i) => {
+                activityPg.pageItems.map((a, i) => {
                   const start = new Date(a.startTime)
                   const end = a.endTime ? new Date(a.endTime) : null
                   const dur = end ? Math.round((end - start)/1000/60) : 0
@@ -94,6 +98,17 @@ export default function Activity() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="px-6 pb-5">
+          {!loading && (
+            <Pagination
+              page={activityPg.page}
+              pageCount={activityPg.pageCount}
+              total={activityPg.total}
+              pageSize={activityPg.pageSize}
+              onPageChange={activityPg.setPage}
+            />
+          )}
         </div>
       </div>
     </div>

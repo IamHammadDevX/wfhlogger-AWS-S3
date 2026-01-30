@@ -1,6 +1,10 @@
 import React from 'react'
+import Pagination from '../../ui/Pagination.jsx'
+import { usePagination } from '../../../hooks/usePagination.js'
 
 export function LedgerTable({ selectedCompanyId, loading, history, onRefresh }) {
+  const historyPg = usePagination(history, 10, [selectedCompanyId, history?.length || 0])
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
       <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
@@ -22,7 +26,7 @@ export function LedgerTable({ selectedCompanyId, loading, history, onRefresh }) 
         <div className="p-6 text-sm text-slate-500 dark:text-slate-400">Select a company to view transaction history.</div>
       ) : loading ? (
         <div className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading transactions…</div>
-      ) : history.length ? (
+      ) : historyPg.total ? (
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-700/40 text-slate-500 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
@@ -34,7 +38,7 @@ export function LedgerTable({ selectedCompanyId, loading, history, onRefresh }) 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-              {history.slice(0, 50).map((t) => (
+              {historyPg.pageItems.map((t) => (
                 <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                   <td className="py-3 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatTs(t.created_at)}</td>
                   <td className="py-3 px-4">
@@ -53,6 +57,15 @@ export function LedgerTable({ selectedCompanyId, loading, history, onRefresh }) 
               ))}
             </tbody>
           </table>
+          <div className="px-4 pb-5">
+            <Pagination
+              page={historyPg.page}
+              pageCount={historyPg.pageCount}
+              total={historyPg.total}
+              pageSize={historyPg.pageSize}
+              onPageChange={historyPg.setPage}
+            />
+          </div>
         </div>
       ) : (
         <div className="p-6 text-sm text-slate-500 dark:text-slate-400">No transactions found.</div>
@@ -70,4 +83,3 @@ function formatTs(ts) {
     return String(ts || '')
   }
 }
-

@@ -3,6 +3,8 @@ import axios from 'axios'
 import { useCredits } from '../CreditsContext.jsx'
 import { resolveApiBase } from '../api.js'
 import { TextField, CountrySelect, TimezoneSelect } from '../components/FormControls.jsx'
+import Pagination from '../components/ui/Pagination.jsx'
+import { usePagination } from '../hooks/usePagination.js'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -22,6 +24,9 @@ export default function Setup() {
   const [employeeTzDraft, setEmployeeTzDraft] = useState({})
   const [tzSaving, setTzSaving] = useState('')
   const [credits, setCredits] = useState(0)
+
+  const credsPg = usePagination(creds, 10, [creds.length])
+  const teamEmployeesPg = usePagination(teamEmployees, 10, [teamEmployees.length])
 
   useEffect(() => {
     resolveApiBase().then((BASE) => {
@@ -171,10 +176,10 @@ export default function Setup() {
           </div>
 
           <div className="sm:hidden space-y-3">
-            {creds.length === 0 ? (
+            {credsPg.total === 0 ? (
               <div className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No initial credentials yet</div>
             ) : (
-              creds.map(c => (
+              credsPg.pageItems.map(c => (
                 <div key={`${c.employee_email}-${c.created_at}`} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/50 dark:bg-slate-900/20">
                   <div className="text-sm font-medium text-slate-900 dark:text-slate-100 break-words">{c.employee_email}</div>
                   <div className="mt-2 grid grid-cols-1 gap-2">
@@ -202,10 +207,10 @@ export default function Setup() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {creds.length === 0 ? (
+                {credsPg.total === 0 ? (
                   <tr><td colSpan="3" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No initial credentials yet</td></tr>
                 ) : (
-                  creds.map(c => (
+                  credsPg.pageItems.map(c => (
                     <tr key={`${c.employee_email}-${c.created_at}`} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                       <td className="px-4 py-2">{c.employee_email}</td>
                       <td className="px-4 py-2 font-mono">{c.temp_password}</td>
@@ -215,6 +220,16 @@ export default function Setup() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4">
+            <Pagination
+              page={credsPg.page}
+              pageCount={credsPg.pageCount}
+              total={credsPg.total}
+              pageSize={credsPg.pageSize}
+              onPageChange={credsPg.setPage}
+            />
           </div>
 
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Use these passwords only for first login; advise employees to change their password after login.</p>
@@ -233,10 +248,10 @@ export default function Setup() {
           </div>
 
           <div className="sm:hidden space-y-3">
-            {teamEmployees.length === 0 ? (
+            {teamEmployeesPg.total === 0 ? (
               <div className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No employees yet</div>
             ) : (
-              teamEmployees.map(u => (
+              teamEmployeesPg.pageItems.map(u => (
                 <div key={u.email} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/50 dark:bg-slate-900/20">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -293,10 +308,10 @@ export default function Setup() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {teamEmployees.length === 0 ? (
+                {teamEmployeesPg.total === 0 ? (
                   <tr><td colSpan="5" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No employees yet</td></tr>
                 ) : (
-                  teamEmployees.map(u => (
+                  teamEmployeesPg.pageItems.map(u => (
                     <tr key={u.email} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                       <td className="px-4 py-2">{u.email}</td>
                       <td className="px-4 py-2">{u.name || '-'}</td>
@@ -336,6 +351,16 @@ export default function Setup() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4">
+            <Pagination
+              page={teamEmployeesPg.page}
+              pageCount={teamEmployeesPg.pageCount}
+              total={teamEmployeesPg.total}
+              pageSize={teamEmployeesPg.pageSize}
+              onPageChange={teamEmployeesPg.setPage}
+            />
           </div>
         </div>
       </div>

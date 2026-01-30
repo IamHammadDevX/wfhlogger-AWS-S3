@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import Pagination from '../../components/ui/Pagination.jsx'
+import { usePagination } from '../../hooks/usePagination.js'
 
 export default function SACompanies() {
   const [data, setData] = useState({ per_company: [], total_companies: 0 })
@@ -26,6 +28,8 @@ export default function SACompanies() {
       c.name.toLowerCase().includes(search.toLowerCase())
     )
   }, [data.per_company, search])
+
+  const companiesPg = usePagination(filteredCompanies, 10, [search, filteredCompanies.length])
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading tenants...</div>
 
@@ -70,8 +74,8 @@ export default function SACompanies() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-              {filteredCompanies.length > 0 ? (
-                filteredCompanies.map(c => (
+              {companiesPg.total > 0 ? (
+                companiesPg.pageItems.map(c => (
                   <tr key={c.company_id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                     <td className="py-3 px-6 font-medium text-slate-900 dark:text-white">
                       {c.name}
@@ -116,8 +120,16 @@ export default function SACompanies() {
           </table>
         </div>
         <div className="bg-slate-50 dark:bg-slate-700/30 px-6 py-4 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 flex justify-between items-center">
-          <span>Showing {filteredCompanies.length} of {data.per_company?.length || 0} companies</span>
-          {/* Pagination could go here */}
+          <span>Showing {companiesPg.total} of {data.per_company?.length || 0} companies</span>
+          <div className="text-sm">
+            <Pagination
+              page={companiesPg.page}
+              pageCount={companiesPg.pageCount}
+              total={companiesPg.total}
+              pageSize={companiesPg.pageSize}
+              onPageChange={companiesPg.setPage}
+            />
+          </div>
         </div>
       </div>
     </div>

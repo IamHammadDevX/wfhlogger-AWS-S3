@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
+import Pagination from '../components/ui/Pagination.jsx'
+import { usePagination } from '../hooks/usePagination.js'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -14,6 +16,8 @@ export default function WorkHours() {
   const [msg, setMsg] = useState('')
   const [role, setRole] = useState('')
   const [rows, setRows] = useState([])
+
+  const rowsPg = usePagination(rows, 10, [rows.length])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -181,10 +185,10 @@ export default function WorkHours() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-            {rows.length === 0 ? (
+            {rowsPg.total === 0 ? (
               <tr><td colSpan="2" className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">No employees</td></tr>
             ) : (
-              rows.map(r => (
+              rowsPg.pageItems.map(r => (
                 <tr key={r.email} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                   <td className="px-4 py-2">{r.email}</td>
                   <td className="px-4 py-2">
@@ -204,6 +208,13 @@ export default function WorkHours() {
             )}
           </tbody>
         </table>
+        <Pagination
+          page={rowsPg.page}
+          pageCount={rowsPg.pageCount}
+          total={rowsPg.total}
+          pageSize={rowsPg.pageSize}
+          onPageChange={rowsPg.setPage}
+        />
       </div>
     </div>
   )

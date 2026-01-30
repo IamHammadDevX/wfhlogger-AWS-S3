@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
+import Pagination from '../components/ui/Pagination.jsx'
+import { usePagination } from '../hooks/usePagination.js'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -12,6 +14,9 @@ export default function Report() {
   const [files, setFiles] = useState([])
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(false)
+
+  const sessionsPg = usePagination(sessions, 10, [selectedEmployee, fromDate, toDate, sessions.length])
+  const filesPg = usePagination(files, 10, [selectedEmployee, fromDate, toDate, files.length])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -163,10 +168,10 @@ export default function Report() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                {sessions.length === 0 ? (
+                {sessionsPg.total === 0 ? (
                   <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No sessions found for this criteria.</td></tr>
                 ) : (
-                  sessions.map((s, i) => {
+                  sessionsPg.pageItems.map((s, i) => {
                     // Fix: Backend uses startedAt/endedAt, NOT startTime/endTime
                     const startTime = s.startedAt || s.startTime
                     const endTime = s.endedAt || s.endTime
@@ -201,16 +206,25 @@ export default function Report() {
               </tbody>
             </table>
           </div>
+          <div className="px-6 pb-5">
+            <Pagination
+              page={sessionsPg.page}
+              pageCount={sessionsPg.pageCount}
+              total={sessionsPg.total}
+              pageSize={sessionsPg.pageSize}
+              onPageChange={sessionsPg.setPage}
+            />
+          </div>
         </section>
 
         {/* Screenshots Grid */}
         <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
           <h3 className="font-bold text-slate-900 dark:text-white mb-6">Screenshots ({files.length})</h3>
-          {files.length === 0 ? (
+          {filesPg.total === 0 ? (
             <div className="text-center py-8 text-slate-500 dark:text-slate-400">No screenshots found.</div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {files.map((f, i) => (
+              {filesPg.pageItems.map((f, i) => (
                 <div key={i} className="group relative aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
                   {(() => {
                     const src = f.preview_url
@@ -237,6 +251,13 @@ export default function Report() {
               ))}
             </div>
           )}
+          <Pagination
+            page={filesPg.page}
+            pageCount={filesPg.pageCount}
+            total={filesPg.total}
+            pageSize={filesPg.pageSize}
+            onPageChange={filesPg.setPage}
+          />
         </section>
       </div>
     </div>

@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { resolveApiBase } from '../api.js'
+import Pagination from '../components/ui/Pagination.jsx'
+import { usePagination } from '../hooks/usePagination.js'
 
 export default function Requests() {
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [apiBase, setApiBase] = useState('')
   const [role, setRole] = useState('')
+
+  const colCount = (role === 'manager' || role === 'company_admin') ? 6 : 4
+  const requestsPg = usePagination(requests, 10, [role, requests.length])
 
   useEffect(() => {
     resolveApiBase().then(base => {
@@ -72,10 +77,10 @@ export default function Requests() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-            {requests.length === 0 ? (
-              <tr><td colSpan="6" className="px-6 py-8 text-center text-slate-400 dark:text-slate-500">No requests found</td></tr>
+            {requestsPg.total === 0 ? (
+              <tr><td colSpan={colCount} className="px-6 py-8 text-center text-slate-400 dark:text-slate-500">No requests found</td></tr>
             ) : (
-              requests.map(r => (
+              requestsPg.pageItems.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                   <td className="px-6 py-3">{r.date}</td>
                   {(role === 'manager' || role === 'company_admin') && (
@@ -109,6 +114,15 @@ export default function Requests() {
             )}
           </tbody>
         </table>
+      </div>
+      <div className="px-6 pb-5">
+        <Pagination
+          page={requestsPg.page}
+          pageCount={requestsPg.pageCount}
+          total={requestsPg.total}
+          pageSize={requestsPg.pageSize}
+          onPageChange={requestsPg.setPage}
+        />
       </div>
     </div>
   )

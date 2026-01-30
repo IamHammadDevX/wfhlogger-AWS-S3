@@ -1,7 +1,11 @@
 import React from 'react'
 import { Search } from 'lucide-react'
+import Pagination from '../../ui/Pagination.jsx'
+import { usePagination } from '../../../hooks/usePagination.js'
 
 export function CompanyPicker({ query, onQueryChange, onRefresh, companies, loading, selectedId, onSelect }) {
+  const companiesPg = usePagination(companies, 10, [query, companies?.length || 0])
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-slate-200 dark:border-slate-700">
@@ -28,9 +32,9 @@ export function CompanyPicker({ query, onQueryChange, onRefresh, companies, load
       <div className="max-h-[520px] overflow-auto">
         {loading ? (
           <div className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading companies…</div>
-        ) : companies.length ? (
+        ) : companiesPg.total ? (
           <ul className="divide-y divide-slate-100 dark:divide-slate-700/50">
-            {companies.map((c) => (
+            {companiesPg.pageItems.map((c) => (
               <CompanyRow
                 key={c.id}
                 company={c}
@@ -42,6 +46,16 @@ export function CompanyPicker({ query, onQueryChange, onRefresh, companies, load
         ) : (
           <div className="p-6 text-sm text-slate-500 dark:text-slate-400">No companies found.</div>
         )}
+      </div>
+
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+        <Pagination
+          page={companiesPg.page}
+          pageCount={companiesPg.pageCount}
+          total={companiesPg.total}
+          pageSize={companiesPg.pageSize}
+          onPageChange={companiesPg.setPage}
+        />
       </div>
     </div>
   )
@@ -72,4 +86,3 @@ function CompanyRow({ company, active, onSelect }) {
     </li>
   )
 }
-

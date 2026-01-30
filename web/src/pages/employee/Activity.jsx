@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
+import Pagination from '../../components/ui/Pagination.jsx'
+import { usePagination } from '../../hooks/usePagination.js'
 
 export default function EmployeeActivity() {
   const [activities, setActivities] = useState([])
@@ -11,6 +13,8 @@ export default function EmployeeActivity() {
     end_date: new Date().toISOString().split('T')[0]
   })
   const [filter, setFilter] = useState('all')
+
+  const activitiesPg = usePagination(activities, 10, [dateRange.start_date, dateRange.end_date, filter, activities.length])
 
   useEffect(() => {
     fetchActivities()
@@ -168,9 +172,9 @@ export default function EmployeeActivity() {
           </p>
         </div>
         <div className="p-6">
-          {activities.length > 0 ? (
+          {activitiesPg.total > 0 ? (
             <div className="space-y-4">
-              {activities.map((activity, index) => (
+              {activitiesPg.pageItems.map((activity, index) => (
                 <div key={index} className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
                   <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center border border-slate-200 dark:border-slate-700">
                     {getActivityIcon(activity.type)}
@@ -242,6 +246,13 @@ export default function EmployeeActivity() {
                   </div>
                 </div>
               ))}
+              <Pagination
+                page={activitiesPg.page}
+                pageCount={activitiesPg.pageCount}
+                total={activitiesPg.total}
+                pageSize={activitiesPg.pageSize}
+                onPageChange={activitiesPg.setPage}
+              />
             </div>
           ) : (
             <div className="text-center py-8">

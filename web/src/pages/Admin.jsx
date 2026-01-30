@@ -5,6 +5,8 @@ import { getSocket } from '../socket.js'
 import { TextField, CountrySelect, TimezoneSelect } from '../components/FormControls.jsx'
 import { Tabs } from '../components/admin/Tabs.jsx'
 import { AuditDetailsDrawer } from '../components/admin/AuditDetailsDrawer.jsx'
+import Pagination from '../components/ui/Pagination.jsx'
+import { usePagination } from '../hooks/usePagination.js'
 import { Shield, Users, FileText, Plus, RefreshCw, Search } from 'lucide-react'
 
 export default function Admin() {
@@ -152,6 +154,11 @@ export default function Admin() {
     return Array.from(set).sort()
   }, [logs])
 
+  const managersPg = usePagination(managers, 10, [tab, managers.length])
+  const managerCredsPg = usePagination(managerCreds, 10, [tab, managerCreds.length])
+  const employeesPg = usePagination(employees, 10, [tab, employees.length])
+  const logsPg = usePagination(logs, 10, [tab, filterManagerId, filterEmployeeId, filterType, logs.length])
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -217,7 +224,7 @@ export default function Admin() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                    {managers.map(m => (
+                    {managersPg.pageItems.map(m => (
                       <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
                         <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">{m.full_name || '-'}</td>
                         <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{m.email}</td>
@@ -228,9 +235,18 @@ export default function Admin() {
                         </td>
                       </tr>
                     ))}
-                    {managers.length === 0 && <tr><td colSpan="5" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No managers found.</td></tr>}
+                    {managersPg.total === 0 && <tr><td colSpan="5" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No managers found.</td></tr>}
                   </tbody>
                 </table>
+              </div>
+              <div className="px-6 pb-5">
+                <Pagination
+                  page={managersPg.page}
+                  pageCount={managersPg.pageCount}
+                  total={managersPg.total}
+                  pageSize={managersPg.pageSize}
+                  onPageChange={managersPg.setPage}
+                />
               </div>
             </section>
 
@@ -252,16 +268,25 @@ export default function Admin() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                    {managerCreds.map((c, i) => (
+                    {managerCredsPg.pageItems.map((c, i) => (
                       <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
                         <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">{c.manager_email}</td>
                         <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200 font-mono">{c.temp_password}</td>
                         <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{new Date(c.created_at).toLocaleString()}</td>
                       </tr>
                     ))}
-                    {managerCreds.length === 0 && <tr><td colSpan="3" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No credentials found.</td></tr>}
+                    {managerCredsPg.total === 0 && <tr><td colSpan="3" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No credentials found.</td></tr>}
                   </tbody>
                 </table>
+              </div>
+              <div className="px-6">
+                <Pagination
+                  page={managerCredsPg.page}
+                  pageCount={managerCredsPg.pageCount}
+                  total={managerCredsPg.total}
+                  pageSize={managerCredsPg.pageSize}
+                  onPageChange={managerCredsPg.setPage}
+                />
               </div>
               <div className="px-6 py-3 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700">For security, advise managers to change their password after first login.</div>
             </section>
@@ -289,7 +314,7 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                {employees.map((u, i) => (
+                {employeesPg.pageItems.map((u, i) => (
                   <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
                     <td className="px-6 py-4 text-sm font-semibold text-slate-900 dark:text-white">{u.email}</td>
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{u.name || '-'}</td>
@@ -299,9 +324,18 @@ export default function Admin() {
                     </td>
                   </tr>
                 ))}
-                {employees.length === 0 && <tr><td colSpan="4" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No employees found.</td></tr>}
+                {employeesPg.total === 0 && <tr><td colSpan="4" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No employees found.</td></tr>}
               </tbody>
             </table>
+          </div>
+          <div className="px-6 pb-5">
+            <Pagination
+              page={employeesPg.page}
+              pageCount={employeesPg.pageCount}
+              total={employeesPg.total}
+              pageSize={employeesPg.pageSize}
+              onPageChange={employeesPg.setPage}
+            />
           </div>
         </section>
       )}
@@ -343,7 +377,7 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                {logs.map((l, i) => (
+                {logsPg.pageItems.map((l, i) => (
                   <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors cursor-pointer" onClick={() => setSelectedLog(l)}>
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{l.ts_local || (l.ts ? new Date(l.ts).toLocaleString() : '-')}</td>
                     <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
@@ -360,9 +394,18 @@ export default function Admin() {
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 max-w-xl truncate" title={l.summary || ''}>{l.summary || '-'}</td>
                   </tr>
                 ))}
-                {logs.length === 0 && <tr><td colSpan="5" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No logs found.</td></tr>}
+                {logsPg.total === 0 && <tr><td colSpan="5" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No logs found.</td></tr>}
               </tbody>
             </table>
+          </div>
+          <div className="px-6 pb-5">
+            <Pagination
+              page={logsPg.page}
+              pageCount={logsPg.pageCount}
+              total={logsPg.total}
+              pageSize={logsPg.pageSize}
+              onPageChange={logsPg.setPage}
+            />
           </div>
         </section>
       )}
