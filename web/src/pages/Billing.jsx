@@ -56,7 +56,10 @@ export default function Billing() {
     setProcessing(true)
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      const { data } = await axios.post(`${apiBase}/api/billing/stripe/checkout-session`, { amount_usd: amount }, { headers })
+      const return_path = (() => {
+        try { return window.location.pathname || '/billing' } catch { return '/billing' }
+      })()
+      const { data } = await axios.post(`${apiBase}/api/billing/stripe/checkout-session`, { amount_usd: amount, return_path }, { headers })
       if (data?.url) {
         window.location.href = data.url
       } else {

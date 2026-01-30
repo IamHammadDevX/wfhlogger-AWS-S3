@@ -7,7 +7,7 @@ import { Tabs } from '../components/admin/Tabs.jsx'
 import { AuditDetailsDrawer } from '../components/admin/AuditDetailsDrawer.jsx'
 import Pagination from '../components/ui/Pagination.jsx'
 import { usePagination } from '../hooks/usePagination.js'
-import { Shield, Users, FileText, Plus, RefreshCw, Search } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, CreditCard, FileText, Globe, KeyRound, Monitor, Plus, RefreshCw, Search, Settings2, Shield, UserPlus, Users, UserX } from 'lucide-react'
 
 export default function Admin() {
   const [email, setEmail] = useState('manager@example.com')
@@ -27,6 +27,7 @@ export default function Admin() {
   const [managerCreds, setManagerCreds] = useState([])
   const [tab, setTab] = useState('managers')
   const [selectedLog, setSelectedLog] = useState(null)
+  const [auditView, setAuditView] = useState('simple')
 
   const submit = async (e) => {
     e.preventDefault()
@@ -158,6 +159,40 @@ export default function Admin() {
   const managerCredsPg = usePagination(managerCreds, 10, [tab, managerCreds.length])
   const employeesPg = usePagination(employees, 10, [tab, employees.length])
   const logsPg = usePagination(logs, 10, [tab, filterManagerId, filterEmployeeId, filterType, logs.length])
+
+  const getAuditMeta = (l) => {
+    const type = String(l?.type || '')
+    const make = (label, Icon, tone) => ({ label, Icon, tone })
+    if (type.startsWith('request_')) {
+      if (type === 'request_approved') return make('Request approved', CheckCircle2, 'emerald')
+      if (type === 'request_rejected') return make('Request rejected', UserX, 'rose')
+      return make('Request updated', FileText, 'blue')
+    }
+    if (type === 'employee_created') return make('Employee created', UserPlus, 'emerald')
+    if (type === 'employee_deleted') return make('Employee removed', UserX, 'rose')
+    if (type === 'employee_timezone_updated') return make('Timezone updated', Globe, 'blue')
+    if (type === 'interval_set') return make('Capture interval set', Settings2, 'violet')
+    if (type === 'payment_success') return make('Payment success', CreditCard, 'emerald')
+    if (type === 'billing_low_credits') return make('Low credits warning', AlertTriangle, 'amber')
+    if (type === 'billing_suspended') return make('Account suspended', AlertTriangle, 'rose')
+    if (type === 'live_view_start') return make('Live view started', Monitor, 'blue')
+    if (type === 'live_view_stop') return make('Live view stopped', Monitor, 'slate')
+    if (type === 'rbac_forbidden') return make('Blocked request', KeyRound, 'rose')
+    if (type === 'rbac_invalid_token') return make('Invalid token', KeyRound, 'rose')
+    const label = type
+      ? type.split('_').map(w => w ? (w[0].toUpperCase() + w.slice(1)) : '').join(' ')
+      : 'Event'
+    return make(label, FileText, 'slate')
+  }
+
+  const auditToneClasses = (tone) => {
+    if (tone === 'emerald') return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/40'
+    if (tone === 'blue') return 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-900/40'
+    if (tone === 'violet') return 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300 border-violet-200 dark:border-violet-900/40'
+    if (tone === 'amber') return 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300 border-amber-200 dark:border-amber-900/40'
+    if (tone === 'rose') return 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300 border-rose-200 dark:border-rose-900/40'
+    return 'bg-slate-50 text-slate-700 dark:bg-slate-900/40 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+  }
 
   return (
     <div className="space-y-6">
@@ -344,20 +379,29 @@ export default function Admin() {
         <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="font-bold text-slate-900 dark:text-white">Audit Logs</div>
-            <button className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white" onClick={loadLogs} type="button">
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setAuditView(v => v === 'simple' ? 'technical' : 'simple')}
+                className="inline-flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700/40"
+              >
+                {auditView === 'simple' ? 'Technical view' : 'Simple view'}
+              </button>
+              <button className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white" onClick={loadLogs} type="button">
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </button>
+            </div>
           </div>
           <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="Actor (id/email)..." value={filterManagerId} onChange={e=>setFilterManagerId(e.target.value)} />
+                <input className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="Actor (name/email)..." value={filterManagerId} onChange={e=>setFilterManagerId(e.target.value)} />
               </div>
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="Employee (email)..." value={filterEmployeeId} onChange={e=>setFilterEmployeeId(e.target.value)} />
+                <input className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="Target employee (name/email)..." value={filterEmployeeId} onChange={e=>setFilterEmployeeId(e.target.value)} />
               </div>
               <select className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" value={filterType} onChange={e=>setFilterType(e.target.value)}>
                 <option value="">All events</option>
@@ -365,39 +409,89 @@ export default function Admin() {
               </select>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-              <thead className="bg-slate-50 dark:bg-slate-900/40">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Time</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Event</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actor</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Target</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Summary</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                {logsPg.pageItems.map((l, i) => (
-                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors cursor-pointer" onClick={() => setSelectedLog(l)}>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{l.ts_local || (l.ts ? new Date(l.ts).toLocaleString() : '-')}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
-                      <span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold dark:bg-slate-900 dark:text-slate-200 dark:border-slate-700">{l.type}</span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <div className="font-semibold text-slate-900 dark:text-white">{l.actor?.name || l.actor?.email || l.details?.actorId || '-'}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">{l.actor?.email && l.actor?.name ? l.actor.email : l.actor?.role || ''}</div>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <div className="font-semibold text-slate-900 dark:text-white">{l.targetEmployee?.name || l.targetEmployee?.email || l.details?.employeeId || '-'}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">{l.targetEmployee?.email && l.targetEmployee?.name ? l.targetEmployee.email : ''}</div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 max-w-xl truncate" title={l.summary || ''}>{l.summary || '-'}</td>
+          {auditView === 'simple' ? (
+            <div className="divide-y divide-slate-100 dark:divide-slate-700">
+              {logsPg.total === 0 ? (
+                <div className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No logs found.</div>
+              ) : (
+                logsPg.pageItems.map((l, i) => {
+                  const meta = getAuditMeta(l)
+                  const Icon = meta.Icon
+                  const actor = l.actor?.name || l.actor?.email || l.details?.actorId || '-'
+                  const target = l.targetEmployee?.name || l.targetEmployee?.email || l.details?.employeeId || '-'
+                  const time = l.ts_local || (l.ts ? new Date(l.ts).toLocaleString() : '-')
+                  const badge = auditToneClasses(meta.tone)
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setSelectedLog(l)}
+                      className="w-full text-left px-6 py-5 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`shrink-0 w-11 h-11 rounded-2xl border flex items-center justify-center ${badge}`}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <div className="text-sm font-bold text-slate-900 dark:text-white">{meta.label}</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">{time}{l.timezone ? ` • ${l.timezone}` : ''}</div>
+                          </div>
+                          <div className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                            {l.summary || meta.label}
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">By</span>
+                            <span className="truncate max-w-[18rem]">{actor}</span>
+                            <span>•</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">Target</span>
+                            <span className="truncate max-w-[18rem]">{target}</span>
+                          </div>
+                        </div>
+                        <span className={`shrink-0 hidden sm:inline-flex items-center px-2.5 py-1 rounded-xl border text-xs font-bold ${badge}`}>
+                          {meta.label}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                <thead className="bg-slate-50 dark:bg-slate-900/40">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Time</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Event</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actor</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Target</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Summary</th>
                   </tr>
-                ))}
-                {logsPg.total === 0 && <tr><td colSpan="5" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No logs found.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+                  {logsPg.pageItems.map((l, i) => (
+                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors cursor-pointer" onClick={() => setSelectedLog(l)}>
+                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{l.ts_local || (l.ts ? new Date(l.ts).toLocaleString() : '-')}</td>
+                      <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-200">
+                        <span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold dark:bg-slate-900 dark:text-slate-200 dark:border-slate-700">{l.type}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="font-semibold text-slate-900 dark:text-white">{l.actor?.name || l.actor?.email || l.details?.actorId || '-'}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{l.actor?.email && l.actor?.name ? l.actor.email : l.actor?.role || ''}</div>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="font-semibold text-slate-900 dark:text-white">{l.targetEmployee?.name || l.targetEmployee?.email || l.details?.employeeId || '-'}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{l.targetEmployee?.email && l.targetEmployee?.name ? l.targetEmployee.email : ''}</div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 max-w-xl truncate" title={l.summary || ''}>{l.summary || '-'}</td>
+                    </tr>
+                  ))}
+                  {logsPg.total === 0 && <tr><td colSpan="5" className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">No logs found.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="px-6 pb-5">
             <Pagination
               page={logsPg.page}

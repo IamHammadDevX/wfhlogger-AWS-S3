@@ -12,10 +12,35 @@ export function initStripe() {
   return stripe
 }
 
-export async function createStripeCheckoutSession({ company_id, admin_user_id, credit_amount_usd, origin }) {
+function normalizeReturnPath(return_path) {
+  const raw = String(return_path || '').trim()
+  if (!raw) return '/billing'
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return '/billing'
+  if (!raw.startsWith('/')) return '/billing'
+  return raw
+}
+
+function buildReturnUrl({ baseOrigin, return_path, status }) {
+  const base = (baseOrigin || '').startsWith('http')
+    ? baseOrigin
+    : (process.env.SUCCESS_URL || process.env.CANCEL_URL || 'http://localhost:5173')
+
+  const safePath = normalizeReturnPath(return_path)
+  const idx = safePath.indexOf('?')
+  const pathname = idx >= 0 ? safePath.slice(0, idx) : safePath
+  const search = idx >= 0 ? safePath.slice(idx) : ''
+
+  const u = new URL(base)
+  u.pathname = pathname || '/billing'
+  u.search = search || ''
+  u.searchParams.set('status', status)
+  return u.toString()
+}
+
+export async function createStripeCheckoutSession({ company_id, admin_user_id, credit_amount_usd, origin, return_path }) {
   const s = initStripe()
-  const success = (origin || '').startsWith('http') ? `${origin}/billing?status=success` : `${process.env.SUCCESS_URL || 'http://localhost:5173'}/billing?status=success`
-  const cancel = (origin || '').startsWith('http') ? `${origin}/billing?status=cancel` : `${process.env.CANCEL_URL || 'http://localhost:5173'}/billing?status=cancel`
+  const success = buildReturnUrl({ baseOrigin: origin, return_path, status: 'success' })
+  const cancel = buildReturnUrl({ baseOrigin: origin, return_path, status: 'cancel' })
   const session = await s.checkout.sessions.create({
     mode: 'payment',
     payment_method_types: ['card'],

@@ -87,7 +87,7 @@ if (!fs.existsSync(screenshotsDriveFile)) fs.writeFileSync(screenshotsDriveFile,
         if (!comp.credits || comp.credits <= 0) {
           // Send suspension warning
           const admin = listAllUsers().find(u => u.company_id == comp.id && u.role === 'company_admin');
-          if (admin) sendAccountSuspensionWarning(admin.email);
+          if (admin) sendAccountSuspensionWarning({ to: admin.email, company: comp });
           continue;
         }
         
@@ -115,14 +115,14 @@ if (!fs.existsSync(screenshotsDriveFile)) fs.writeFileSync(screenshotsDriveFile,
               // sendSubscriptionDeduction(admin.email, cost, comp.credits);
               // New Summary
               const period = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-              sendMonthlyBillingSummary(admin.email, { period, activeEmployees: employees.length, deducted: cost, remaining: comp.credits });
+              sendMonthlyBillingSummary({ to: admin.email, company: comp, period, activeEmployees: employees.length, deducted: cost, remaining: comp.credits });
             }
           try { io.to(`company:${comp.id}`).emit('company:credits_updated', { company_id: comp.id, balance: comp.credits }) } catch {}
           } else {
             // Partial deduction or suspend?
             // For now, just warn
             const admin = listAllUsers().find(u => u.company_id == comp.id && u.role === 'company_admin');
-            if (admin) sendLowCreditWarning(admin.email, comp.credits);
+            if (admin) sendLowCreditWarning({ to: admin.email, balance: comp.credits, company: comp });
           }
         }
       }
@@ -1003,8 +1003,14 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
     const company = getCompanyById(company_id);
     if (company && (company.credits || 0) < 1) {
       // Send email to admin?
-      const admin = listManagers(company_id).find(u => u.role === 'company_admin') || listManagers(company_id).find(u => u.role === 'super_admin') || { email: req.user.email };
-      sendCreationBlocked(admin.email);
+      const recipients = []
+      if (company?.billing_email) recipients.push(company.billing_email)
+      const adminEmail = listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin')?.email
+      if (adminEmail) recipients.push(adminEmail)
+      if (company?.admin_contact_email) recipients.push(company.admin_contact_email)
+      if (req.user?.email) recipients.push(req.user.email)
+      const to = Array.from(new Set(recipients.filter(Boolean))).join(',')
+      if (to) sendCreationBlocked({ to, company, actor: req.user?.email || req.user?.uid || req.user?.sub })
       return res.status(402).json({ error: 'Insufficient credits. Please add credits to your account.' });
     }
 
@@ -1027,9 +1033,9 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
 
     // Send New User Created Emails
     try {
-       const loginUrl = `${process.env.APP_URL || 'http://localhost:4000'}`;
-       // 1. To Company Admin
-       const admin = listManagers(company_id).find(u => u.role === 'company_admin') || listManagers(company_id).find(u => u.role === 'super_admin');
+       const loginUrl = `${process.env.APP_URL || 'http://localhost:5173'}`;
+       const company = getCompanyById(company_id)
+       const adminEmail = company?.billing_email || listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin')?.email || company?.admin_contact_email || null
        // 2. To Assigned Manager (if any)
        let manager = null;
        if (managerId) {
@@ -1051,13 +1057,14 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
          role: 'employee',
          teamName,
          password: tempPassword,
-         loginUrl
+         loginUrl,
+         company
        };
 
-       if (admin) {
-         sendNewUserCreated(admin.email, emailData);
+       if (adminEmail) {
+         sendNewUserCreated(adminEmail, emailData);
        }
-       if (manager && manager.email !== admin?.email) {
+       if (manager && manager.email && manager.email !== adminEmail) {
          sendNewUserCreated(manager.email, emailData);
        }
     } catch (emailErr) {
@@ -1078,7 +1085,10 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
       });
       const admin = listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin');
       if (admin) {
-        sendEmployeeCreatedDeduction(admin.email, {
+        const comp = getCompanyById(company_id)
+        sendEmployeeCreatedDeduction({
+          to: admin.email,
+          company: comp || { id: company_id },
           employeeName: name || email,
           employeeEmail: email,
           deducted: 1,
@@ -1087,9 +1097,9 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
         
         // Check for Low Balance or Suspension after deduction
         if (newBalance <= 0) {
-          sendAccountSuspensionWarning(admin.email);
+          sendAccountSuspensionWarning({ to: admin.email, company: comp || { id: company_id } });
         } else if (newBalance < 5) {
-          sendLowCreditWarning(admin.email, newBalance);
+          sendLowCreditWarning({ to: admin.email, balance: newBalance, company: comp || { id: company_id } });
         }
       }
       try { io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance }) } catch {}
@@ -1155,18 +1165,20 @@ app.post('/api/admin/managers', requireRole(['company_admin']), (req, res) => {
     
     // Send New User Created Emails (Manager)
     try {
-       const loginUrl = `${process.env.APP_URL || 'http://localhost:4000'}`;
-       const admin = listManagers(company_id).find(u => u.role === 'super_admin');
+       const loginUrl = `${process.env.APP_URL || 'http://localhost:5173'}`;
+       const company = getCompanyById(company_id)
+       const adminEmail = req.user?.email || listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin')?.email || null
        const emailData = {
          name: name, 
          email,
          role: 'manager',
          teamName: orgName.trim(),
          password: password,
-         loginUrl
+         loginUrl,
+         company
        };
        // Send to Admin (copy)
-       if (admin) sendNewUserCreated(admin.email, emailData);
+       if (adminEmail) sendNewUserCreated(adminEmail, emailData);
        // Send to New Manager
        sendNewUserCreated(email, emailData);
     } catch (e) {
@@ -1796,12 +1808,12 @@ app.get('/api/company/brand', requireRole(['company_admin','manager','employee']
 app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']), async (req, res) => {
   try {
     if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' });
-    const { amount_usd } = req.body || {};
+    const { amount_usd, return_path } = req.body || {};
     const amount = Number(amount_usd);
     if (!amount || isNaN(amount) || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
     const company_id = req.user?.company_id;
     const admin_user_id = req.user?.uid;
-    const url = await createStripeCheckoutSession({ company_id, admin_user_id, credit_amount_usd: amount, origin: req.headers.origin });
+    const url = await createStripeCheckoutSession({ company_id, admin_user_id, credit_amount_usd: amount, origin: req.headers.origin, return_path });
     return res.json({ url });
   } catch (e) {
     console.error('[stripe:checkout-session] error:', e);
@@ -1864,8 +1876,24 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
           console.warn('[invoice] pdf generate failed:', e?.message || e)
         }
         try {
-          const admin = listManagers(company_id).find(u => u.role === 'super_admin');
-          if (admin) sendPaymentSuccess(admin.email, credit_amount_usd, credits);
+          const comp = getCompanyById(company_id) || company || { id: company_id }
+          const recipients = []
+          if (comp?.billing_email) recipients.push(comp.billing_email)
+          const adminUserEmail = listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin')?.email
+          if (adminUserEmail) recipients.push(adminUserEmail)
+          if (comp?.admin_contact_email) recipients.push(comp.admin_contact_email)
+          const to = Array.from(new Set(recipients.filter(Boolean))).join(',')
+          if (to) {
+            sendPaymentSuccess({
+              to,
+              company: comp,
+              amount_usd: credit_amount_usd,
+              credits,
+              balance: newBalance,
+              invoice_id: invId,
+              payment_reference_id: ref,
+            })
+          }
         } catch {}
         try {
           io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance })

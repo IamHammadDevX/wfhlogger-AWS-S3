@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import fs from 'fs'
+import path from 'path'
 
 // Use environment variables for credentials
 // In development, you can use Ethereal (https://ethereal.email) if no Gmail credentials provided
@@ -29,7 +31,111 @@ transporter.verify(function (error, success) {
   }
 });
 
-export async function sendEmail(to, subject, text, html) {
+function slugifyName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function normalizeAppUrl(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return 'http://localhost:5173'
+  return s.endsWith('/') ? s.slice(0, -1) : s
+}
+
+function tenantUrl(companyName, routePath) {
+  const base = normalizeAppUrl(process.env.APP_URL || 'http://localhost:5173')
+  const slug = slugifyName(companyName || 'company') || 'company'
+  const rp = String(routePath || '/').startsWith('/') ? String(routePath || '/') : `/${routePath}`
+  return `${base}/${slug}${rp}`
+}
+
+function buildTenantLogoAttachment(companyLogoUrl) {
+  try {
+    const raw = String(companyLogoUrl || '').trim()
+    if (!raw) return null
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return null
+    const rel = raw.replace(/^\//, '')
+    const abs = path.resolve(process.cwd(), rel)
+    if (!fs.existsSync(abs)) return null
+    const stat = fs.statSync(abs)
+    if (!stat.isFile() || stat.size <= 0 || stat.size > 1_500_000) return null
+    return { filename: path.basename(abs), path: abs, cid: 'tenant-logo' }
+  } catch {
+    return null
+  }
+}
+
+function renderEmail({ companyName, companyId, companyLogoUrl, preheader, title, tone = 'blue', blocks = [], cta }) {
+  const safeCompanyName = escapeHtml(companyName || 'Your Company')
+  const brand = escapeHtml(process.env.EMAIL_BRAND_NAME || 'Time Tracker')
+  const toneMap = {
+    blue: { bar: '#2563EB', soft: '#EFF6FF', text: '#1D4ED8' },
+    emerald: { bar: '#059669', soft: '#ECFDF5', text: '#047857' },
+    amber: { bar: '#D97706', soft: '#FFFBEB', text: '#B45309' },
+    rose: { bar: '#E11D48', soft: '#FFF1F2', text: '#BE123C' },
+    slate: { bar: '#334155', soft: '#F1F5F9', text: '#0F172A' },
+  }
+  const t = toneMap[tone] || toneMap.blue
+  const att = buildTenantLogoAttachment(companyLogoUrl)
+  const logoHtml = att
+    ? `<img src="cid:tenant-logo" width="36" height="36" style="display:block;border-radius:10px;border:1px solid #E2E8F0;object-fit:cover;" alt="${safeCompanyName}" />`
+    : `<div style="width:36px;height:36px;border-radius:10px;border:1px solid #E2E8F0;background:${t.soft};color:${t.text};display:flex;align-items:center;justify-content:center;font-weight:800;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;">${escapeHtml((companyName || 'C').trim().slice(0, 1).toUpperCase())}</div>`
+
+  const pre = preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>` : ''
+  const bodyBlocks = blocks.map(b => `<div style="margin-top:14px;color:#334155;font-size:14px;line-height:20px;">${b}</div>`).join('')
+
+  const ctaHtml = cta?.url && cta?.label ? `
+    <div style="margin-top:18px;">
+      <a href="${escapeHtml(cta.url)}" style="display:inline-block;padding:12px 16px;background:${t.bar};color:#fff;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">${escapeHtml(cta.label)}</a>
+    </div>
+  ` : ''
+
+  const html = `
+    ${pre}
+    <div style="background:#F1F5F9;padding:24px 12px;">
+      <div style="max-width:640px;margin:0 auto;">
+        <div style="background:#fff;border-radius:18px;border:1px solid #E2E8F0;overflow:hidden;">
+          <div style="height:6px;background:${t.bar};"></div>
+          <div style="padding:20px 20px 12px 20px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              ${logoHtml}
+              <div style="min-width:0;">
+                <div style="font-size:14px;font-weight:800;color:#0F172A;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;">${safeCompanyName}</div>
+                <div style="margin-top:2px;font-size:12px;color:#64748B;">${brand}${companyId != null ? ` • Tenant #${escapeHtml(companyId)}` : ''}</div>
+              </div>
+            </div>
+            <div style="margin-top:16px;background:${t.soft};border:1px solid #E2E8F0;border-radius:14px;padding:14px;">
+              <div style="font-size:16px;font-weight:900;color:#0F172A;">${escapeHtml(title || 'Notification')}</div>
+              ${bodyBlocks}
+              ${ctaHtml}
+            </div>
+          </div>
+          <div style="padding:14px 20px 18px 20px;border-top:1px solid #E2E8F0;color:#64748B;font-size:12px;line-height:18px;">
+            <div>Need help? Contact ${escapeHtml(process.env.SUPPORT_EMAIL || 'support@timetracker.com')}.</div>
+            <div style="margin-top:6px;">This is an automated message. Please do not reply.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+
+  const attachments = att ? [att] : []
+  return { html, attachments }
+}
+
+export async function sendEmail(to, subject, text, html, extra = {}) {
   // If no credentials, log and return
   if (!process.env.EMAIL_USER || process.env.EMAIL_USER.includes('example.com')) {
     console.log('[Email] Mock send (No credentials):', { to, subject });
@@ -42,7 +148,8 @@ export async function sendEmail(to, subject, text, html) {
       to,
       subject,
       text,
-      html: html || text
+      html: html || text,
+      ...(extra || {})
     });
     console.log('[Email] Sent:', info.messageId);
     return true;
@@ -65,71 +172,162 @@ export async function sendEmail(to, subject, text, html) {
   }
 }
 
-export function sendLowCreditWarning(to, balance) {
-  const subject = 'Action Required: Low Credit Balance';
-  const text = `Your Time Tracker account balance is low (${balance} credits). Please add credits to ensure uninterrupted service.`;
-  const html = `
-    <h2 style="color: #d97706;">Low Balance Warning</h2>
-    <p>Your Time Tracker account balance has dropped to <strong>${balance} credits</strong>.</p>
-    <p>Please add credits immediately to ensure uninterrupted service for your employees.</p>
-    <a href="${process.env.APP_URL || 'http://localhost:5173'}/billing" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Add Credits</a>
-  `;
-  return sendEmail(to, subject, text, html);
+export function sendLowCreditWarning(toOrPayload, balanceLegacy) {
+  const payload = typeof toOrPayload === 'object' && toOrPayload
+    ? toOrPayload
+    : { to: toOrPayload, balance: balanceLegacy }
+  const to = payload.to
+  const balance = Number(payload.balance || 0)
+  const companyName = payload.companyName || payload.company?.name || ''
+  const companyId = payload.companyId ?? payload.company?.id
+  const companyLogoUrl = payload.companyLogoUrl || payload.company?.logo_url || ''
+  const billingUrl = payload.billingUrl || tenantUrl(companyName, '/billing')
+  const subject = `Low credits: ${balance} remaining`
+  const text = `Your credit balance is low (${balance} credits). Add credits to avoid service disruption.`
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId,
+    companyLogoUrl,
+    title: 'Low credit balance',
+    tone: 'amber',
+    preheader: `Low credits: ${balance} remaining`,
+    blocks: [
+      `Your current balance is <strong>${escapeHtml(balance)}</strong> credits.`,
+      `Add credits to ensure uninterrupted monitoring and reporting for your team.`,
+    ],
+    cta: { label: 'Add credits', url: billingUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
-export function sendPaymentSuccess(to, amount, credits) {
-  const subject = 'Payment Successful';
-  const text = `We received your payment of $${amount}. ${credits} credits have been added to your account.`;
-  const html = `
-    <h2 style="color: #059669;">Payment Received</h2>
-    <p>We successfully received your payment of <strong>$${amount}</strong>.</p>
-    <p><strong>${credits} credits</strong> have been added to your account.</p>
-    <p>Thank you for your business!</p>
-  `;
-  return sendEmail(to, subject, text, html);
+export function sendPaymentSuccess(toOrPayload, amountLegacy, creditsLegacy) {
+  const payload = typeof toOrPayload === 'object' && toOrPayload
+    ? toOrPayload
+    : { to: toOrPayload, amount_usd: amountLegacy, credits: creditsLegacy }
+  const to = payload.to
+  const amountUsd = Number(payload.amount_usd ?? payload.amount ?? 0)
+  const credits = Number(payload.credits ?? 0)
+  const balance = payload.balance != null ? Number(payload.balance) : null
+  const invoiceId = payload.invoice_id || payload.invoiceId || ''
+  const ref = payload.payment_reference_id || payload.reference_id || payload.ref || ''
+  const companyName = payload.companyName || payload.company?.name || ''
+  const companyId = payload.companyId ?? payload.company?.id
+  const companyLogoUrl = payload.companyLogoUrl || payload.company?.logo_url || ''
+  const billingUrl = payload.billingUrl || tenantUrl(companyName, '/billing')
+  const subject = `Payment received • $${amountUsd.toFixed(2)}`
+  const text = `Payment received: $${amountUsd.toFixed(2)}. ${credits} credits added${balance != null ? ` (new balance: ${balance})` : ''}.`
+  const blocks = [
+    `We received your payment of <strong>$${escapeHtml(amountUsd.toFixed(2))}</strong>.`,
+    `<strong>${escapeHtml(credits)}</strong> credits have been added to your account${balance != null ? ` (new balance: <strong>${escapeHtml(balance)}</strong>)` : ''}.`,
+  ]
+  if (invoiceId) blocks.push(`Invoice: <strong>${escapeHtml(invoiceId)}</strong>`)
+  if (ref) blocks.push(`Transaction reference: <strong>${escapeHtml(ref)}</strong>`)
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId,
+    companyLogoUrl,
+    title: 'Payment successful',
+    tone: 'emerald',
+    preheader: `Payment received: $${amountUsd.toFixed(2)}`,
+    blocks,
+    cta: { label: 'Open billing', url: billingUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
-export function sendCreationBlocked(to) {
-  const subject = 'Action Required: Employee Creation Blocked';
-  const text = `You attempted to create a new employee, but your account has insufficient credits. Please add credits to proceed.`;
-  const html = `
-    <h2 style="color: #dc2626;">Action Blocked</h2>
-    <p>A manager attempted to create a new employee, but the action was blocked due to insufficient credits.</p>
-    <p>Please add credits to your account to allow your team to grow.</p>
-    <a href="${process.env.APP_URL || 'http://localhost:5173'}/billing" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Add Credits</a>
-  `;
-  return sendEmail(to, subject, text, html);
+export function sendCreationBlocked(toOrPayload) {
+  const payload = typeof toOrPayload === 'object' && toOrPayload ? toOrPayload : { to: toOrPayload }
+  const to = payload.to
+  const companyName = payload.companyName || payload.company?.name || ''
+  const companyId = payload.companyId ?? payload.company?.id
+  const companyLogoUrl = payload.companyLogoUrl || payload.company?.logo_url || ''
+  const billingUrl = payload.billingUrl || tenantUrl(companyName, '/billing')
+  const actor = payload.actor || ''
+  const subject = 'Employee creation blocked (insufficient credits)'
+  const text = 'Employee creation was blocked due to insufficient credits. Add credits to continue.'
+  const blocks = [
+    `An attempt to create an employee was blocked because your credit balance is insufficient.`,
+    actor ? `Action attempted by: <strong>${escapeHtml(actor)}</strong>` : '',
+    `Add credits to continue provisioning employees.`
+  ].filter(Boolean)
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId,
+    companyLogoUrl,
+    title: 'Action blocked',
+    tone: 'rose',
+    preheader: 'Insufficient credits for employee creation',
+    blocks,
+    cta: { label: 'Add credits', url: billingUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
-export function sendSubscriptionDeduction(to, deducted, remaining) {
-  const subject = 'Monthly Subscription Deduction';
-  const text = `We have deducted ${deducted} credits for your active employees. Remaining balance: ${remaining}.`;
-  const html = `
-    <h2>Subscription Update</h2>
-    <p>We have deducted <strong>${deducted} credits</strong> for your active employees this month.</p>
-    <p><strong>Remaining Balance:</strong> ${remaining} credits</p>
-  `;
-  return sendEmail(to, subject, text, html);
+export function sendSubscriptionDeduction(toOrPayload, deductedLegacy, remainingLegacy) {
+  const payload = typeof toOrPayload === 'object' && toOrPayload
+    ? toOrPayload
+    : { to: toOrPayload, deducted: deductedLegacy, remaining: remainingLegacy }
+  const to = payload.to
+  const deducted = Number(payload.deducted || 0)
+  const remaining = Number(payload.remaining || 0)
+  const companyName = payload.companyName || payload.company?.name || ''
+  const companyId = payload.companyId ?? payload.company?.id
+  const companyLogoUrl = payload.companyLogoUrl || payload.company?.logo_url || ''
+  const billingUrl = payload.billingUrl || tenantUrl(companyName, '/billing')
+  const subject = `Monthly billing: ${deducted} credits deducted`
+  const text = `Monthly deduction: ${deducted} credits. Remaining balance: ${remaining}.`
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId,
+    companyLogoUrl,
+    title: 'Monthly subscription deduction',
+    tone: 'slate',
+    preheader: `Deducted ${deducted} credits`,
+    blocks: [
+      `We deducted <strong>${escapeHtml(deducted)}</strong> credits for your active employees.`,
+      `Remaining balance: <strong>${escapeHtml(remaining)}</strong> credits.`
+    ],
+    cta: { label: 'Open billing', url: billingUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
-export function sendEmployeeCreatedDeduction(to, { employeeName, employeeEmail, deducted, remaining }) {
-  const subject = 'New Employee Created - Credit Deducted';
-  const text = `A new employee (${employeeName}) was created. ${deducted} credit has been deducted. Remaining balance: ${remaining}.`;
-  const html = `
-    <h2>New Employee Added</h2>
-    <p>A new employee has been successfully added to your organization:</p>
-    <ul>
-      <li><strong>Name:</strong> ${employeeName}</li>
-      <li><strong>Email:</strong> ${employeeEmail}</li>
-    </ul>
-    <p><strong>${deducted} credit</strong> has been deducted from your account.</p>
-    <p><strong>Remaining Balance:</strong> ${remaining} credits</p>
-  `;
-  return sendEmail(to, subject, text, html);
+export function sendEmployeeCreatedDeduction(toOrPayload, legacyPayload) {
+  const payload = typeof toOrPayload === 'object' && toOrPayload
+    ? toOrPayload
+    : { to: toOrPayload, ...(legacyPayload || {}) }
+  const to = payload.to
+  const employeeName = payload.employeeName || ''
+  const employeeEmail = payload.employeeEmail || ''
+  const deducted = Number(payload.deducted || 0)
+  const remaining = Number(payload.remaining || 0)
+  const companyName = payload.companyName || payload.company?.name || ''
+  const companyId = payload.companyId ?? payload.company?.id
+  const companyLogoUrl = payload.companyLogoUrl || payload.company?.logo_url || ''
+  const billingUrl = payload.billingUrl || tenantUrl(companyName, '/billing')
+  const subject = 'Employee created • credits deducted'
+  const text = `New employee created (${employeeEmail}). Deducted ${deducted} credit(s). Remaining balance: ${remaining}.`
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId,
+    companyLogoUrl,
+    title: 'New employee provisioned',
+    tone: 'blue',
+    preheader: 'Employee created and credits updated',
+    blocks: [
+      `Employee: <strong>${escapeHtml(employeeName || '—')}</strong>`,
+      `Email: <strong>${escapeHtml(employeeEmail)}</strong>`,
+      `Credits deducted: <strong>${escapeHtml(deducted)}</strong>`,
+      `Remaining balance: <strong>${escapeHtml(remaining)}</strong>`,
+    ],
+    cta: { label: 'Open billing', url: billingUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
-export function sendNewUserCreated(to, { name, email, role, teamName, password, loginUrl }) {
-  const subject = 'New User Account Created';
+export function sendNewUserCreated(to, data) {
+  const { name, email, role, teamName, password, loginUrl } = data || {}
+  const subject = 'New user account created';
   const text = `A new user account has been created.
   
 Name: ${name}
@@ -140,79 +338,108 @@ Password: ${password}
 
 Login here: ${loginUrl}`;
 
-  const html = `
-    <h2>New User Account Created</h2>
-    <p>A new user account has been successfully created.</p>
-    <ul>
-      <li><strong>Name:</strong> ${name}</li>
-      <li><strong>Email:</strong> ${email}</li>
-      <li><strong>Role:</strong> ${role}</li>
-      <li><strong>Team:</strong> ${teamName}</li>
-      <li><strong>Password:</strong> <code>${password}</code></li>
-    </ul>
-    <p>Please login and change your password immediately.</p>
-    <a href="${loginUrl}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Login Now</a>
-  `;
-  return sendEmail(to, subject, text, html);
+  const companyName = data?.companyName || data?.company?.name || teamName || 'Organization'
+  const companyId = data?.companyId ?? data?.company?.id ?? null
+  const companyLogoUrl = data?.companyLogoUrl || data?.company?.logo_url || ''
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId,
+    companyLogoUrl,
+    title: 'New account created',
+    tone: 'blue',
+    preheader: `Account created for ${email}`,
+    blocks: [
+      `Name: <strong>${escapeHtml(name)}</strong>`,
+      `Email: <strong>${escapeHtml(email)}</strong>`,
+      `Role: <strong>${escapeHtml(role)}</strong>`,
+      password ? `Temporary password: <strong>${escapeHtml(password)}</strong>` : '',
+      `For security, change the password after first login.`
+    ].filter(Boolean),
+    cta: { label: 'Open login', url: loginUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
 export function sendRequestStatus(to, status, date, reason) {
-  const subject = `Time Request ${status.charAt(0).toUpperCase() + status.slice(1)}`;
+  const subject = `Time request ${status}`;
   const text = `Your time request for ${date} has been ${status}.
   
 Reason: ${reason}`;
 
-  const color = status === 'approved' ? '#059669' : '#dc2626';
-  const html = `
-    <h2 style="color: ${color};">Time Request ${status.charAt(0).toUpperCase() + status.slice(1)}</h2>
-    <p>Your time request for <strong>${date}</strong> has been processed.</p>
-    <p><strong>Status:</strong> <span style="color: ${color}; font-weight: bold;">${status.toUpperCase()}</span></p>
-    <p><strong>Reason:</strong> ${reason}</p>
-  `;
-  return sendEmail(to, subject, text, html);
+  const tone = status === 'approved' ? 'emerald' : status === 'rejected' ? 'rose' : 'slate'
+  const { html, attachments } = renderEmail({
+    companyName: process.env.EMAIL_BRAND_NAME || 'Time Tracker',
+    companyId: null,
+    companyLogoUrl: '',
+    title: 'Time request update',
+    tone,
+    preheader: `Your request is ${status}`,
+    blocks: [
+      `Date: <strong>${escapeHtml(date)}</strong>`,
+      `Status: <strong>${escapeHtml(String(status || '').toUpperCase())}</strong>`,
+      reason ? `Reason: ${escapeHtml(reason)}` : '',
+    ].filter(Boolean),
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
-export function sendMonthlyBillingSummary(to, { period, activeEmployees, deducted, remaining }) {
-  const subject = `Monthly Billing Summary - ${period}`;
-  const text = `Here is your monthly billing summary for ${period}.
-  
-- Active Employees: ${activeEmployees}
-- Credits Deducted: ${deducted}
-- Remaining Balance: ${remaining}
+export function sendMonthlyBillingSummary(toOrPayload, legacyData) {
+  const payload = typeof toOrPayload === 'object' && toOrPayload
+    ? toOrPayload
+    : { to: toOrPayload, ...(legacyData || {}) }
+  const to = payload.to
+  const period = payload.period || ''
+  const activeEmployees = payload.activeEmployees ?? 0
+  const deducted = payload.deducted ?? 0
+  const remaining = payload.remaining ?? 0
+  const companyName = payload.companyName || payload.company?.name || (process.env.EMAIL_BRAND_NAME || 'Time Tracker')
+  const companyId = payload.companyId ?? payload.company?.id ?? null
+  const companyLogoUrl = payload.companyLogoUrl || payload.company?.logo_url || ''
+  const billingUrl = payload.billingUrl || tenantUrl(companyName, '/billing')
 
-Thank you for using Time Tracker.`;
-  const html = `
-    <h2>Monthly Billing Summary</h2>
-    <p>Here is the summary for <strong>${period}</strong>:</p>
-    <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">Active Employees</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${activeEmployees}</strong></td>
-      </tr>
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">Credits Deducted</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${deducted}</strong></td>
-      </tr>
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">Remaining Balance</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>${remaining}</strong></td>
-      </tr>
-    </table>
-    <p>Thank you for using Time Tracker.</p>
-  `;
-  return sendEmail(to, subject, text, html);
+  const subject = `Monthly billing summary • ${period}`
+  const text = `Here is your monthly billing summary for ${period}.\n\n- Active Employees: ${activeEmployees}\n- Credits Deducted: ${deducted}\n- Remaining Balance: ${remaining}`
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId,
+    companyLogoUrl,
+    title: 'Monthly billing summary',
+    tone: 'slate',
+    preheader: `Summary for ${period}`,
+    blocks: [
+      `Period: <strong>${escapeHtml(period)}</strong>`,
+      `Active employees: <strong>${escapeHtml(activeEmployees)}</strong>`,
+      `Credits deducted: <strong>${escapeHtml(deducted)}</strong>`,
+      `Remaining balance: <strong>${escapeHtml(remaining)}</strong>`,
+    ],
+    cta: { label: 'Open billing', url: billingUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
-export function sendAccountSuspensionWarning(to) {
-  const subject = 'Urgent: Account Suspension Warning';
-  const text = `Your account credits have expired or reached zero. Your account will be suspended soon. Please recharge immediately.`;
-  const html = `
-    <h2 style="color: #dc2626;">Account Suspension Warning</h2>
-    <p>Your account credits have expired or reached zero.</p>
-    <p>To avoid service interruption for your team, please recharge your account immediately.</p>
-    <a href="${process.env.APP_URL || 'http://localhost:5173'}/billing" style="display:inline-block;padding:10px 20px;background-color:#dc2626;color:white;text-decoration:none;border-radius:5px;">Recharge Now</a>
-  `;
-  return sendEmail(to, subject, text, html);
+export function sendAccountSuspensionWarning(toOrPayload) {
+  const payload = typeof toOrPayload === 'object' && toOrPayload ? toOrPayload : { to: toOrPayload }
+  const to = payload.to
+  const companyName = payload.companyName || payload.company?.name || ''
+  const companyId = payload.companyId ?? payload.company?.id
+  const companyLogoUrl = payload.companyLogoUrl || payload.company?.logo_url || ''
+  const billingUrl = payload.billingUrl || tenantUrl(companyName, '/billing')
+  const subject = 'Urgent: account credits exhausted'
+  const text = 'Your account credits reached zero. Recharge immediately to avoid interruption.'
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId,
+    companyLogoUrl,
+    title: 'Account at risk',
+    tone: 'rose',
+    preheader: 'Credits are exhausted',
+    blocks: [
+      `Your credits have reached <strong>0</strong>.`,
+      `Recharge now to keep monitoring and reporting available for your team.`,
+    ],
+    cta: { label: 'Recharge now', url: billingUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
 
 export function sendContactFormEmail(to, { name, email, subject, message }) {
@@ -226,18 +453,21 @@ Subject: ${subject}
 Message:
 ${message}`;
 
-  const html = `
-    <h2>New Contact Form Submission</h2>
-    <ul>
-      <li><strong>Name:</strong> ${name}</li>
-      <li><strong>Email:</strong> ${email}</li>
-      <li><strong>Subject:</strong> ${subject}</li>
-    </ul>
-    <h3>Message:</h3>
-    <p>${message.replace(/\n/g, '<br>')}</p>
-  `;
-
-  return sendEmail(to, emailSubject, text, html);
+  const { html, attachments } = renderEmail({
+    companyName: process.env.EMAIL_BRAND_NAME || 'Time Tracker',
+    companyId: null,
+    companyLogoUrl: '',
+    title: 'New contact form submission',
+    tone: 'slate',
+    preheader: `From ${name}`,
+    blocks: [
+      `Name: <strong>${escapeHtml(name)}</strong>`,
+      `Email: <strong>${escapeHtml(email)}</strong>`,
+      `Subject: <strong>${escapeHtml(subject)}</strong>`,
+      `<div style="margin-top:10px;padding:12px;border:1px solid #E2E8F0;border-radius:12px;background:#fff;">${escapeHtml(message).replace(/\n/g, '<br>')}</div>`
+    ]
+  })
+  return sendEmail(to, emailSubject, text, html, { attachments });
 }
 
 export function sendPasswordResetEmail(to, resetUrl) {
@@ -250,14 +480,18 @@ ${resetUrl}
 If you did not request this, please ignore this email.
 Link expires in 1 hour.`;
 
-  const html = `
-    <h2>Password Reset Request</h2>
-    <p>You requested a password reset for your Time Tracker account.</p>
-    <p>Please click the button below to reset your password:</p>
-    <a href="${resetUrl}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;">Reset Password</a>
-    <p>If you did not request this, please ignore this email.</p>
-    <p><small>Link expires in 1 hour.</small></p>
-  `;
-  
-  return sendEmail(to, subject, text, html);
+  const { html, attachments } = renderEmail({
+    companyName: process.env.EMAIL_BRAND_NAME || 'Time Tracker',
+    companyId: null,
+    companyLogoUrl: '',
+    title: 'Reset your password',
+    tone: 'blue',
+    preheader: 'Password reset link (expires in 1 hour)',
+    blocks: [
+      `Click the button below to reset your password.`,
+      `This link expires in <strong>1 hour</strong>. If you didn’t request this, you can ignore this email.`
+    ],
+    cta: { label: 'Reset password', url: resetUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
 }
