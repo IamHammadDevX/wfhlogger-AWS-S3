@@ -13,6 +13,7 @@ const fallbacks = {
   orgs: path.resolve(process.cwd(), DATA_DIR, 'organizations.sqlite.json'),
   companies: path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json'),
   transactions: path.resolve(process.cwd(), DATA_DIR, 'transactions.sqlite.json'),
+  employee_billing: path.resolve(process.cwd(), DATA_DIR, 'employee_billing.sqlite.json'),
   requests: path.resolve(process.cwd(), DATA_DIR, 'time_requests.sqlite.json'),
   reset_tokens: path.resolve(process.cwd(), DATA_DIR, 'reset_tokens.sqlite.json')
 }
@@ -140,6 +141,17 @@ try {
     token TEXT NOT NULL,
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS employee_billing (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL,
+    employee_id INTEGER NOT NULL UNIQUE,
+    next_charge_at TEXT NOT NULL,
+    last_charge_at TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(company_id) REFERENCES companies(id),
+    FOREIGN KEY(employee_id) REFERENCES users(id)
   );
   `)
   
@@ -296,13 +308,19 @@ export function listAllUsers() {
 export function createCompany({ name }) {
   const now = new Date().toISOString()
   if (db) {
-    const stmt = db.prepare('INSERT INTO companies (name, created_at, plan, credits, updated_at) VALUES (?, ?, ?, ?, ?)')
-    const info = stmt.run(name, now, 'free', 0, now)
-    return { id: info.lastInsertRowid, name, created_at: now, plan: 'free', credits: 0, updated_at: now }
+    const billing_email = arguments[0]?.billing_email || null
+    const admin_contact_email = arguments[0]?.admin_contact_email || null
+    const logo_url = arguments[0]?.logo_url || null
+    const stmt = db.prepare('INSERT INTO companies (name, created_at, plan, credits, updated_at, billing_email, admin_contact_email, logo_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    const info = stmt.run(name, now, 'free', 0, now, billing_email, admin_contact_email, logo_url)
+    return { id: info.lastInsertRowid, name, created_at: now, plan: 'free', credits: 0, updated_at: now, billing_email, admin_contact_email, logo_url }
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
   const id = (arr[arr.length - 1]?.id || 0) + 1
-  const record = { id, name, created_at: now, plan: 'free', credits: 0, updated_at: now }
+  const billing_email = arguments[0]?.billing_email || null
+  const admin_contact_email = arguments[0]?.admin_contact_email || null
+  const logo_url = arguments[0]?.logo_url || null
+  const record = { id, name, created_at: now, plan: 'free', credits: 0, updated_at: now, billing_email, admin_contact_email, logo_url }
   arr.push(record)
   fs.writeFileSync(fallbacks.companies, JSON.stringify(arr, null, 2))
   return record
@@ -718,6 +736,130 @@ export function creditCompanyWithTransaction({ company_id, amount_usd, credits, 
   txs.push(record)
   fs.writeFileSync(fallbacks.transactions, JSON.stringify(txs, null, 2))
   return companies[cidx]?.credits || 0
+}
+
+export function debitCompanyWithTransaction({ company_id, amount_usd, credits, description, reference_id }) {
+  const now = new Date().toISOString()
+  const cost = Math.abs(Number(credits || 0))
+  if (cost <= 0) return getCompanyById(company_id)?.credits || 0
+
+  if (db) {
+    const tx = db.transaction(() => {
+      const cur = db.prepare('SELECT credits FROM companies WHERE id = ?').get(company_id)
+      const curCredits = Number(cur?.credits || 0)
+      if (curCredits < cost) {
+        const err = new Error('insufficient_credits')
+        err.code = 'INSUFFICIENT_CREDITS'
+        throw err
+      }
+      db.prepare('UPDATE companies SET credits = credits - ?, updated_at = ? WHERE id = ?').run(cost, now, company_id)
+      db.prepare('INSERT INTO transactions (company_id, amount, credits, type, description, reference_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(company_id, Number(amount_usd || cost), -cost, 'debit', description || '', reference_id || '', 'success', now)
+      return Number(db.prepare('SELECT credits FROM companies WHERE id = ?').get(company_id)?.credits || 0)
+    })
+    return tx()
+  }
+
+  const companies = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
+  const idx = companies.findIndex(c => c.id == company_id)
+  const curCredits = Number(companies[idx]?.credits || 0)
+  if (idx < 0 || curCredits < cost) {
+    const err = new Error('insufficient_credits')
+    err.code = 'INSUFFICIENT_CREDITS'
+    throw err
+  }
+  companies[idx].credits = curCredits - cost
+  companies[idx].updated_at = now
+  fs.writeFileSync(fallbacks.companies, JSON.stringify(companies, null, 2))
+  createTransaction({ company_id, amount: Number(amount_usd || cost), credits: -cost, type: 'debit', description, reference_id, status: 'success' })
+  return companies[idx].credits
+}
+
+function addDaysIso(iso, days) {
+  const base = new Date(iso)
+  return new Date(base.getTime() + Number(days || 0) * 86400000).toISOString()
+}
+
+export function ensureEmployeeBillingSchedule({ company_id, employee_id, start_at }) {
+  const createdAt = start_at || new Date().toISOString()
+  const next = addDaysIso(createdAt, 30)
+  if (db) {
+    const stmt = db.prepare('INSERT OR REPLACE INTO employee_billing (company_id, employee_id, next_charge_at, last_charge_at, created_at) VALUES (?, ?, ?, ?, ?)')
+    stmt.run(company_id, employee_id, next, createdAt, createdAt)
+    return { company_id, employee_id, next_charge_at: next, last_charge_at: createdAt, created_at: createdAt }
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.employee_billing, 'utf-8'))
+  const idx = arr.findIndex(r => r.employee_id == employee_id)
+  const record = { company_id, employee_id, next_charge_at: next, last_charge_at: createdAt, created_at: createdAt }
+  if (idx >= 0) arr[idx] = record
+  else arr.push(record)
+  fs.writeFileSync(fallbacks.employee_billing, JSON.stringify(arr, null, 2))
+  return record
+}
+
+export function ensureEmployeeBillingForCompany(company_id) {
+  const now = new Date().toISOString()
+  if (db) {
+    const employees = db.prepare("SELECT id, created_at FROM users WHERE company_id = ? AND role = 'employee'").all(company_id)
+    const existing = new Set(db.prepare('SELECT employee_id FROM employee_billing WHERE company_id = ?').all(company_id).map(r => r.employee_id))
+    const ins = db.prepare('INSERT INTO employee_billing (company_id, employee_id, next_charge_at, last_charge_at, created_at) VALUES (?, ?, ?, ?, ?)')
+    for (const e of employees) {
+      if (existing.has(e.id)) continue
+      const createdAt = e.created_at || now
+      ins.run(company_id, e.id, addDaysIso(createdAt, 30), createdAt, createdAt)
+    }
+    return true
+  }
+  const employees = listUsersByCompany(company_id).filter(u => u.role === 'employee')
+  const arr = JSON.parse(fs.readFileSync(fallbacks.employee_billing, 'utf-8'))
+  const existing = new Set(arr.filter(r => r.company_id == company_id).map(r => r.employee_id))
+  let changed = false
+  for (const e of employees) {
+    if (existing.has(e.id)) continue
+    const createdAt = e.created_at || now
+    arr.push({ company_id, employee_id: e.id, next_charge_at: addDaysIso(createdAt, 30), last_charge_at: createdAt, created_at: createdAt })
+    changed = true
+  }
+  if (changed) fs.writeFileSync(fallbacks.employee_billing, JSON.stringify(arr, null, 2))
+  return true
+}
+
+export function listDueEmployeeBillingsForCompany(company_id, as_of_iso) {
+  const asOf = as_of_iso || new Date().toISOString()
+  if (db) {
+    return db.prepare(`
+      SELECT eb.employee_id, eb.next_charge_at, u.email
+      FROM employee_billing eb
+      JOIN users u ON u.id = eb.employee_id
+      WHERE eb.company_id = ? AND u.role = 'employee' AND eb.next_charge_at <= ?
+      ORDER BY eb.next_charge_at ASC
+    `).all(company_id, asOf)
+  }
+  const eb = JSON.parse(fs.readFileSync(fallbacks.employee_billing, 'utf-8'))
+  const employees = listUsersByCompany(company_id).filter(u => u.role === 'employee')
+  const byId = new Map(employees.map(e => [e.id, e]))
+  return eb
+    .filter(r => r.company_id == company_id && byId.has(r.employee_id) && String(r.next_charge_at) <= String(asOf))
+    .map(r => ({ employee_id: r.employee_id, next_charge_at: r.next_charge_at, email: byId.get(r.employee_id)?.email }))
+    .sort((a, b) => String(a.next_charge_at).localeCompare(String(b.next_charge_at)))
+}
+
+export function setEmployeeBillingNextCharge(employee_id, next_charge_at, last_charge_at) {
+  const next = next_charge_at || new Date().toISOString()
+  const last = last_charge_at || new Date().toISOString()
+  if (db) {
+    db.prepare('UPDATE employee_billing SET next_charge_at = ?, last_charge_at = ? WHERE employee_id = ?').run(next, last, employee_id)
+    return true
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.employee_billing, 'utf-8'))
+  const idx = arr.findIndex(r => r.employee_id == employee_id)
+  if (idx >= 0) {
+    arr[idx].next_charge_at = next
+    arr[idx].last_charge_at = last
+    fs.writeFileSync(fallbacks.employee_billing, JSON.stringify(arr, null, 2))
+    return true
+  }
+  return false
 }
 
 // ---- Time Requests ----

@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
@@ -18,6 +18,7 @@ import bcrypt from 'bcryptjs';
 // import { createOrder, verifySignature } from './payment.js';
 import { createStripeCheckoutSession, verifyStripeWebhookAndExtract } from './payments/stripe.js';
 import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning } from './email.js';
+import { runEmployeeMonthlyBilling, getCompanyAdminEmail } from './subscriptionBilling.js'
 import cron from 'node-cron';
 import crypto from 'crypto';
 import { Readable } from 'stream';
@@ -61,76 +62,19 @@ const screenshotsDriveFile = path.join(dataPath, 'screenshots.drive.json');
 if (!fs.existsSync(driveTokensFile)) fs.writeFileSync(driveTokensFile, '[]');
 if (!fs.existsSync(folderCacheFile)) fs.writeFileSync(folderCacheFile, '[]');
 if (!fs.existsSync(screenshotsDriveFile)) fs.writeFileSync(screenshotsDriveFile, '[]');
-  const transactionsFile = path.join(dataPath, 'transactions.sqlite.json');
-  if (!fs.existsSync(transactionsFile)) fs.writeFileSync(transactionsFile, '[]');
+const transactionsFile = path.join(dataPath, 'transactions.sqlite.json');
+if (!fs.existsSync(transactionsFile)) fs.writeFileSync(transactionsFile, '[]');
 
-  // Monthly Subscription Logic (Simple Check)
-  // Run daily check for monthly billing cycle
-  // For demo, we run it every hour or on startup? 
-  // We'll use node-cron to run daily at midnight
-  cron.schedule('0 0 * * *', () => {
-    console.log('[Billing] Running daily subscription check...');
-    processSubscriptions();
-  });
-
-  async function processSubscriptions() {
-    // Iterate all companies (sqlite or json)
-    // In real app, check 'next_billing_date'. Here we simulate.
-    // We will just log for now as we don't have a robust subscription engine with dates in schema.
-    console.log('[Billing] Running subscription cycle...');
-    try {
-      const companiesPath = path.resolve(process.cwd(), DATA_DIR, 'companies.sqlite.json');
-      if (!fs.existsSync(companiesPath)) return;
-      const companies = JSON.parse(fs.readFileSync(companiesPath, 'utf-8'));
-      
-      for (const comp of companies) {
-        if (!comp.credits || comp.credits <= 0) {
-          // Send suspension warning
-          const admin = listAllUsers().find(u => u.company_id == comp.id && u.role === 'company_admin');
-          if (admin) sendAccountSuspensionWarning({ to: admin.email, company: comp });
-          continue;
-        }
-        
-        // Count active employees
-        const employees = readUsers().filter(u => u.company_id == comp.id && u.role === 'employee');
-        const cost = employees.length; // $1 per employee
-        
-        if (cost > 0) {
-          if (comp.credits >= cost && comp.credits > 0) {
-            comp.credits = Math.max(0, comp.credits - cost);
-            // Record Transaction
-            createTransaction({
-              company_id: comp.id,
-              amount: 0,
-              credits: -cost,
-              type: 'debit',
-              description: `Monthly subscription for ${cost} employees`,
-              reference_id: `sub_${Date.now()}`,
-              status: 'success'
-            });
-            // Send Email
-            const admin = listAllUsers().find(u => u.company_id == comp.id && u.role === 'company_admin');
-            if (admin) {
-              // Legacy
-              // sendSubscriptionDeduction(admin.email, cost, comp.credits);
-              // New Summary
-              const period = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-              sendMonthlyBillingSummary({ to: admin.email, company: comp, period, activeEmployees: employees.length, deducted: cost, remaining: comp.credits });
-            }
-          try { io.to(`company:${comp.id}`).emit('company:credits_updated', { company_id: comp.id, balance: comp.credits }) } catch {}
-          } else {
-            // Partial deduction or suspend?
-            // For now, just warn
-            const admin = listAllUsers().find(u => u.company_id == comp.id && u.role === 'company_admin');
-            if (admin) sendLowCreditWarning({ to: admin.email, balance: comp.credits, company: comp });
-          }
-        }
-      }
-      fs.writeFileSync(companiesPath, JSON.stringify(companies, null, 2));
-    } catch (e) {
-      console.error('[Billing] Subscription error:', e);
+cron.schedule('0 0 * * *', () => {
+  console.log('[Billing] Running daily employee subscription cycle...')
+  runEmployeeMonthlyBilling({
+    emitCreditsUpdated: (company_id, balance) => {
+      try { io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance }) } catch {}
     }
-  }
+  }).catch(e => {
+    console.error('[Billing] Subscription error:', e?.message || e)
+  })
+});
 
 // Users/team helpers
 function readUsers(){
@@ -490,7 +434,7 @@ app.post('/api/auth/signup', (req, res) => {
     if (existing) return res.status(409).json({ error: 'User already exists' });
 
     // Create Company
-    const company = createCompany({ name: companyName });
+    const company = createCompany({ name: companyName, billing_email: email, admin_contact_email: email });
     
     const user = createUser({ email, full_name: fullName, country, timezone, password, role: 'company_admin', company_id: company.id });
     
@@ -1002,14 +946,7 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
     // Let's enforce: Must have at least 1 credit to add an employee.
     const company = getCompanyById(company_id);
     if (company && (company.credits || 0) < 1) {
-      // Send email to admin?
-      const recipients = []
-      if (company?.billing_email) recipients.push(company.billing_email)
-      const adminEmail = listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin')?.email
-      if (adminEmail) recipients.push(adminEmail)
-      if (company?.admin_contact_email) recipients.push(company.admin_contact_email)
-      if (req.user?.email) recipients.push(req.user.email)
-      const to = Array.from(new Set(recipients.filter(Boolean))).join(',')
+      const to = getCompanyAdminEmail(company_id, company) || req.user?.email
       if (to) sendCreationBlocked({ to, company, actor: req.user?.email || req.user?.uid || req.user?.sub })
       return res.status(402).json({ error: 'Insufficient credits. Please add credits to your account.' });
     }
@@ -1073,22 +1010,20 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
 
     // Immediate debit: $1 (1 credit) for employee activation
     try {
-      const newBalance = updateCompanyCredits(company_id, -1);
-      createTransaction({
+      const comp = getCompanyById(company_id) || { id: company_id }
+      const newBalance = debitCompanyWithTransaction({
         company_id,
-        amount: 1,
-        credits: -1,
-        type: 'debit',
-        description: 'Employee creation initial month',
-        reference_id: `emp_${loginUser.id}`,
-        status: 'success'
-      });
+        amount_usd: 1,
+        credits: 1,
+        description: 'Employee activation (first 30 days)',
+        reference_id: `emp_${loginUser.id}`
+      })
+      try { ensureEmployeeBillingSchedule({ company_id, employee_id: loginUser.id, start_at: new Date().toISOString() }) } catch {}
       const admin = listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin');
       if (admin) {
-        const comp = getCompanyById(company_id)
         sendEmployeeCreatedDeduction({
           to: admin.email,
-          company: comp || { id: company_id },
+          company: comp,
           employeeName: name || email,
           employeeEmail: email,
           deducted: 1,
@@ -1097,9 +1032,9 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
         
         // Check for Low Balance or Suspension after deduction
         if (newBalance <= 0) {
-          sendAccountSuspensionWarning({ to: admin.email, company: comp || { id: company_id } });
+          sendAccountSuspensionWarning({ to: admin.email, company: comp });
         } else if (newBalance < 5) {
-          sendLowCreditWarning({ to: admin.email, balance: newBalance, company: comp || { id: company_id } });
+          sendLowCreditWarning({ to: admin.email, balance: newBalance, company: comp });
         }
       }
       try { io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance }) } catch {}
@@ -1877,23 +1812,8 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         }
         try {
           const comp = getCompanyById(company_id) || company || { id: company_id }
-          const recipients = []
-          if (comp?.billing_email) recipients.push(comp.billing_email)
-          const adminUserEmail = listAllUsers().find(u => u.company_id == company_id && u.role === 'company_admin')?.email
-          if (adminUserEmail) recipients.push(adminUserEmail)
-          if (comp?.admin_contact_email) recipients.push(comp.admin_contact_email)
-          const to = Array.from(new Set(recipients.filter(Boolean))).join(',')
-          if (to) {
-            sendPaymentSuccess({
-              to,
-              company: comp,
-              amount_usd: credit_amount_usd,
-              credits,
-              balance: newBalance,
-              invoice_id: invId,
-              payment_reference_id: ref,
-            })
-          }
+          const to = getCompanyAdminEmail(company_id, comp)
+          if (to) sendPaymentSuccess({ to, company: comp, amount_usd: credit_amount_usd, credits, balance: newBalance, invoice_id: invId, payment_reference_id: ref })
         } catch {}
         try {
           io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance })
