@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { COUNTRIES, getTimezones } from '../utils/geo.js'
 
 export function TextField({ label, value, onChange, type = 'text', placeholder = '', required = false, autoComplete }) {
@@ -30,15 +31,45 @@ export function SearchableSelect({ label, value, onChange, options, placeholder 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const ref = useRef(null)
+  const panelRef = useRef(null)
+  const [panelStyle, setPanelStyle] = useState({ top: 0, left: 0, width: 0 })
   const filtered = useFilteredOptions(options, query)
 
   useEffect(() => {
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      const inTrigger = ref.current && ref.current.contains(e.target)
+      const inPanel = panelRef.current && panelRef.current.contains(e.target)
+      if (!inTrigger && !inPanel) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  useEffect(() => {
+    if (!open) return
+    const el = ref.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setPanelStyle({
+      top: Math.round(rect.bottom + 8),
+      left: Math.round(rect.left),
+      width: Math.round(rect.width),
+    })
+    const onRecalc = () => {
+      const r = el.getBoundingClientRect()
+      setPanelStyle({
+        top: Math.round(r.bottom + 8),
+        left: Math.round(r.left),
+        width: Math.round(r.width),
+      })
+    }
+    window.addEventListener('scroll', onRecalc, true)
+    window.addEventListener('resize', onRecalc)
+    return () => {
+      window.removeEventListener('scroll', onRecalc, true)
+      window.removeEventListener('resize', onRecalc)
+    }
+  }, [open])
 
   return (
     <div className="relative" ref={ref}>
@@ -51,8 +82,12 @@ export function SearchableSelect({ label, value, onChange, options, placeholder 
         {value || placeholder}
       </button>
       {required && !value && <input tabIndex={-1} className="sr-only" required />}
-      {open && (
-        <div className="absolute z-20 mt-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg text-slate-900 dark:text-slate-100">
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg text-slate-900 dark:text-slate-100"
+          style={{ top: panelStyle.top, left: panelStyle.left, width: panelStyle.width }}
+        >
           <div className="p-2 border-b border-slate-100 dark:border-slate-700">
             <input
               className="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
@@ -75,7 +110,8 @@ export function SearchableSelect({ label, value, onChange, options, placeholder 
               <div className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">No results</div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
