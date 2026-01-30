@@ -24,7 +24,12 @@ export default function Dashboard() {
     const headers = { Authorization: `Bearer ${token}` }
     resolveApiBase().then((BASE)=>{
       API = BASE
-      try { const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); setRole(payload?.role || '') } catch {}
+      try {
+        const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+        const raw = payload?.role || ''
+        const effective = (raw === 'super_admin' && payload?.company_id != null) ? 'company_admin' : raw
+        setRole(effective)
+      } catch {}
       
       // If user is company owner (super_admin), get company info directly from signup/login response context or API?
       // Actually /api/org returns the organization. For super_admin owner, we might want company name.
@@ -172,12 +177,23 @@ export default function Dashboard() {
       {/* Quick actions */}
       <section>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <Quick to="/live" title="Live View" desc="Monitor active employee screens in real-time." icon={<SvgLive/>} />
-          <Quick to="/report" title="Reports" desc="Generate productivity reports and analyze work sessions." icon={<SvgCamera/>} />
-          <Quick to="/activity" title="Activity Logs" desc="Detailed timeline of user activities and idle time." icon={<SvgChart/>} />
-          <Quick to="/setup" title="Organization" desc="Manage team settings, invites, and permissions." icon={<SvgCog/>} />
-          <Quick to="/downloads" title="Client Download" desc="Get the latest desktop tracker for Windows." icon={<SvgDownload/>} />
+          <Quick to="/report" title="Reports" desc="Generate reports, screenshots, and session insights." icon={<SvgCamera/>} />
+          <Quick to="/time-tracking" title="Time Tracking" desc="Working hours, idle time, and totals by date range." icon={<SvgTime/>} />
+          <Quick to="/activity" title="Activity Logs" desc="Evidence timeline and recent screenshots." icon={<SvgChart/>} />
+          <Quick to="/requests" title="Requests" desc="Approve or reject manual time requests." icon={<SvgRequests/>} />
+          <Quick to="/setup" title={role === 'company_admin' ? 'Company Setup' : 'Organization'} desc="Manage employees, timezones, and capture intervals." icon={<SvgCog/>} />
+          {role === 'company_admin' && (
+            <Quick to="/company" title="Company Profile" desc="Branding, logo, and workspace details." icon={<SvgCompany/>} />
+          )}
+          {role === 'company_admin' && (
+            <Quick to="/billing" title="Billing" desc="Credits, payments, and invoices." icon={<SvgBilling/>} />
+          )}
+          {role === 'company_admin' && (
+            <Quick to="/admin" title="Administration" desc="Managers, audit logs, and controls." icon={<SvgAdmin/>} />
+          )}
+          <Quick to="/downloads" title="Downloads" desc="Get the latest desktop tracker for Windows." icon={<SvgDownload/>} />
         </div>
       </section>
 
@@ -257,5 +273,35 @@ function SvgCog(){
 function SvgDownload(){
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M12 3a1 1 0 011 1v8.59l2.3-2.3a1 1 0 111.4 1.42l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 011.4-1.42L11 12.59V4a1 1 0 011-1zm-7 16a2 2 0 002 2h10a2 2 0 002-2v-1a1 1 0 112 0v1a4 4 0 01-4 4H7a4 4 0 01-4-4v-1a1 1 0 112 0v1z"/></svg>
+  )
+}
+
+function SvgTime(){
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M12 2a10 10 0 1010 10A10.012 10.012 0 0012 2zm1 11h4a1 1 0 010 2h-5a1 1 0 01-1-1V7a1 1 0 012 0z"/></svg>
+  )
+}
+
+function SvgRequests(){
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M7 2a2 2 0 00-2 2v16l4-2h10a2 2 0 002-2V4a2 2 0 00-2-2H7zm2 6h6a1 1 0 010 2H9a1 1 0 010-2zm0 4h6a1 1 0 010 2H9a1 1 0 010-2z"/></svg>
+  )
+}
+
+function SvgCompany(){
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M4 21V5a2 2 0 012-2h8a2 2 0 012 2v16h-2v-2H8v2H4zm6-4h4v-2h-4v2zm0-4h4v-2h-4v2zm0-4h4V7h-4v2zM18 21V9h2a2 2 0 012 2v10h-4z"/></svg>
+  )
+}
+
+function SvgBilling(){
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7zm2 1v2h14V8H5zm0 4v5h14v-5H5zm2 3h4a1 1 0 010 2H7a1 1 0 010-2z"/></svg>
+  )
+}
+
+function SvgAdmin(){
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4zm0 6a3 3 0 100 6 3 3 0 000-6zm0 8c-2.2 0-4 1.8-4 4h8c0-2.2-1.8-4-4-4z"/></svg>
   )
 }
