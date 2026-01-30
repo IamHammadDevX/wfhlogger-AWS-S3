@@ -4,6 +4,8 @@ import { resolveApiBase } from '../api.js'
 import Pagination from '../components/ui/Pagination.jsx'
 import { usePagination } from '../hooks/usePagination.js'
 import ImageViewerModal from '../components/ui/ImageViewerModal.jsx'
+import DatePicker from '../components/ui/DatePicker.jsx'
+import EmployeeSelect from '../components/ui/EmployeeSelect.jsx'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -20,6 +22,8 @@ export default function Report() {
   const [viewerIndex, setViewerIndex] = useState(0)
   const [driveQuota, setDriveQuota] = useState(null)
   const [quotaLoading, setQuotaLoading] = useState(false)
+  const [driveModalOpen, setDriveModalOpen] = useState(false)
+  const [dateAlertOpen, setDateAlertOpen] = useState(false)
 
   const sessionsPg = usePagination(sessions, 10, [selectedEmployee, fromDate, toDate, sessions.length])
   const filesPg = usePagination(files, 10, [selectedEmployee, fromDate, toDate, files.length])
@@ -197,6 +201,14 @@ export default function Report() {
     }
   }
 
+  const generateReport = () => {
+    if (!String(fromDate || '').trim() && !String(toDate || '').trim()) {
+      setDateAlertOpen(true)
+      return
+    }
+    search()
+  }
+
   const formatBytes = (bytes) => {
     const n = Number(bytes)
     if (!Number.isFinite(n) || n < 0) return '—'
@@ -251,52 +263,37 @@ export default function Report() {
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
         <div className="flex flex-col md:flex-row gap-4 items-end">
           <div className="w-full md:w-1/3">
-            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Employee</label>
-            <select 
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" 
-              value={selectedEmployee} 
-              onChange={e=>setSelectedEmployee(e.target.value)}
-            >
-              <option value="">All Employees</option>
-              {employees.map(e => (
-                <option key={e.email} value={e.email}>{e.email}</option>
-              ))}
-            </select>
-            {!!selectedEmployee && (
-              <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                {quotaLoading ? 'Loading Drive space…' : (
-                  driveQuota?.connected
-                    ? (driveQuota.remaining_bytes != null && driveQuota.limit_bytes != null
-                      ? `Drive remaining: ${formatBytes(driveQuota.remaining_bytes)} / ${formatBytes(driveQuota.limit_bytes)}`
-                      : 'Drive remaining: Unknown')
-                    : 'Drive: Not connected'
-                )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="w-full sm:flex-1">
+                <EmployeeSelect
+                  employees={employees}
+                  value={selectedEmployee}
+                  onChange={setSelectedEmployee}
+                />
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setDriveModalOpen(true)}
+                disabled={!String(selectedEmployee || '').trim()}
+                className="w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Drive Space
+              </button>
+            </div>
           </div>
           
           <div className="w-full md:w-1/4">
             <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">From Date</label>
-            <input 
-              type="date" 
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" 
-              value={fromDate} 
-              onChange={e=>setFromDate(e.target.value)} 
-            />
+            <DatePicker value={fromDate} onChange={setFromDate} placeholder="Select date" />
           </div>
           
           <div className="w-full md:w-1/4">
             <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">To Date</label>
-            <input 
-              type="date" 
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors" 
-              value={toDate} 
-              onChange={e=>setToDate(e.target.value)} 
-            />
+            <DatePicker value={toDate} onChange={setToDate} placeholder="Select date" />
           </div>
 
           <button 
-            onClick={search}
+            onClick={generateReport}
             disabled={loading}
             className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors shadow-sm disabled:opacity-70"
           >
@@ -312,6 +309,91 @@ export default function Report() {
           </button>
         </div>
       </div>
+
+      {driveModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setDriveModalOpen(false) }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-bold text-slate-900 dark:text-white">Drive Space</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[18rem]">{String(selectedEmployee || '').trim()}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDriveModalOpen(false)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-5">
+              {quotaLoading ? (
+                <div className="text-sm text-slate-600 dark:text-slate-300">Loading…</div>
+              ) : (!driveQuota || !driveQuota.connected) ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  Drive not connected for this employee.
+                </div>
+              ) : (
+                (() => {
+                  const limit = driveQuota?.limit_bytes != null ? Number(driveQuota.limit_bytes) : null
+                  const remaining = driveQuota?.remaining_bytes != null ? Number(driveQuota.remaining_bytes) : null
+                  const used = (limit != null && remaining != null) ? Math.max(0, limit - remaining) : (driveQuota?.used_bytes != null ? Number(driveQuota.used_bytes) : null)
+                  const pct = (limit != null && used != null && limit > 0) ? Math.min(100, Math.max(0, (used / limit) * 100)) : null
+                  return (
+                    <div className="space-y-3">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Remaining</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 dark:text-white">
+                          {(remaining != null && limit != null) ? `${formatBytes(remaining)} / ${formatBytes(limit)}` : 'Unknown'}
+                        </div>
+                        {pct != null && (
+                          <div className="mt-3">
+                            <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                              <div className="h-2 rounded-full bg-blue-600" style={{ width: `${pct.toFixed(2)}%` }} />
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{pct.toFixed(1)}% used</div>
+                          </div>
+                        )}
+                      </div>
+                      {!!driveQuota?.updated_at && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400">Last updated: {new Date(driveQuota.updated_at).toLocaleString()}</div>
+                      )}
+                    </div>
+                  )
+                })()
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dateAlertOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setDateAlertOpen(false) }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="text-sm font-bold text-slate-900 dark:text-white">Select date range</div>
+              <button
+                type="button"
+                onClick={() => setDateAlertOpen(false)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                Please select at least one date (From or To) before generating the report.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Results */}
       <div className="space-y-8">
