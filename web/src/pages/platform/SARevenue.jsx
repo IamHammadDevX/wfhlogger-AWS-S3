@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+import FinanceLineChart from '../../components/ui/FinanceLineChart.jsx'
 
 export default function SARevenue() {
   const [data, setData] = useState({ total_revenue: 0, growth: { monthly_revenue: [] }, per_company: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [range, setRange] = useState('12m')
 
   useEffect(() => {
     import('../../api.js').then(({ resolveApiBase }) => resolveApiBase().then(base => {
@@ -19,16 +21,31 @@ export default function SARevenue() {
     }))
   }, [])
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading financials...</div>
-
   // Calculate some derived stats
   const monthlyRevenue = data.growth?.monthly_revenue || []
   const currentMonth = new Date().toISOString().slice(0, 7)
   const thisMonthRev = monthlyRevenue.find(m => m.month === currentMonth)?.revenue || 0
   const totalCredits = data.per_company?.reduce((acc, c) => acc + (c.credits || 0), 0) || 0
 
-  // Find max revenue for chart scaling
-  const maxRev = Math.max(...monthlyRevenue.map(m => m.revenue), 100)
+  const series = useMemo(() => {
+    const sorted = [...monthlyRevenue].sort((a, b) => (a.month > b.month ? 1 : -1))
+    if (range === '6m') return sorted.slice(-6)
+    if (range === '12m') return sorted.slice(-12)
+    return sorted
+  }, [monthlyRevenue, range])
+
+  const mom = useMemo(() => {
+    const s = series
+    if (s.length < 2) return { pct: null, prev: 0, cur: s[0]?.revenue || 0 }
+    const cur = Number(s[s.length - 1]?.revenue) || 0
+    const prev = Number(s[s.length - 2]?.revenue) || 0
+    if (prev <= 0) return { pct: null, prev, cur }
+    return { pct: ((cur - prev) / prev) * 100, prev, cur }
+  }, [series])
+
+  const rangeLabel = range === '6m' ? 'Last 6 months' : range === '12m' ? 'Last 12 months' : 'All time'
+
+  if (loading) return <div className="p-8 text-center text-slate-500">Loading financials...</div>
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -73,6 +90,14 @@ export default function SARevenue() {
               <div className="text-2xl font-bold text-slate-900 dark:text-white">
                 ${Number(thisMonthRev).toLocaleString()}
               </div>
+              {mom.pct != null && (
+                <div className="mt-2 inline-flex items-center gap-2 text-xs font-bold">
+                  <span className={`px-2 py-1 rounded-lg border ${mom.pct >= 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-900/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-900/40'}`}>
+                    {mom.pct >= 0 ? '+' : ''}{mom.pct.toFixed(1)}%
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400">MoM</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -95,31 +120,29 @@ export default function SARevenue() {
       </div>
 
       {/* Revenue Chart */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Revenue Growth</h2>
-        <div className="h-64 flex items-end justify-between gap-2">
-          {monthlyRevenue.length > 0 ? (
-            monthlyRevenue.map((item, i) => (
-              <div key={item.month} className="flex flex-col items-center flex-1 group">
-                <div 
-                  className="w-full bg-blue-500 dark:bg-blue-600 rounded-t-sm transition-all duration-500 relative group-hover:bg-blue-600 dark:group-hover:bg-blue-500"
-                  style={{ height: `${(item.revenue / maxRev) * 100}%`, minHeight: '4px' }}
-                >
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                    ${item.revenue.toLocaleString()}
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 rotate-0 truncate w-full text-center">
-                  {item.month}
-                </div>
-              </div>
-            ))
-          ) : (
-             <div className="w-full h-full flex items-center justify-center text-slate-400">
-               No revenue data available
-             </div>
-          )}
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Revenue growth</div>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">{rangeLabel} • Hover for details</div>
+          </div>
+          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => setRange('6m')} className={`px-3 py-1.5 text-sm font-bold rounded-lg ${range === '6m' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>6M</button>
+            <button type="button" onClick={() => setRange('12m')} className={`px-3 py-1.5 text-sm font-bold rounded-lg ${range === '12m' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>12M</button>
+            <button type="button" onClick={() => setRange('all')} className={`px-3 py-1.5 text-sm font-bold rounded-lg ${range === 'all' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>All</button>
+          </div>
         </div>
+        {series.length ? (
+          <FinanceLineChart
+            title="Revenue"
+            subtitle="Multi-tenant platform revenue trend"
+            series={series}
+          />
+        ) : (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-10 border border-slate-200 dark:border-slate-700 shadow-sm text-center text-slate-500">
+            No revenue data available
+          </div>
+        )}
       </div>
 
       {/* Recent Transactions / Top Performers */}

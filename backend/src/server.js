@@ -791,6 +791,19 @@ async function fetchDriveStorageQuota({ company_id, employeeEmail }) {
   const refresh = aeadDecrypt(t.enc_refresh_token)
   const access = await googleTokenFromRefresh(refresh)
   const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=storageQuota', { headers: { Authorization: `Bearer ${access}` } })
+  if (!r.ok) {
+    const nowIso = new Date().toISOString()
+    return {
+      connected: true,
+      employee_id: employeeEmail,
+      limit_bytes: null,
+      used_bytes: null,
+      remaining_bytes: null,
+      updated_at: nowIso,
+      quota_status: r.status,
+      needs_reconnect: r.status === 401 || r.status === 403,
+    }
+  }
   const j = await r.json()
   const limit = j?.storageQuota?.limit != null ? Number(j.storageQuota.limit) : null
   const used = j?.storageQuota?.usage != null ? Number(j.storageQuota.usage) : null
@@ -839,6 +852,18 @@ app.get('/api/drive/quota/list', requireRole(['manager', 'company_admin']), asyn
     res.json({ quotas: out })
   } catch {
     res.status(500).json({ error: 'Failed to list quotas' })
+  }
+})
+
+app.get('/api/drive/quota/self', requireRole(['employee']), async (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const email = String(req.user?.sub || '').trim().toLowerCase()
+    if (!company_id || !email) return res.status(400).json({ error: 'Missing context' })
+    const quota = await fetchDriveStorageQuota({ company_id, employeeEmail: email })
+    res.json({ quota })
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch quota' })
   }
 })
 app.get('/api/drive/oauth/start', requireRole(['employee']), (req, res) => {
