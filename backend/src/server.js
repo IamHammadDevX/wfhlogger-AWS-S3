@@ -28,13 +28,42 @@ const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || '127.0.0.1';
 const UPLOAD_DIR = process.env.UPLOAD_DIR || 'uploads';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+function parseAllowedOrigins(raw) {
+  return String(raw || '')
+    .split(',')
+    .map(s => String(s || '').trim())
+    .map(s => s.replace(/^`|`$/g, '').replace(/^"|"$/g, '').replace(/^'|'$/g, ''))
+    .map(s => s.replace(/\/$/, ''))
+    .filter(Boolean)
+}
+
+const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 const DATA_DIR = process.env.DATA_DIR || 'data';
 const PAYMENT_PROVIDER = (process.env.PAYMENT_PROVIDER || 'stripe').toLowerCase();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
 const DRIVE_TOKEN_KEY = process.env.DRIVE_TOKEN_KEY || '';
+
+function validateProductionEnv() {
+  const env = String(process.env.NODE_ENV || '').toLowerCase()
+  if (env !== 'production') return
+
+  const jwt = String(process.env.JWT_SECRET || '')
+  if (!jwt || jwt === 'dev_secret' || jwt.length < 32) {
+    throw new Error('Invalid JWT_SECRET for production')
+  }
+
+  const origins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS)
+  if (!origins.length) {
+    throw new Error('ALLOWED_ORIGINS must be set in production')
+  }
+  if (origins.some(o => o === '*' || o.startsWith('http://'))) {
+    throw new Error('ALLOWED_ORIGINS must not contain * or http:// in production')
+  }
+}
+
+validateProductionEnv()
 
 // Ensure upload directory exists (relative to current working dir)
 const uploadPath = path.resolve(process.cwd(), UPLOAD_DIR);

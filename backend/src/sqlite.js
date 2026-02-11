@@ -534,11 +534,54 @@ export function getSuperAdmin() {
 }
 
 export function seedDefaultSuperAdmin() {
-  const existing = getSuperAdmin()
-  if (existing) return existing
-  const email = process.env.SUPERADMIN_EMAIL || 'admin@example.com'
-  const password = process.env.SUPERADMIN_PASSWORD || 'admin123'
-  return createUser({ email, password, role: 'super_admin' })
+  const email = String(process.env.SUPERADMIN_EMAIL || 'admin@example.com').trim()
+  const password = String(process.env.SUPERADMIN_PASSWORD || 'admin123')
+  const shouldResetPassword = String(process.env.SUPERADMIN_RESET_PASSWORD || '').trim() === '1'
+
+  if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+    if (!process.env.SUPERADMIN_EMAIL || !process.env.SUPERADMIN_PASSWORD) {
+      throw new Error('SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD must be set in production')
+    }
+    if (password === 'admin123') {
+      throw new Error('Refusing to use default super admin credentials in production')
+    }
+  }
+
+  const normalize = (v) => String(v || '').trim().toLowerCase()
+  const desiredEmailKey = normalize(email)
+
+  const existingByEmail = getUserByEmail(email)
+
+  if (db) {
+    const tx = db.transaction(() => {
+      if (existingByEmail) {
+        db.prepare('UPDATE users SET role = ?, company_id = NULL WHERE lower(email) = lower(?)').run('super_admin', email)
+        if (shouldResetPassword) {
+          const hash = bcrypt.hashSync(password, 10)
+          db.prepare('UPDATE users SET password_hash = ? WHERE lower(email) = lower(?)').run(hash, email)
+        }
+        return getUserByEmail(email)
+      }
+
+      const created = createUser({ email, password, role: 'super_admin', company_id: null })
+      return created
+    })
+    return tx()
+  }
+
+  const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
+  const idx = arr.findIndex(u => normalize(u.email) === desiredEmailKey)
+  if (idx >= 0) {
+    const next = { ...arr[idx], role: 'super_admin', company_id: null }
+    if (shouldResetPassword) {
+      next.password_hash = bcrypt.hashSync(password, 10)
+    }
+    arr[idx] = next
+    fs.writeFileSync(fallbacks.users, JSON.stringify(arr, null, 2))
+    return next
+  }
+
+  return createUser({ email, password, role: 'super_admin', company_id: null })
 }
 
 export function createOrganization({ name, managerId, company_id }) {
