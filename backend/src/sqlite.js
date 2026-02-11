@@ -153,6 +153,16 @@ try {
     FOREIGN KEY(company_id) REFERENCES companies(id),
     FOREIGN KEY(employee_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS webhook_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    company_id INTEGER,
+    reference_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(provider, event_id)
+  );
   `)
   
   // Migration: Ensure company_id column exists
@@ -685,6 +695,25 @@ export function getTransactions(company_id) {
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.transactions, 'utf-8'))
   return arr.filter(t => t.company_id == company_id).sort((a, b) => b.created_at.localeCompare(a.created_at))
+}
+
+export function markWebhookEventProcessed({ provider, event_id, company_id, reference_id }) {
+  const now = new Date().toISOString()
+  const prov = String(provider || '').trim()
+  const eid = String(event_id || '').trim()
+  if (!prov || !eid) return false
+
+  if (db) {
+    const stmt = db.prepare('INSERT OR IGNORE INTO webhook_events (provider, event_id, company_id, reference_id, created_at) VALUES (?, ?, ?, ?, ?)')
+    const info = stmt.run(prov, eid, company_id || null, String(reference_id || ''), now)
+    return info.changes > 0
+  }
+
+  if (!globalThis.__webhookEvents) globalThis.__webhookEvents = new Set()
+  const key = `${prov}:${eid}`
+  if (globalThis.__webhookEvents.has(key)) return false
+  globalThis.__webhookEvents.add(key)
+  return true
 }
 
 export function updateCompanyCredits(company_id, delta) {

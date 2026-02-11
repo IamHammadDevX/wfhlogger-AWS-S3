@@ -11,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
@@ -317,7 +317,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 // Stripe webhook must receive raw body BEFORE JSON parser
-app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+app.use(['/api/webhooks/stripe', '/webhooks/stripe', '/webhook'], express.raw({ type: 'application/json' }));
 // Allow all origins for dev and do not set credentials to avoid the invalid '*' + credentials combination
 app.use(cors({ origin: ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : '*', credentials: false }));
 app.use(express.json({ limit: '2mb' }));
@@ -1849,10 +1849,10 @@ app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']),
     if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' });
     const { amount_usd, return_path } = req.body || {};
     const amount = Number(amount_usd);
-    if (!amount || isNaN(amount) || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+    if (!Number.isInteger(amount) || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
     const company_id = req.user?.company_id;
     const admin_user_id = req.user?.uid;
-    const url = await createStripeCheckoutSession({ company_id, admin_user_id, credit_amount_usd: amount, origin: req.headers.origin, return_path });
+    const url = await createStripeCheckoutSession({ company_id, admin_user_id, credits: amount, origin: req.headers.origin, return_path });
     return res.json({ url });
   } catch (e) {
     console.error('[stripe:checkout-session] error:', e);
@@ -1861,75 +1861,98 @@ app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']),
 });
 
 // Stripe Webhook (raw body needed)
-app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+async function stripeWebhookHandler(req, res) {
+  if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).end();
+
+  const sig = req.headers['stripe-signature'];
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(String(req.body || ''))
+
+  let event
   try {
-    if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).end();
-    const sig = req.headers['stripe-signature'];
-    const event = verifyStripeWebhookAndExtract(req.body, sig);
-    if (!event) return res.status(400).end();
-    console.log('[stripe:webhook] received', event?.type);
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const meta = session.metadata || {};
-      const company_id = Number(meta.company_id);
-      const admin_user_id = Number(meta.admin_user_id);
-      const credit_amount_usd = Number(meta.credit_amount_usd || 0);
-      const credits = Math.floor(credit_amount_usd); // 1 USD = 1 credit
-      if (company_id && credits > 0) {
-        console.log('[stripe:webhook] company_id resolved', company_id);
-        const ref = String(session.id || session.payment_intent || '');
-        const newBalance = creditCompanyWithTransaction({
-          company_id,
-          amount_usd: credit_amount_usd,
-          credits,
-          description: 'Credit purchase via Stripe',
-          reference_id: ref
-        });
-        console.log('[stripe:webhook] credits added', { company_id, added: credits, balance: newBalance });
-        const company = getCompanyById(company_id)
-        const nextNo = getNextInvoiceNo(company_id)
-        const invId = `INV-${company_id}-${String(nextNo).padStart(5, '0')}`
-        const invoice = createInvoice({
-          company_id,
-          invoice_no: nextNo,
-          invoice_id: invId,
-          company_name: company?.name || '',
-          company_logo_url: company?.logo_url || '',
-          billing_email: company?.billing_email || '',
-          invoice_date: new Date().toISOString(),
-          billing_period: 'one-time credit purchase',
-          line_items: [{ description: `Credit Purchase – ${credits} Credits`, quantity: credits, unit_price: 1, subtotal: credits }],
-          subtotal_amount: credits,
-          tax_amount: 0,
-          total_amount: credits,
-          currency: 'USD',
-          payment_provider: 'Stripe',
-          payment_reference_id: ref,
-          payment_status: 'paid'
-        })
-        try {
-          const pdfPath = await generateInvoicePdf(invoice)
-          setInvoicePdfPath(company_id, invId, pdfPath)
-          appendAudit('invoice_generated', { company_id, invoice_id: invId }, company_id)
-        } catch (e) {
-          console.warn('[invoice] pdf generate failed:', e?.message || e)
-        }
-        try {
-          const comp = getCompanyById(company_id) || company || { id: company_id }
-          const to = getCompanyAdminEmail(company_id, comp)
-          if (to) sendPaymentSuccess({ to, company: comp, amount_usd: credit_amount_usd, credits, balance: newBalance, invoice_id: invId, payment_reference_id: ref })
-        } catch {}
-        try {
-          io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance })
-        } catch {}
-      }
-    }
-    res.status(200).end();
+    event = verifyStripeWebhookAndExtract(rawBody, sig)
   } catch (e) {
-    console.error('[stripe:webhook] error:', e);
-    res.status(400).end();
+    console.warn('[stripe:webhook] verify failed:', e?.message || e)
+    return res.status(400).end()
   }
-});
+
+  const type = String(event?.type || '')
+  const eventId = String(event?.id || '')
+  console.log('[stripe:webhook] received', { id: eventId, type })
+
+  if (type === 'checkout.session.completed' || type === 'checkout.session.async_payment_succeeded') {
+    const session = event.data.object;
+    const meta = session.metadata || {};
+    const company_id = Number(meta.companyId || meta.company_id || '')
+    const credits = Number(meta.credits || '') || Math.floor(Number(meta.credit_amount_usd || 0))
+    const ref = String(session.id || session.payment_intent || eventId || '')
+
+    if (!company_id || !Number.isFinite(company_id) || !Number.isInteger(company_id) || credits <= 0 || !Number.isFinite(credits)) {
+      console.warn('[stripe:webhook] invalid metadata', { company_id, credits, ref })
+      return res.status(200).end()
+    }
+
+    const firstTime = markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: ref })
+    if (!firstTime) {
+      console.log('[stripe:webhook] duplicate ignored', { id: eventId, type, company_id, ref })
+      return res.status(200).end()
+    }
+
+    const amount_usd = Number(session.amount_total || 0) ? (Number(session.amount_total) / 100) : Number(credits)
+    const newBalance = creditCompanyWithTransaction({
+      company_id,
+      amount_usd,
+      credits: Math.floor(Number(credits)),
+      description: 'Credit purchase via Stripe',
+      reference_id: `stripe:${ref}`
+    });
+
+    console.log('[stripe:webhook] credits added', { company_id, added: credits, amount_usd, balance: newBalance, ref })
+
+    const company = getCompanyById(company_id)
+    const nextNo = getNextInvoiceNo(company_id)
+    const invId = `INV-${company_id}-${String(nextNo).padStart(5, '0')}`
+    const invoice = createInvoice({
+      company_id,
+      invoice_no: nextNo,
+      invoice_id: invId,
+      company_name: company?.name || '',
+      company_logo_url: company?.logo_url || '',
+      billing_email: company?.billing_email || '',
+      invoice_date: new Date().toISOString(),
+      billing_period: 'one-time credit purchase',
+      line_items: [{ description: `Credit Purchase – ${credits} Credits`, quantity: credits, unit_price: 1, subtotal: credits }],
+      subtotal_amount: credits,
+      tax_amount: 0,
+      total_amount: credits,
+      currency: 'USD',
+      payment_provider: 'Stripe',
+      payment_reference_id: `stripe:${ref}`,
+      payment_status: 'paid'
+    })
+
+    try {
+      const pdfPath = await generateInvoicePdf(invoice)
+      setInvoicePdfPath(company_id, invId, pdfPath)
+      appendAudit('invoice_generated', { company_id, invoice_id: invId }, company_id)
+    } catch (e) {
+      console.warn('[invoice] pdf generate failed:', e?.message || e)
+    }
+
+    try {
+      const comp = getCompanyById(company_id) || company || { id: company_id }
+      const to = getCompanyAdminEmail(company_id, comp)
+      if (to) sendPaymentSuccess({ to, company: comp, amount_usd, credits, balance: newBalance, invoice_id: invId, payment_reference_id: `stripe:${ref}` })
+    } catch {}
+
+    try {
+      io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance })
+    } catch {}
+  }
+
+  return res.status(200).end()
+}
+
+app.post(['/api/webhooks/stripe', '/webhooks/stripe', '/webhook'], stripeWebhookHandler);
 // ---- Screen capture interval configuration ----
 const allowedSeconds = [
   5,
