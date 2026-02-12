@@ -8,7 +8,21 @@ export function initStripe() {
   if (stripe) return stripe
   const key = process.env.STRIPE_SECRET_KEY
   if (!key) throw new Error('STRIPE_SECRET_KEY missing')
-  stripe = new Stripe(key)
+  
+  // Configure Stripe with proper timeouts for production
+  stripe = new Stripe(key, {
+    timeout: 30000, // 30 second timeout
+    maxNetworkRetries: 3, // Retry failed requests 3 times
+    apiVersion: '2023-10-16' // Use stable API version
+  })
+  
+  // Log key type for debugging (test vs live)
+  if (key.startsWith('sk_test_')) {
+    console.log('[stripe] Using TEST key - this is for development/testing only')
+  } else if (key.startsWith('sk_live_')) {
+    console.log('[stripe] Using LIVE key - production mode')
+  }
+  
   return stripe
 }
 

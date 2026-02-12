@@ -1922,6 +1922,9 @@ app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']),
 });
 
 app.post('/api/billing/stripe/confirm-session', requireRole(['company_admin']), async (req, res) => {
+  // Set timeout for this specific endpoint to prevent 504 errors
+  req.setTimeout(45000) // 45 seconds total timeout
+  
   try {
     if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' })
     const session_id = String(req.body?.session_id || '').trim()
@@ -1930,12 +1933,35 @@ app.post('/api/billing/stripe/confirm-session', requireRole(['company_admin']), 
     const key = String(process.env.STRIPE_SECRET_KEY || '').trim()
     if (!key) return res.status(500).json({ error: 'STRIPE_SECRET_KEY missing' })
 
-    const stripe = new Stripe(key)
+    // Test key validation - warn but allow for testing
+    if (key.startsWith('sk_test_')) {
+      console.warn('[stripe:confirm-session] Using test key in production - this is for testing only')
+    }
+
+    // Configure Stripe with proper timeouts for production
+    const stripe = new Stripe(key, {
+      timeout: 30000, // 30 second timeout
+      maxNetworkRetries: 3, // Retry failed requests 3 times
+      apiVersion: '2023-10-16' // Use stable API version
+    })
+    
     let session
     try {
+      console.log('[stripe:confirm-session] retrieving session:', session_id)
       session = await stripe.checkout.sessions.retrieve(session_id)
+      console.log('[stripe:confirm-session] session retrieved successfully:', session.id)
     } catch (stripeError) {
       console.error('[stripe:confirm-session] Stripe retrieve error:', stripeError)
+      // Handle specific Stripe errors
+      if (stripeError.code === 'resource_missing') {
+        return res.status(404).json({ error: 'Session not found', details: 'The payment session may have expired' })
+      }
+      if (stripeError.code === 'authentication_error') {
+        return res.status(502).json({ error: 'Stripe authentication failed', details: 'Invalid API key configuration' })
+      }
+      if (stripeError.code === 'rate_limit') {
+        return res.status(429).json({ error: 'Rate limit exceeded', details: 'Please try again in a few moments' })
+      }
       return res.status(502).json({ error: 'Stripe API error', details: String(stripeError?.message || stripeError) })
     }
     
@@ -1981,6 +2007,42 @@ app.post('/api/billing/stripe/confirm-session', requireRole(['company_admin']), 
       return res.status(502).json({ error: 'Stripe API error', details: msg })
     }
     return res.status(500).json({ error: 'Failed to confirm session', details: msg })
+  }
+})
+
+// Emergency fallback endpoint for manual credit application when Stripe API fails
+app.post('/api/billing/credits/apply-manual', requireRole(['company_admin']), async (req, res) => {
+  try {
+    const { session_id, credits, amount_usd } = req.body
+    if (!session_id || !credits || !amount_usd) {
+      return res.status(400).json({ error: 'session_id, credits, and amount_usd are required' })
+    }
+    
+    const company_id = Number(req.user?.company_id)
+    if (!company_id) return res.status(403).json({ error: 'Invalid company' })
+    
+    const reference_id = `stripe:${session_id}`
+    const exists = getTransactionByReferenceId(company_id, reference_id)
+    if (exists) {
+      const company = getCompanyById(company_id)
+      return res.json({ ok: true, already_applied: true, credits: company?.credits || 0 })
+    }
+    
+    // Apply credits manually without Stripe API call
+    const newBalance = creditCompanyWithTransaction({
+      company_id,
+      amount_usd: Number(amount_usd),
+      credits: Number(credits),
+      description: 'Manual credit application (Stripe API fallback)',
+      reference_id
+    })
+    
+    console.log('[billing:manual] credits applied manually', { company_id, credits, amount_usd, newBalance })
+    return res.json({ ok: true, already_applied: false, credits: newBalance })
+    
+  } catch (e) {
+    console.error('[billing:manual] error:', e)
+    return res.status(500).json({ error: 'Failed to apply credits manually', details: String(e?.message || e) })
   }
 })
 
