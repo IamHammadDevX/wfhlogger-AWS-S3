@@ -38,8 +38,12 @@ export default function Billing() {
           if (sessionId) {
             try {
               const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-              await axios.post(`${base}/api/billing/stripe/confirm-session`, { session_id: sessionId }, { headers })
-            } catch {}
+              console.log('[billing] confirming session:', sessionId)
+              const result = await axios.post(`${base}/api/billing/stripe/confirm-session`, { session_id: sessionId }, { headers })
+              console.log('[billing] confirm-session result:', result.data)
+            } catch (err) {
+              console.error('[billing] confirm-session error:', err?.response?.data || err?.message || err)
+            }
           }
           setConfirming(true)
           await pollForCredits(base)

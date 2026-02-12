@@ -1927,8 +1927,18 @@ app.post('/api/billing/stripe/confirm-session', requireRole(['company_admin']), 
     const session_id = String(req.body?.session_id || '').trim()
     if (!session_id) return res.status(400).json({ error: 'session_id is required' })
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
-    const session = await stripe.checkout.sessions.retrieve(session_id)
+    const key = String(process.env.STRIPE_SECRET_KEY || '').trim()
+    if (!key) return res.status(500).json({ error: 'STRIPE_SECRET_KEY missing' })
+
+    const stripe = new Stripe(key)
+    let session
+    try {
+      session = await stripe.checkout.sessions.retrieve(session_id)
+    } catch (stripeError) {
+      console.error('[stripe:confirm-session] Stripe retrieve error:', stripeError)
+      return res.status(502).json({ error: 'Stripe API error', details: String(stripeError?.message || stripeError) })
+    }
+    
     if (!session) return res.status(404).json({ error: 'Checkout Session not found' })
     if (session.payment_status !== 'paid') {
       return res.status(409).json({ error: 'Payment not completed yet', payment_status: session.payment_status })
@@ -1965,8 +1975,12 @@ app.post('/api/billing/stripe/confirm-session', requireRole(['company_admin']), 
 
     return res.json({ ok: true, already_applied: false, credits: newBalance })
   } catch (e) {
-    console.error('[stripe:confirm-session] error:', e?.message || e)
-    return res.status(500).json({ error: 'Failed to confirm session' })
+    const msg = String(e?.message || e || '')
+    console.error('[stripe:confirm-session] error:', msg)
+    if (String(e?.type || '').includes('Stripe')) {
+      return res.status(502).json({ error: 'Stripe API error', details: msg })
+    }
+    return res.status(500).json({ error: 'Failed to confirm session', details: msg })
   }
 })
 
@@ -1997,24 +2011,21 @@ async function stripeWebhookHandler(req, res) {
     const ref = String(session.id || session.payment_intent || eventId || '')
 
     if (!company_id || !Number.isFinite(company_id) || !Number.isInteger(company_id) || credits <= 0 || !Number.isFinite(credits)) {
-      console.warn('[stripe:webhook] invalid metadata', { company_id, credits, ref })
+      console.warn('[stripe:webhook] invalid metadata', { company_id, credits, ref, meta })
       return res.status(200).end()
     }
+    console.log('[stripe:webhook] validation passed', { company_id, credits, ref, payment_status: session.payment_status })
 
     const reference_id = `stripe:${ref}`
     const already = getTransactionByReferenceId(company_id, reference_id)
+    console.log('[stripe:webhook] transaction check', { company_id, reference_id, already: !!already })
     if (already) {
       markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: ref })
       console.log('[stripe:webhook] already applied', { id: eventId, company_id, ref })
       return res.status(200).end()
     }
 
-    const firstTime = markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: ref })
-    if (!firstTime) {
-      console.log('[stripe:webhook] duplicate ignored', { id: eventId, type, company_id, ref })
-      return res.status(200).end()
-    }
-
+    // Only mark as processed after successfully applying credits
     const amount_usd = Number(session.amount_total || 0) ? (Number(session.amount_total) / 100) : Number(credits)
     const newBalance = creditCompanyWithTransaction({
       company_id,
@@ -2023,6 +2034,9 @@ async function stripeWebhookHandler(req, res) {
       description: 'Credit purchase via Stripe',
       reference_id
     });
+
+    // Mark webhook event as processed only after successful credit application
+    markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: ref })
 
     console.log('[stripe:webhook] credits added', { company_id, added: credits, amount_usd, balance: newBalance, ref })
 
