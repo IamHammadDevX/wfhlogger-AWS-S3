@@ -13,7 +13,7 @@ export function CreditsProvider({ children }) {
     try {
       const base = await resolveApiBase()
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      const { data } = await axios.get(`${base}/api/billing/balance`, { headers })
+      const { data } = await axios.get(`${base}/api/billing/balance?t=${Date.now()}`, { headers: { ...headers, 'Cache-Control': 'no-cache' } })
       const next = Number(data?.credits)
       if (!Number.isFinite(next)) throw new Error('Invalid credits response')
       setCredits(next)

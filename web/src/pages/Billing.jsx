@@ -70,7 +70,7 @@ export default function Billing() {
     const lastKnown = Number(credits ?? balance ?? 0)
     for (let i = 0; i < 15; i++) {
       await new Promise(r => setTimeout(r, 2000))
-      const { data } = await axios.get(`${base}/api/billing/balance`, { headers })
+      const { data } = await axios.get(`${base}/api/billing/balance?t=${Date.now()}`, { headers: { ...headers, 'Cache-Control': 'no-cache' } })
       const cur = Number(data?.credits)
       if (!Number.isFinite(cur)) continue
       if (cur > lastKnown) {

@@ -328,6 +328,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 const app = express();
+app.set('etag', false)
 const httpServer = createServer(app);
 // Socket.IO: allow all origins because desktop clients are non-browser
 // and rely on JWT for authorization. Express CORS remains restricted.
@@ -345,6 +346,12 @@ app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  next()
+})
 // Stripe webhook must receive raw body BEFORE JSON parser
 app.use(['/api/webhooks/stripe', '/webhooks/stripe', '/webhook'], express.raw({ type: 'application/json' }));
 // Allow all origins for dev and do not set credentials to avoid the invalid '*' + credentials combination
