@@ -1,22 +1,19 @@
 // API configuration utility for dynamic environment detection
 export function getApiBase() {
-  // In production, use the current origin
+  const explicit = String(import.meta?.env?.VITE_API_URL || '').trim()
+  if (explicit) return explicit.replace(/\/$/, '')
+
   if (typeof window !== 'undefined') {
-    const { hostname, protocol, origin } = window.location;
-    
-    // Check if we're in production (not localhost/127.0.0.1)
-    const isProduction = hostname !== 'localhost' && hostname !== '127.0.0.1';
-    
+    const { hostname, origin } = window.location
+    const isProduction = hostname !== 'localhost' && hostname !== '127.0.0.1'
     if (isProduction) {
-      if (hostname === 'tracker.vughy.com') {
-        return 'https://backend-tracker.vughy.com';
-      }
-      return origin;
+      if (hostname === 'tracker.vughy.com') return 'https://backend-tracker.vughy.com'
+      if (hostname === 'wfhlogger.com' || hostname === 'www.wfhlogger.com') return 'https://backend.wfhlogger.com'
+      return origin.replace(/\/$/, '')
     }
   }
-  
-  // In development, use environment variable or fallback
-  return import.meta.env.VITE_API_URL || 'http://127.0.0.1:4000';
+
+  return 'http://127.0.0.1:4000'
 }
 
 export function getWebSocketBase() {

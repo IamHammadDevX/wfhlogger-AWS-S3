@@ -20,12 +20,17 @@ const validCandidates = candidates.filter(url => {
   return true;
 });
 
-const checks = validCandidates.map((base) => axios.get(`${base}/health`, { timeout: 2000 })
-  .then((r) => ({ base, r }))
-  .catch(() => Promise.reject(base)))
-Promise.any(checks).then(({ base, r }) => {
-  const ok = r.status === 200 && String(r.headers['content-type'] || '').includes('application/json') && r.data && r.data.ok === true
-  if (ok) cachedBase = base
+const checks = validCandidates.map((base) =>
+  axios.get(`${base}/health`, { timeout: 2000 })
+    .then((r) => {
+      const ok = r.status === 200 && String(r.headers['content-type'] || '').includes('application/json') && r.data && r.data.ok === true
+      if (!ok) return Promise.reject(base)
+      return base
+    })
+    .catch(() => Promise.reject(base))
+)
+Promise.any(checks).then((base) => {
+  cachedBase = base
 }).catch(() => {})
 
 export async function apiPost(path, data, config = {}) {

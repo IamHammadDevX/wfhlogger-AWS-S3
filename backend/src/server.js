@@ -1773,6 +1773,28 @@ app.get('/api/billing/summary', requireRole(['company_admin']), (req, res) => {
   }
 });
 
+app.get('/api/billing/diagnostics', requireRole(['company_admin']), (req, res) => {
+  try {
+    const company_id = req.user?.company_id
+    const company = getCompanyById(company_id)
+    const history = getTransactions(company_id) || []
+    const lastTransaction = history[0] || null
+    const lastCredit = history.find(t => t.type === 'credit') || null
+    res.json({
+      ok: true,
+      storage: db ? 'sqlite' : 'json',
+      company_id,
+      credits: company?.credits || 0,
+      plan: company?.plan || 'free',
+      last_transaction: lastTransaction,
+      last_credit: lastCredit,
+      now: new Date().toISOString()
+    })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: 'Failed to fetch diagnostics' })
+  }
+})
+
 app.get('/api/billing/invoices', requireRole(['company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id

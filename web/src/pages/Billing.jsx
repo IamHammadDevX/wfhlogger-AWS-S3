@@ -14,6 +14,7 @@ export default function Billing() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
   const [apiBase, setApiBase] = useState('')
   const [amount, setAmount] = useState(25)
@@ -23,32 +24,61 @@ export default function Billing() {
   const invoicesPg = usePagination(invoices, 10, [tab, invoices.length])
 
   useEffect(() => {
-    resolveApiBase().then(base => {
+    let cancelled = false
+    resolveApiBase().then(async base => {
+      if (cancelled) return
       setApiBase(base)
-      fetchData(base)
+      await fetchData(base)
       try {
         const params = new URLSearchParams(window.location.search)
         if (params.get('status') === 'success') {
-          fetchData(base)
-          refreshCredits()
+          setConfirming(true)
+          await pollForCredits(base)
+          setConfirming(false)
         }
-      } catch {}
+      } catch {
+        setConfirming(false)
+      }
     })
+    return () => { cancelled = true }
   }, [])
 
   const fetchData = async (base) => {
     setLoading(true)
+    setError('')
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      const summary = await axios.get(`${base}/api/billing/summary`, { headers }).catch(e => ({ data: { balance: 0, history: [] } }))
-      const inv = await axios.get(`${base}/api/billing/invoices`, { headers }).catch(e => ({ data: { invoices: [] } }))
-      setBalance(summary.data.balance)
+      const summary = await axios.get(`${base}/api/billing/summary`, { headers })
+      const nextBalance = Number(summary?.data?.balance)
+      if (!Number.isFinite(nextBalance)) throw new Error('Invalid billing summary (balance)')
+      if (!Array.isArray(summary?.data?.history)) throw new Error('Invalid billing summary (history)')
+      setBalance(nextBalance)
       setHistory(summary.data.history)
+
+      const inv = await axios.get(`${base}/api/billing/invoices`, { headers })
+      if (!Array.isArray(inv?.data?.invoices)) throw new Error('Invalid invoices response')
       setInvoices(inv.data.invoices)
     } catch (e) {
       setError('Failed to load billing info')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const pollForCredits = async (base) => {
+    const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    const lastKnown = Number(credits ?? balance ?? 0)
+    for (let i = 0; i < 15; i++) {
+      await new Promise(r => setTimeout(r, 2000))
+      const { data } = await axios.get(`${base}/api/billing/balance`, { headers })
+      const cur = Number(data?.credits)
+      if (!Number.isFinite(cur)) continue
+      if (cur > lastKnown) {
+        setBalance(cur)
+        await fetchData(base)
+        await refreshCredits()
+        return
+      }
     }
   }
 
@@ -97,6 +127,7 @@ export default function Billing() {
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Add Credits</h2>
             {error && <div className="mb-4 text-red-600 dark:text-red-400 text-sm">{error}</div>}
+            {!error && confirming && <div className="mb-4 text-slate-600 dark:text-slate-300 text-sm">Payment received. Waiting for Stripe confirmation...</div>}
             <div className="flex flex-wrap gap-3 mb-4">
               {presets.map(v => (
                 <button

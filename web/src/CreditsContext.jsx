@@ -7,14 +7,20 @@ const CreditsContext = createContext({ credits: 0, refreshCredits: () => {} })
 
 export function CreditsProvider({ children }) {
   const [credits, setCredits] = useState(0)
+  const [creditsError, setCreditsError] = useState('')
 
   const refreshCredits = async () => {
     try {
       const base = await resolveApiBase()
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
       const { data } = await axios.get(`${base}/api/billing/balance`, { headers })
-      setCredits(data?.credits || 0)
-    } catch {}
+      const next = Number(data?.credits)
+      if (!Number.isFinite(next)) throw new Error('Invalid credits response')
+      setCredits(next)
+      setCreditsError('')
+    } catch (e) {
+      setCreditsError('Failed to load credit balance.')
+    }
   }
 
   useEffect(() => {
@@ -44,7 +50,7 @@ export function CreditsProvider({ children }) {
   }, [])
 
   return (
-    <CreditsContext.Provider value={{ credits, refreshCredits }}>
+    <CreditsContext.Provider value={{ credits, refreshCredits, creditsError }}>
       {children}
     </CreditsContext.Provider>
   )
