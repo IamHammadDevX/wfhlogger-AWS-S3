@@ -39,7 +39,11 @@ function buildReturnUrl({ baseOrigin, return_path, status }) {
 
 export async function createStripeCheckoutSession({ company_id, admin_user_id, credits, origin, return_path }) {
   const s = initStripe()
-  const success = buildReturnUrl({ baseOrigin: origin, return_path, status: 'success' })
+  const success = (() => {
+    const u = new URL(buildReturnUrl({ baseOrigin: origin, return_path, status: 'success' }))
+    u.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}')
+    return u.toString()
+  })()
   const cancel = buildReturnUrl({ baseOrigin: origin, return_path, status: 'cancel' })
   const qty = Number(credits)
   if (!Number.isInteger(qty) || qty <= 0) throw new Error('Invalid credits')

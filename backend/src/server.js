@@ -11,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
@@ -23,6 +23,7 @@ import { runEmployeeMonthlyBilling, getCompanyAdminEmail } from './subscriptionB
 import cron from 'node-cron';
 import crypto from 'crypto';
 import { Readable } from 'stream';
+import Stripe from 'stripe';
 
 const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -1920,6 +1921,55 @@ app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']),
   }
 });
 
+app.post('/api/billing/stripe/confirm-session', requireRole(['company_admin']), async (req, res) => {
+  try {
+    if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' })
+    const session_id = String(req.body?.session_id || '').trim()
+    if (!session_id) return res.status(400).json({ error: 'session_id is required' })
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+    const session = await stripe.checkout.sessions.retrieve(session_id)
+    if (!session) return res.status(404).json({ error: 'Checkout Session not found' })
+    if (session.payment_status !== 'paid') {
+      return res.status(409).json({ error: 'Payment not completed yet', payment_status: session.payment_status })
+    }
+
+    const meta = session.metadata || {}
+    const company_id = Number(meta.companyId || meta.company_id || '')
+    const credits = Number(meta.credits || '') || Math.floor(Number(meta.credit_amount_usd || 0))
+    const requesterCompanyId = Number(req.user?.company_id || 0)
+    if (!company_id || company_id !== requesterCompanyId) {
+      return res.status(403).json({ error: 'Forbidden: session does not belong to this company' })
+    }
+    if (!Number.isInteger(credits) || credits <= 0) {
+      return res.status(400).json({ error: 'Invalid credits on session metadata' })
+    }
+
+    const ref = String(session.id || session.payment_intent || session_id)
+    const reference_id = `stripe:${ref}`
+    const exists = getTransactionByReferenceId(company_id, reference_id)
+    if (exists) {
+      const company = getCompanyById(company_id)
+      return res.json({ ok: true, already_applied: true, credits: company?.credits || 0 })
+    }
+
+    const amount_usd = Number(session.amount_total || 0) ? (Number(session.amount_total) / 100) : Number(credits)
+    markWebhookEventProcessed({ provider: 'stripe', event_id: `session:${session_id}`, company_id, reference_id: ref })
+    const newBalance = creditCompanyWithTransaction({
+      company_id,
+      amount_usd,
+      credits,
+      description: 'Credit purchase via Stripe (confirm-session)',
+      reference_id
+    })
+
+    return res.json({ ok: true, already_applied: false, credits: newBalance })
+  } catch (e) {
+    console.error('[stripe:confirm-session] error:', e?.message || e)
+    return res.status(500).json({ error: 'Failed to confirm session' })
+  }
+})
+
 // Stripe Webhook (raw body needed)
 async function stripeWebhookHandler(req, res) {
   if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).end();
@@ -1951,6 +2001,14 @@ async function stripeWebhookHandler(req, res) {
       return res.status(200).end()
     }
 
+    const reference_id = `stripe:${ref}`
+    const already = getTransactionByReferenceId(company_id, reference_id)
+    if (already) {
+      markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: ref })
+      console.log('[stripe:webhook] already applied', { id: eventId, company_id, ref })
+      return res.status(200).end()
+    }
+
     const firstTime = markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: ref })
     if (!firstTime) {
       console.log('[stripe:webhook] duplicate ignored', { id: eventId, type, company_id, ref })
@@ -1963,7 +2021,7 @@ async function stripeWebhookHandler(req, res) {
       amount_usd,
       credits: Math.floor(Number(credits)),
       description: 'Credit purchase via Stripe',
-      reference_id: `stripe:${ref}`
+      reference_id
     });
 
     console.log('[stripe:webhook] credits added', { company_id, added: credits, amount_usd, balance: newBalance, ref })

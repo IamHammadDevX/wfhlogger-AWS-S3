@@ -34,6 +34,13 @@ export default function Billing() {
       try {
         const params = new URLSearchParams(window.location.search)
         if (params.get('status') === 'success') {
+          const sessionId = String(params.get('session_id') || '').trim()
+          if (sessionId) {
+            try {
+              const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+              await axios.post(`${base}/api/billing/stripe/confirm-session`, { session_id: sessionId }, { headers })
+            } catch {}
+          }
           setConfirming(true)
           await pollForCredits(base)
           setConfirming(false)

@@ -740,6 +740,17 @@ export function getTransactions(company_id) {
   return arr.filter(t => t.company_id == company_id).sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
 
+export function getTransactionByReferenceId(company_id, reference_id) {
+  const cid = Number(company_id)
+  const ref = String(reference_id || '')
+  if (!cid || !ref) return null
+  if (db) {
+    return db.prepare('SELECT * FROM transactions WHERE company_id = ? AND reference_id = ? LIMIT 1').get(cid, ref) || null
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.transactions, 'utf-8'))
+  return arr.find(t => t.company_id == cid && String(t.reference_id || '') === ref) || null
+}
+
 export function markWebhookEventProcessed({ provider, event_id, company_id, reference_id }) {
   const now = new Date().toISOString()
   const prov = String(provider || '').trim()
