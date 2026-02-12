@@ -759,6 +759,21 @@ export function markWebhookEventProcessed({ provider, event_id, company_id, refe
   return true
 }
 
+export function listWebhookEvents({ provider, company_id, limit }) {
+  const prov = String(provider || '').trim()
+  const cid = company_id == null ? null : Number(company_id)
+  const lim = Math.max(1, Math.min(50, Number(limit || 10)))
+  if (!prov || !db) return []
+  try {
+    if (cid != null && Number.isFinite(cid)) {
+      return db.prepare('SELECT provider, event_id, company_id, reference_id, created_at FROM webhook_events WHERE provider = ? AND company_id = ? ORDER BY created_at DESC LIMIT ?').all(prov, cid, lim)
+    }
+    return db.prepare('SELECT provider, event_id, company_id, reference_id, created_at FROM webhook_events WHERE provider = ? ORDER BY created_at DESC LIMIT ?').all(prov, lim)
+  } catch {
+    return []
+  }
+}
+
 export function updateCompanyCredits(company_id, delta) {
   if (db) {
     const tx = db.transaction((cid, d) => {

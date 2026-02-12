@@ -11,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
@@ -1787,6 +1787,7 @@ app.get('/api/billing/diagnostics', requireRole(['company_admin']), (req, res) =
     const history = getTransactions(company_id) || []
     const lastTransaction = history[0] || null
     const lastCredit = history.find(t => t.type === 'credit') || null
+    const webhookEvents = listWebhookEvents({ provider: 'stripe', company_id, limit: 10 })
     res.json({
       ok: true,
       storage: db ? 'sqlite' : 'json',
@@ -1795,6 +1796,7 @@ app.get('/api/billing/diagnostics', requireRole(['company_admin']), (req, res) =
       plan: company?.plan || 'free',
       last_transaction: lastTransaction,
       last_credit: lastCredit,
+      last_webhook_events: webhookEvents,
       now: new Date().toISOString()
     })
   } catch (e) {

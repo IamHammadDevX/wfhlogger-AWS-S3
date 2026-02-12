@@ -7,7 +7,7 @@ import Pagination from '../components/ui/Pagination.jsx'
 import { usePagination } from '../hooks/usePagination.js'
 
 export default function Billing() {
-  const { refreshCredits, credits } = useCredits()
+  const { refreshCredits, credits, creditsError } = useCredits()
   const [tab, setTab] = useState('transactions')
   const [balance, setBalance] = useState(0)
   const [history, setHistory] = useState([])
@@ -19,6 +19,8 @@ export default function Billing() {
   const [apiBase, setApiBase] = useState('')
   const [amount, setAmount] = useState(25)
   const presets = [10, 25, 50, 100, 250]
+
+  const displayCredits = Math.max(Number(credits || 0), Number(balance || 0))
 
   const historyPg = usePagination(history, 10, [tab, history.length])
   const invoicesPg = usePagination(invoices, 10, [tab, invoices.length])
@@ -58,6 +60,7 @@ export default function Billing() {
       const inv = await axios.get(`${base}/api/billing/invoices`, { headers })
       if (!Array.isArray(inv?.data?.invoices)) throw new Error('Invalid invoices response')
       setInvoices(inv.data.invoices)
+      try { await refreshCredits() } catch {}
     } catch (e) {
       setError('Failed to load billing info')
     } finally {
@@ -112,7 +115,7 @@ export default function Billing() {
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex justify-between items-center">
             <div>
               <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Available Credits</h2>
-              <div className="text-4xl font-bold text-slate-900 dark:text-white">{credits ?? balance}</div>
+              <div className="text-4xl font-bold text-slate-900 dark:text-white">{displayCredits}</div>
               <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">$1.00 / active employee / month</p>
             </div>
             <div className="text-right">
@@ -127,6 +130,7 @@ export default function Billing() {
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Add Credits</h2>
             {error && <div className="mb-4 text-red-600 dark:text-red-400 text-sm">{error}</div>}
+            {!error && creditsError && <div className="mb-4 text-red-600 dark:text-red-400 text-sm">{creditsError}</div>}
             {!error && confirming && <div className="mb-4 text-slate-600 dark:text-slate-300 text-sm">Payment received. Waiting for Stripe confirmation...</div>}
             <div className="flex flex-wrap gap-3 mb-4">
               {presets.map(v => (
