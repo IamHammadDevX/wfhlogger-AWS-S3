@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -11,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
@@ -23,7 +22,6 @@ import { runEmployeeMonthlyBilling, getCompanyAdminEmail } from './subscriptionB
 import cron from 'node-cron';
 import crypto from 'crypto';
 import { Readable } from 'stream';
-import Stripe from 'stripe';
 
 const PORT = process.env.PORT || 4000;
 const HOST = process.env.HOST || '127.0.0.1';
@@ -65,6 +63,13 @@ function validateProductionEnv() {
 }
 
 validateProductionEnv()
+
+function uuid() {
+  try {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  } catch {}
+  return crypto.randomBytes(16).toString('hex')
+}
 
 // Ensure upload directory exists (relative to current working dir)
 const uploadPath = path.resolve(process.cwd(), UPLOAD_DIR);
@@ -353,8 +358,7 @@ app.use('/api', (req, res, next) => {
   res.setHeader('Expires', '0')
   next()
 })
-// Stripe webhook must receive raw body BEFORE JSON parser
-app.use(['/api/webhooks/stripe', '/webhooks/stripe', '/webhook'], express.raw({ type: 'application/json' }));
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookHandler)
 // Allow all origins for dev and do not set credentials to avoid the invalid '*' + credentials combination
 app.use(cors({ origin: ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : '*', credentials: false }));
 app.use(express.json({ limit: '2mb' }));
@@ -615,7 +619,7 @@ app.post('/api/support/request', async (req, res) => {
     if (s.length > 200) return res.status(400).json({ error: 'Subject is too long' })
     if (m.length > 8000) return res.status(400).json({ error: 'Message is too long' })
 
-    const requestId = crypto.randomUUID()
+    const requestId = uuid()
     const supportEmail = process.env.SUPPORT_EMAIL || process.env.EMAIL_USER
     const prefix = t === 'support' ? 'Support Request' : 'Contact Request'
     const decoratedSubject = `${prefix}: ${s}`
@@ -1912,8 +1916,8 @@ app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']),
     const amount = Number(amount_usd);
     if (!Number.isInteger(amount) || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
     const company_id = req.user?.company_id;
-    const admin_user_id = req.user?.uid;
-    const url = await createStripeCheckoutSession({ company_id, admin_user_id, credits: amount, origin: req.headers.origin, return_path });
+    const user_id = req.user?.uid;
+    const url = await createStripeCheckoutSession({ company_id, user_id, creditAmount: amount, origin: req.headers.origin, return_path });
     return res.json({ url });
   } catch (e) {
     console.error('[stripe:checkout-session] error:', e);
@@ -1922,97 +1926,18 @@ app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']),
 });
 
 app.post('/api/billing/stripe/confirm-session', requireRole(['company_admin']), async (req, res) => {
-  // Set timeout for this specific endpoint to prevent 504 errors
-  req.setTimeout(45000) // 45 seconds total timeout
-  
-  try {
-    if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' })
-    const session_id = String(req.body?.session_id || '').trim()
-    if (!session_id) return res.status(400).json({ error: 'session_id is required' })
-
-    const key = String(process.env.STRIPE_SECRET_KEY || '').trim()
-    if (!key) return res.status(500).json({ error: 'STRIPE_SECRET_KEY missing' })
-
-    // Test key validation - warn but allow for testing
-    if (key.startsWith('sk_test_')) {
-      console.warn('[stripe:confirm-session] Using test key in production - this is for testing only')
-    }
-
-    // Configure Stripe with proper timeouts for production
-    const stripe = new Stripe(key, {
-      timeout: 30000, // 30 second timeout
-      maxNetworkRetries: 3, // Retry failed requests 3 times
-      apiVersion: '2023-10-16' // Use stable API version
-    })
-    
-    let session
-    try {
-      console.log('[stripe:confirm-session] retrieving session:', session_id)
-      session = await stripe.checkout.sessions.retrieve(session_id)
-      console.log('[stripe:confirm-session] session retrieved successfully:', session.id)
-    } catch (stripeError) {
-      console.error('[stripe:confirm-session] Stripe retrieve error:', stripeError)
-      // Handle specific Stripe errors
-      if (stripeError.code === 'resource_missing') {
-        return res.status(404).json({ error: 'Session not found', details: 'The payment session may have expired' })
-      }
-      if (stripeError.code === 'authentication_error') {
-        return res.status(502).json({ error: 'Stripe authentication failed', details: 'Invalid API key configuration' })
-      }
-      if (stripeError.code === 'rate_limit') {
-        return res.status(429).json({ error: 'Rate limit exceeded', details: 'Please try again in a few moments' })
-      }
-      return res.status(502).json({ error: 'Stripe API error', details: String(stripeError?.message || stripeError) })
-    }
-    
-    if (!session) return res.status(404).json({ error: 'Checkout Session not found' })
-    if (session.payment_status !== 'paid') {
-      return res.status(409).json({ error: 'Payment not completed yet', payment_status: session.payment_status })
-    }
-
-    const meta = session.metadata || {}
-    const company_id = Number(meta.companyId || meta.company_id || '')
-    const credits = Number(meta.credits || '') || Math.floor(Number(meta.credit_amount_usd || 0))
-    const requesterCompanyId = Number(req.user?.company_id || 0)
-    if (!company_id || company_id !== requesterCompanyId) {
-      return res.status(403).json({ error: 'Forbidden: session does not belong to this company' })
-    }
-    if (!Number.isInteger(credits) || credits <= 0) {
-      return res.status(400).json({ error: 'Invalid credits on session metadata' })
-    }
-
-    const ref = String(session.id || session.payment_intent || session_id)
-    const reference_id = `stripe:${ref}`
-    const exists = getTransactionByReferenceId(company_id, reference_id)
-    if (exists) {
-      const company = getCompanyById(company_id)
-      return res.json({ ok: true, already_applied: true, credits: company?.credits || 0 })
-    }
-
-    const amount_usd = Number(session.amount_total || 0) ? (Number(session.amount_total) / 100) : Number(credits)
-    markWebhookEventProcessed({ provider: 'stripe', event_id: `session:${session_id}`, company_id, reference_id: ref })
-    const newBalance = creditCompanyWithTransaction({
-      company_id,
-      amount_usd,
-      credits,
-      description: 'Credit purchase via Stripe (confirm-session)',
-      reference_id
-    })
-
-    return res.json({ ok: true, already_applied: false, credits: newBalance })
-  } catch (e) {
-    const msg = String(e?.message || e || '')
-    console.error('[stripe:confirm-session] error:', msg)
-    if (String(e?.type || '').includes('Stripe')) {
-      return res.status(502).json({ error: 'Stripe API error', details: msg })
-    }
-    return res.status(500).json({ error: 'Failed to confirm session', details: msg })
-  }
+  return res.status(410).json({
+    error: 'deprecated',
+    message: 'Credits are applied by Stripe webhooks only. Redirect success pages should refresh /balance.'
+  })
 })
 
 // Emergency fallback endpoint for manual credit application when Stripe API fails
-app.post('/api/billing/credits/apply-manual', requireRole(['company_admin']), async (req, res) => {
+app.post('/api/billing/credits/apply-manual', requireRole(['super_admin']), async (req, res) => {
   try {
+    if (String(process.env.ALLOW_MANUAL_CREDITS || '').trim() !== '1') {
+      return res.status(410).json({ error: 'deprecated', message: 'Manual credit application is disabled.' })
+    }
     const { session_id, credits, amount_usd } = req.body
     if (!session_id || !credits || !amount_usd) {
       return res.status(400).json({ error: 'session_id, credits, and amount_usd are required' })
@@ -2065,88 +1990,103 @@ async function stripeWebhookHandler(req, res) {
   const eventId = String(event?.id || '')
   console.log('[stripe:webhook] received', { id: eventId, type })
 
-  if (type === 'checkout.session.completed' || type === 'checkout.session.async_payment_succeeded') {
-    const session = event.data.object;
-    const meta = session.metadata || {};
-    const company_id = Number(meta.companyId || meta.company_id || '')
-    const credits = Number(meta.credits || '') || Math.floor(Number(meta.credit_amount_usd || 0))
-    const ref = String(session.id || session.payment_intent || eventId || '')
-
-    if (!company_id || !Number.isFinite(company_id) || !Number.isInteger(company_id) || credits <= 0 || !Number.isFinite(credits)) {
-      console.warn('[stripe:webhook] invalid metadata', { company_id, credits, ref, meta })
-      return res.status(200).end()
-    }
-    console.log('[stripe:webhook] validation passed', { company_id, credits, ref, payment_status: session.payment_status })
-
-    const reference_id = `stripe:${ref}`
-    const already = getTransactionByReferenceId(company_id, reference_id)
-    console.log('[stripe:webhook] transaction check', { company_id, reference_id, already: !!already })
-    if (already) {
-      markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: ref })
-      console.log('[stripe:webhook] already applied', { id: eventId, company_id, ref })
-      return res.status(200).end()
-    }
-
-    // Only mark as processed after successfully applying credits
-    const amount_usd = Number(session.amount_total || 0) ? (Number(session.amount_total) / 100) : Number(credits)
-    const newBalance = creditCompanyWithTransaction({
-      company_id,
-      amount_usd,
-      credits: Math.floor(Number(credits)),
-      description: 'Credit purchase via Stripe',
-      reference_id
-    });
-
-    // Mark webhook event as processed only after successful credit application
-    markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: ref })
-
-    console.log('[stripe:webhook] credits added', { company_id, added: credits, amount_usd, balance: newBalance, ref })
-
-    const company = getCompanyById(company_id)
-    const nextNo = getNextInvoiceNo(company_id)
-    const invId = `INV-${company_id}-${String(nextNo).padStart(5, '0')}`
-    const invoice = createInvoice({
-      company_id,
-      invoice_no: nextNo,
-      invoice_id: invId,
-      company_name: company?.name || '',
-      company_logo_url: company?.logo_url || '',
-      billing_email: company?.billing_email || '',
-      invoice_date: new Date().toISOString(),
-      billing_period: 'one-time credit purchase',
-      line_items: [{ description: `Credit Purchase – ${credits} Credits`, quantity: credits, unit_price: 1, subtotal: credits }],
-      subtotal_amount: credits,
-      tax_amount: 0,
-      total_amount: credits,
-      currency: 'USD',
-      payment_provider: 'Stripe',
-      payment_reference_id: `stripe:${ref}`,
-      payment_status: 'paid'
-    })
-
-    try {
-      const pdfPath = await generateInvoicePdf(invoice)
-      setInvoicePdfPath(company_id, invId, pdfPath)
-      appendAudit('invoice_generated', { company_id, invoice_id: invId }, company_id)
-    } catch (e) {
-      console.warn('[invoice] pdf generate failed:', e?.message || e)
-    }
-
-    try {
-      const comp = getCompanyById(company_id) || company || { id: company_id }
-      const to = getCompanyAdminEmail(company_id, comp)
-      if (to) sendPaymentSuccess({ to, company: comp, amount_usd, credits, balance: newBalance, invoice_id: invId, payment_reference_id: `stripe:${ref}` })
-    } catch {}
-
-    try {
-      io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance })
-    } catch {}
+  if (type !== 'checkout.session.completed' && type !== 'checkout.session.async_payment_succeeded') {
+    return res.status(200).end()
   }
 
-  return res.status(200).end()
+  const session = event.data.object
+  const meta = session?.metadata || {}
+
+  const paymentStatus = String(session?.payment_status || '')
+  if (paymentStatus !== 'paid') {
+    console.log('[stripe:webhook] ignoring unpaid session', { eventId, payment_status: paymentStatus, session_id: session?.id })
+    return res.status(200).end()
+  }
+
+  const company_id = Number(meta.companyId || meta.company_id || '')
+  const user_id = Number(meta.userId || meta.user_id || '')
+  const credits = Number(meta.creditAmount || meta.credits || meta.credit_amount || '')
+  const sessionId = String(session?.id || '').trim()
+
+  if (!sessionId || !Number.isInteger(company_id) || company_id <= 0 || !Number.isInteger(credits) || credits <= 0) {
+    console.warn('[stripe:webhook] invalid metadata', { eventId, sessionId, company_id, user_id, credits, meta })
+    return res.status(200).end()
+  }
+
+  const amount_usd = Number(session.amount_total || 0) ? (Number(session.amount_total) / 100) : Number(credits)
+  const reference_id = `stripe:${sessionId}`
+
+  let applied
+  let newBalance
+  try {
+    const result = applyStripeCheckoutCreditsOnce({ company_id, user_id: Number.isInteger(user_id) && user_id > 0 ? user_id : null, session_id: sessionId, amount_usd, credits, reference_id })
+    applied = !!result?.applied
+    newBalance = Number(result?.credits)
+  } catch (e) {
+    console.error('[stripe:webhook] credit apply failed', { eventId, sessionId, company_id, error: String(e?.message || e) })
+    return res.status(500).end()
+  }
+
+  markWebhookEventProcessed({ provider: 'stripe', event_id: eventId, company_id, reference_id: sessionId })
+
+  if (!applied) {
+    console.log('[stripe:webhook] already processed', { eventId, sessionId, company_id, credits, balance: newBalance })
+    return res.status(200).end()
+  }
+
+  console.log('[stripe:webhook] credits added', { eventId, sessionId, company_id, credits, amount_usd, balance: newBalance })
+
+  res.status(200).end()
+
+  setImmediate(async () => {
+    try {
+      const company = getCompanyById(company_id)
+      const nextNo = getNextInvoiceNo(company_id)
+      const invId = `INV-${company_id}-${String(nextNo).padStart(5, '0')}`
+      const invoice = createInvoice({
+        company_id,
+        invoice_no: nextNo,
+        invoice_id: invId,
+        company_name: company?.name || '',
+        company_logo_url: company?.logo_url || '',
+        billing_email: company?.billing_email || '',
+        invoice_date: new Date().toISOString(),
+        billing_period: 'one-time credit purchase',
+        line_items: [{ description: `Credit Purchase – ${credits} Credits`, quantity: credits, unit_price: 1, subtotal: credits }],
+        subtotal_amount: credits,
+        tax_amount: 0,
+        total_amount: credits,
+        currency: 'USD',
+        payment_provider: 'Stripe',
+        payment_reference_id: reference_id,
+        payment_status: 'paid'
+      })
+
+      try {
+        const pdfPath = await generateInvoicePdf(invoice)
+        setInvoicePdfPath(company_id, invId, pdfPath)
+        appendAudit('invoice_generated', { company_id, invoice_id: invId }, company_id)
+      } catch (e) {
+        console.warn('[invoice] pdf generate failed:', e?.message || e)
+      }
+
+      try {
+        const comp = getCompanyById(company_id) || company || { id: company_id }
+        const to = getCompanyAdminEmail(company_id, comp)
+        if (to) sendPaymentSuccess({ to, company: comp, amount_usd, credits, balance: newBalance, invoice_id: invId, payment_reference_id: reference_id })
+      } catch {}
+
+      try {
+        io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance })
+      } catch {}
+    } catch (e) {
+      console.warn('[stripe:webhook] post-processing failed', { eventId, sessionId, company_id, error: String(e?.message || e) })
+    }
+  })
+
+  return
 }
 
-app.post(['/api/webhooks/stripe', '/webhooks/stripe', '/webhook'], stripeWebhookHandler);
 // ---- Screen capture interval configuration ----
 const allowedSeconds = [
   5,
@@ -3591,7 +3531,7 @@ app.post('/api/platform/companies/:company_id/grant-credits', requireRole(['supe
     if (credits > 100000) return res.status(400).json({ error: 'Credits amount too large' })
 
     const actorEmail = req.user?.email || 'super_admin'
-    const ref = `free:${crypto.randomUUID()}`
+    const ref = `free:${uuid()}`
     const desc = `Free credits grant by ${actorEmail}${reason ? `: ${reason}` : ''}`
 
     const newBalance = creditCompanyWithTransaction({
@@ -3628,8 +3568,7 @@ httpServer.listen(PORT, () => {
   console.log(`[server] API listening at ${base}`);
   console.log(`[server] Upload dir: ${uploadPath}`);
 
-  // only create proxy when needed and when LEGACY_PORT !== ACTUAL_PORT
-  if (Number(ACTUAL_PORT) !== Number(LEGACY_PORT)) {
+  if (String(process.env.NODE_ENV || '').toLowerCase() !== 'production' && Number(ACTUAL_PORT) !== Number(LEGACY_PORT)) {
     try {
       const proxy = http.createServer((req, res) => {
         // forward request to actual server

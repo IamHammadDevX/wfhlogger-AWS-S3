@@ -34,59 +34,6 @@ export default function Billing() {
       try {
         const params = new URLSearchParams(window.location.search)
         if (params.get('status') === 'success') {
-          const sessionId = String(params.get('session_id') || '').trim()
-          if (sessionId) {
-            try {
-              const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-              console.log('[billing] confirming session:', sessionId)
-              
-              // Try normal confirm-session with timeout handling
-              try {
-                     const result = await axios.post(
-                       `${base}/api/billing/stripe/confirm-session`, 
-                       { session_id: sessionId }, 
-                       { 
-                         headers,
-                         timeout: 30000 // 30 second timeout
-                       }
-                     )
-                     console.log('[billing] confirm-session result:', result.data)
-                     // Clean up stored amount on success
-                     localStorage.removeItem('pending_credits_amount')
-               } catch (confirmError) {
-                console.error('[billing] confirm-session failed:', confirmError?.response?.data || confirmError?.message)
-                
-                // If it's a timeout (504) or Stripe API error, try manual fallback
-                 if (confirmError.response?.status === 504 || confirmError.response?.data?.error === 'Stripe API error') {
-                   console.log('[billing] trying manual fallback...')
-                   
-                   // Get credits amount from localStorage or use reasonable default
-                   const storedAmount = localStorage.getItem('pending_credits_amount')
-                   const fallbackCredits = storedAmount ? Number(storedAmount) : 100
-                   const fallbackAmount = fallbackCredits
-                  
-                  try {
-                    const manualResult = await axios.post(
-                       `${base}/api/billing/credits/apply-manual`,
-                       { 
-                         session_id: sessionId,
-                         credits: fallbackCredits,
-                         amount_usd: fallbackAmount
-                       },
-                       { headers }
-                     )
-                     console.log('[billing] manual fallback result:', manualResult.data)
-                     // Clean up stored amount on successful manual application
-                     localStorage.removeItem('pending_credits_amount')
-                  } catch (manualError) {
-                    console.error('[billing] manual fallback also failed:', manualError?.response?.data || manualError?.message)
-                  }
-                }
-              }
-            } catch (err) {
-              console.error('[billing] confirm-session error:', err?.response?.data || err?.message || err)
-            }
-          }
           setConfirming(true)
           await pollForCredits(base)
           setConfirming(false)
@@ -145,10 +92,7 @@ export default function Billing() {
       const return_path = (() => {
         try { return window.location.pathname || '/billing' } catch { return '/billing' }
       })()
-      
-      // Store the credits amount in localStorage for fallback
-      localStorage.setItem('pending_credits_amount', String(amount))
-      
+
       const { data } = await axios.post(`${apiBase}/api/billing/stripe/checkout-session`, { amount_usd: amount, return_path }, { headers })
       if (data?.url) {
         window.location.href = data.url

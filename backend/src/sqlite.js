@@ -15,7 +15,8 @@ const fallbacks = {
   transactions: path.resolve(process.cwd(), DATA_DIR, 'transactions.sqlite.json'),
   employee_billing: path.resolve(process.cwd(), DATA_DIR, 'employee_billing.sqlite.json'),
   requests: path.resolve(process.cwd(), DATA_DIR, 'time_requests.sqlite.json'),
-  reset_tokens: path.resolve(process.cwd(), DATA_DIR, 'reset_tokens.sqlite.json')
+  reset_tokens: path.resolve(process.cwd(), DATA_DIR, 'reset_tokens.sqlite.json'),
+  stripe_sessions: path.resolve(process.cwd(), DATA_DIR, 'stripe_sessions.sqlite.json')
 }
 fs.mkdirSync(path.dirname(dbPath), { recursive: true })
 
@@ -163,6 +164,16 @@ try {
     created_at TEXT NOT NULL,
     UNIQUE(provider, event_id)
   );
+
+  CREATE TABLE IF NOT EXISTS stripe_processed_sessions (
+    session_id TEXT PRIMARY KEY,
+    company_id INTEGER NOT NULL,
+    user_id INTEGER,
+    credits INTEGER NOT NULL,
+    amount_usd INTEGER NOT NULL,
+    reference_id TEXT,
+    processed_at TEXT NOT NULL
+  );
   `)
   
   // Migration: Ensure company_id column exists
@@ -261,6 +272,9 @@ try {
 
   console.log('[sqlite] Using better-sqlite3 at', dbPath)
 } catch (e) {
+  if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+    throw new Error(`better-sqlite3 is required in production. Install it and ensure build tools are available. Details: ${String(e?.message || e)}`)
+  }
   console.info('[sqlite] better-sqlite3 not available; using JSON store for dev:', e?.message || e)
   for (const p of Object.values(fallbacks)) {
     if (!fs.existsSync(p)) fs.writeFileSync(p, '[]')
@@ -834,6 +848,56 @@ export function creditCompanyWithTransaction({ company_id, amount_usd, credits, 
   txs.push(record)
   fs.writeFileSync(fallbacks.transactions, JSON.stringify(txs, null, 2))
   return companies[cidx]?.credits || 0
+}
+
+export function applyStripeCheckoutCreditsOnce({ company_id, user_id, session_id, amount_usd, credits, reference_id }) {
+  const now = new Date().toISOString()
+  const cid = Number(company_id)
+  const sid = String(session_id || '').trim()
+  const c = Number(credits)
+  const amt = Number(amount_usd)
+  const ref = String(reference_id || '').trim() || `stripe:${sid}`
+
+  if (!cid || !sid || !Number.isInteger(c) || c <= 0) {
+    throw new Error('invalid_stripe_credit_payload')
+  }
+
+  if (db) {
+    const tx = db.transaction(() => {
+      const ins = db.prepare('INSERT OR IGNORE INTO stripe_processed_sessions (session_id, company_id, user_id, credits, amount_usd, reference_id, processed_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      const info = ins.run(sid, cid, user_id || null, c, Number.isFinite(amt) ? amt : c, ref, now)
+
+      if (info.changes === 0) {
+        const row = db.prepare('SELECT credits FROM companies WHERE id = ?').get(cid)
+        return { applied: false, credits: Number(row?.credits || 0) }
+      }
+
+      db.prepare('UPDATE companies SET credits = credits + ?, plan = CASE WHEN ? > 0 THEN "pro" ELSE plan END, updated_at = ? WHERE id = ?')
+        .run(c, c, now, cid)
+
+      db.prepare('INSERT INTO transactions (company_id, amount, credits, type, description, reference_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(cid, Number.isFinite(amt) ? amt : c, c, 'credit', 'Credit purchase via Stripe (webhook)', ref, 'success', now)
+
+      const row = db.prepare('SELECT credits FROM companies WHERE id = ?').get(cid)
+      return { applied: true, credits: Number(row?.credits || 0) }
+    })
+
+    return tx()
+  }
+
+  if (!fs.existsSync(fallbacks.stripe_sessions)) fs.writeFileSync(fallbacks.stripe_sessions, '[]')
+  const sessions = JSON.parse(fs.readFileSync(fallbacks.stripe_sessions, 'utf-8'))
+  const key = `${cid}:${sid}`
+  if (sessions.some(r => String(r.key) === key)) {
+    const company = getCompanyById(cid)
+    return { applied: false, credits: Number(company?.credits || 0) }
+  }
+
+  sessions.push({ key, company_id: cid, user_id: user_id || null, session_id: sid, credits: c, amount_usd: Number.isFinite(amt) ? amt : c, reference_id: ref, processed_at: now })
+  fs.writeFileSync(fallbacks.stripe_sessions, JSON.stringify(sessions, null, 2))
+
+  const newBalance = creditCompanyWithTransaction({ company_id: cid, amount_usd: Number.isFinite(amt) ? amt : c, credits: c, description: 'Credit purchase via Stripe (webhook)', reference_id: ref })
+  return { applied: true, credits: Number(newBalance || 0) }
 }
 
 export function debitCompanyWithTransaction({ company_id, amount_usd, credits, description, reference_id }) {

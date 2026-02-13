@@ -1,6 +1,4 @@
-import dotenv from 'dotenv'
 import Stripe from 'stripe'
-dotenv.config()
 
 let stripe = null
 
@@ -51,7 +49,7 @@ function buildReturnUrl({ baseOrigin, return_path, status }) {
   return u.toString()
 }
 
-export async function createStripeCheckoutSession({ company_id, admin_user_id, credits, origin, return_path }) {
+export async function createStripeCheckoutSession({ company_id, user_id, creditAmount, origin, return_path }) {
   const s = initStripe()
   const success = (() => {
     const u = new URL(buildReturnUrl({ baseOrigin: origin, return_path, status: 'success' }))
@@ -59,8 +57,8 @@ export async function createStripeCheckoutSession({ company_id, admin_user_id, c
     return u.toString()
   })()
   const cancel = buildReturnUrl({ baseOrigin: origin, return_path, status: 'cancel' })
-  const qty = Number(credits)
-  if (!Number.isInteger(qty) || qty <= 0) throw new Error('Invalid credits')
+  const qty = Number(creditAmount)
+  if (!Number.isInteger(qty) || qty <= 0) throw new Error('Invalid creditAmount')
   const session = await s.checkout.sessions.create({
     mode: 'payment',
     payment_method_types: ['card'],
@@ -74,9 +72,11 @@ export async function createStripeCheckoutSession({ company_id, admin_user_id, c
     }],
     success_url: success,
     cancel_url: cancel,
+    client_reference_id: String(user_id || company_id || ''),
     metadata: {
       companyId: String(company_id || ''),
-      adminUserId: String(admin_user_id || ''),
+      userId: String(user_id || ''),
+      creditAmount: String(qty),
       credits: String(qty),
     }
   })
