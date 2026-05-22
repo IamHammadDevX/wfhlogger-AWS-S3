@@ -426,6 +426,12 @@ if (JWT_SECRET === 'dev_secret') {
 if (!ALLOWED_ORIGINS.length) {
   console.warn('[cors] ALLOWED_ORIGINS not set. CORS is wide open (*) for development.');
 }
+if (GOOGLE_CLIENT_ID) {
+  const scope = 'https://www.googleapis.com/auth/drive.file';
+  console.log('[drive] OAuth scope:', scope, '- Non-sensitive, no Google verification needed');
+  console.log('[drive] To allow all users: Go to Google Cloud Console > OAuth consent screen > Publish App');
+  console.log('[drive] Or add test users at: https://console.cloud.google.com/apis/credentials/consent');
+}
 
 // Seed default Super Admin on startup
 seedDefaultSuperAdmin();
@@ -916,7 +922,7 @@ app.get('/api/drive/oauth/start', requireRole(['employee']), (req, res) => {
     u.searchParams.set('response_type', 'code');
     u.searchParams.set('access_type', 'offline');
     u.searchParams.set('prompt', 'consent');
-    u.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly');
+    u.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.file');
     u.searchParams.set('state', state);
     res.json({ url: u.toString() });
   } catch {
