@@ -52,9 +52,10 @@ function buildReturnUrl({ baseOrigin, return_path, status }) {
 export async function createStripeCheckoutSession({ company_id, user_id, creditAmount, origin, return_path }) {
   const s = initStripe()
   const success = (() => {
-    const u = new URL(buildReturnUrl({ baseOrigin: origin, return_path, status: 'success' }))
-    u.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}')
-    return u.toString()
+    // Build URL manually — URLSearchParams encodes { } which Stripe won't recognize
+    const base = buildReturnUrl({ baseOrigin: origin, return_path, status: 'success' })
+    const sep = base.includes('?') ? '&' : '?'
+    return `${base}${sep}session_id={CHECKOUT_SESSION_ID}`
   })()
   const cancel = buildReturnUrl({ baseOrigin: origin, return_path, status: 'cancel' })
   const qty = Number(creditAmount)
@@ -89,4 +90,25 @@ export function verifyStripeWebhookAndExtract(rawBody, signature) {
   if (!secret) throw new Error('STRIPE_WEBHOOK_SECRET missing')
   if (!signature) throw new Error('stripe-signature missing')
   return s.webhooks.constructEvent(rawBody, signature, secret)
+}
+
+export async function retrieveCheckoutSession(sessionId) {
+  const s = initStripe()
+  return s.checkout.sessions.retrieve(sessionId)
+}
+
+export async function listRecentCheckoutSessions({ company_id, limit = 10 }) {
+  const s = initStripe()
+  // Search for sessions with matching companyId metadata, created in last 2 hours
+  const twoHoursAgo = Math.floor((Date.now() - 2 * 3600 * 1000) / 1000)
+  const sessions = await s.checkout.sessions.list({
+    limit,
+    created: { gte: twoHoursAgo },
+    expand: ['data.payment_intent'],
+  })
+  // Filter to sessions matching this company
+  return sessions.data.filter(session => {
+    const meta = session.metadata || {}
+    return String(meta.companyId || meta.company_id || '') === String(company_id)
+  })
 }

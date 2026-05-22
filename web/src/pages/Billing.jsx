@@ -18,6 +18,8 @@ export default function Billing() {
   const [error, setError] = useState('')
   const [apiBase, setApiBase] = useState('')
   const [amount, setAmount] = useState(25)
+  const [resolving, setResolving] = useState(false)
+  const [resolveMsg, setResolveMsg] = useState('')
   const presets = [10, 25, 50, 100, 250]
 
   const displayCredits = Math.max(Number(credits || 0), Number(balance || 0))
@@ -35,7 +37,7 @@ export default function Billing() {
         const params = new URLSearchParams(window.location.search)
         if (params.get('status') === 'success') {
           setConfirming(true)
-          await pollForCredits(base)
+          await confirmAndRefresh(base, params.get('session_id'))
           setConfirming(false)
         }
       } catch {
@@ -68,8 +70,17 @@ export default function Billing() {
     }
   }
 
-  const pollForCredits = async (base) => {
+  const confirmAndRefresh = async (base, sessionId) => {
     const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    try {
+      // Skip confirm-session if session_id is literal template (Stripe didn't replace it)
+      if (sessionId && !sessionId.includes('{CHECKOUT_SESSION_ID}')) {
+        await axios.post(`${base}/api/billing/stripe/confirm-session`, { session_id: sessionId }, { headers })
+      }
+    } catch (e) {
+      console.warn('[billing] confirm-session failed, falling back to poll:', e?.response?.data || e?.message)
+    }
+    // Poll balance until credits update (catches webhook-delayed or already-applied)
     const lastKnown = Number(credits ?? balance ?? 0)
     for (let i = 0; i < 15; i++) {
       await new Promise(r => setTimeout(r, 2000))
@@ -105,6 +116,25 @@ export default function Billing() {
     }
   }
 
+  const handleResolvePending = async () => {
+    setResolving(true)
+    setResolveMsg('')
+    try {
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      const { data } = await axios.post(`${apiBase}/api/billing/stripe/resolve-pending`, {}, { headers })
+      setResolveMsg(data?.message || 'No pending credits found')
+      if (data?.resolved > 0) {
+        setBalance(data?.balance ?? balance)
+        await fetchData(apiBase)
+        await refreshCredits()
+      }
+    } catch (e) {
+      setResolveMsg('Failed to check for pending credits')
+    } finally {
+      setResolving(false)
+    }
+  }
+
   if (loading && balance === undefined) return <div className="p-8 text-slate-500 dark:text-slate-400">Loading...</div>
 
   return (
@@ -118,13 +148,25 @@ export default function Billing() {
               <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Available Credits</h2>
               <div className="text-4xl font-bold text-slate-900 dark:text-white">{displayCredits}</div>
               <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">$1.00 / active employee / month</p>
+              {resolveMsg && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{resolveMsg}</p>}
             </div>
-            <div className="text-right">
+            <div className="text-right flex flex-col items-end gap-2">
               <div className="text-xs text-slate-500 dark:text-slate-400">Secured by</div>
-              <div className="mt-1 inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
                 <span className="font-semibold">Stripe</span>
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M2 7a5 5 0 015-5h10a5 5 0 015 5v10a5 5 0 01-5 5H7a5 5 0 01-5-5V7z"/></svg>
               </div>
+              <button
+                onClick={handleResolvePending}
+                disabled={resolving}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition ${
+                  resolving
+                    ? 'bg-slate-100 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                    : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                }`}
+              >
+                {resolving ? 'Checking...' : 'Resolve Pending Credits'}
+              </button>
             </div>
           </div>
 
@@ -132,7 +174,7 @@ export default function Billing() {
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Add Credits</h2>
             {error && <div className="mb-4 text-red-600 dark:text-red-400 text-sm">{error}</div>}
             {!error && creditsError && <div className="mb-4 text-red-600 dark:text-red-400 text-sm">{creditsError}</div>}
-            {!error && confirming && <div className="mb-4 text-slate-600 dark:text-slate-300 text-sm">Payment received. Waiting for Stripe confirmation...</div>}
+            {!error && confirming && <div className="mb-4 text-slate-600 dark:text-slate-300 text-sm">Payment confirmed! Applying credits...</div>}
             <div className="flex flex-wrap gap-3 mb-4">
               {presets.map(v => (
                 <button

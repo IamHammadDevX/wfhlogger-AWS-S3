@@ -16,7 +16,7 @@ import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } 
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
-import { createStripeCheckoutSession, verifyStripeWebhookAndExtract } from './payments/stripe.js';
+import { createStripeCheckoutSession, verifyStripeWebhookAndExtract, retrieveCheckoutSession, listRecentCheckoutSessions } from './payments/stripe.js';
 import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning } from './email.js';
 import { runEmployeeMonthlyBilling, getCompanyAdminEmail } from './subscriptionBilling.js'
 import cron from 'node-cron';
@@ -1926,10 +1926,110 @@ app.post('/api/billing/stripe/checkout-session', requireRole(['company_admin']),
 });
 
 app.post('/api/billing/stripe/confirm-session', requireRole(['company_admin']), async (req, res) => {
-  return res.status(410).json({
-    error: 'deprecated',
-    message: 'Credits are applied by Stripe webhooks only. Redirect success pages should refresh /balance.'
-  })
+  try {
+    if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' });
+    
+    const { session_id } = req.body || {};
+    if (!session_id) return res.status(400).json({ error: 'session_id is required' });
+
+    const company_id = req.user?.company_id;
+    if (!company_id) return res.status(403).json({ error: 'Invalid company' });
+
+    // Retrieve session from Stripe to verify payment
+    const session = await retrieveCheckoutSession(session_id);
+    
+    if (session.payment_status !== 'paid') {
+      return res.status(402).json({ error: 'Payment not completed', payment_status: session.payment_status });
+    }
+
+    const meta = session?.metadata || {};
+    const metaCompanyId = Number(meta.companyId || meta.company_id || '');
+    
+    // Verify session belongs to this company
+    if (metaCompanyId !== company_id) {
+      return res.status(403).json({ error: 'Session does not belong to your company' });
+    }
+
+    const credits = Number(meta.creditAmount || meta.credits || '');
+    if (!Number.isInteger(credits) || credits <= 0) {
+      return res.status(400).json({ error: 'Invalid credit amount in session metadata' });
+    }
+
+    const amount_usd = Number(session.amount_total || 0) ? (Number(session.amount_total) / 100) : credits;
+    const user_id = Number(meta.userId || meta.user_id || '');
+    const reference_id = `stripe:${session_id}`;
+
+    // Check if already applied (by webhook or previous confirm)
+    const exists = getTransactionByReferenceId(company_id, reference_id);
+    if (exists) {
+      const company = getCompanyById(company_id);
+      return res.json({ ok: true, already_applied: true, credits: company?.credits || 0 });
+    }
+
+    // Apply credits
+    const result = applyStripeCheckoutCreditsOnce({
+      company_id,
+      user_id: Number.isInteger(user_id) && user_id > 0 ? user_id : null,
+      session_id,
+      amount_usd,
+      credits,
+      reference_id
+    });
+
+    const newBalance = Number(result?.credits || 0);
+    console.log('[stripe:confirm-session] credits applied', { company_id, session_id, credits, amount_usd, balance: newBalance });
+
+    // Emit real-time update
+    try {
+      io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance });
+    } catch {}
+
+    // Generate invoice async
+    setImmediate(async () => {
+      try {
+        const company = getCompanyById(company_id);
+        const nextNo = getNextInvoiceNo(company_id);
+        const invId = `INV-${company_id}-${String(nextNo).padStart(5, '0')}`;
+        const invoice = createInvoice({
+          company_id,
+          invoice_no: nextNo,
+          invoice_id: invId,
+          company_name: company?.name || '',
+          company_logo_url: company?.logo_url || '',
+          billing_email: company?.billing_email || '',
+          invoice_date: new Date().toISOString(),
+          billing_period: 'one-time credit purchase',
+          line_items: [{ description: `Credit Purchase – ${credits} Credits`, quantity: credits, unit_price: 1, subtotal: credits }],
+          subtotal_amount: credits,
+          tax_amount: 0,
+          total_amount: credits,
+          currency: 'USD',
+          payment_provider: 'Stripe',
+          payment_reference_id: reference_id,
+          payment_status: 'paid'
+        });
+        try {
+          const pdfPath = await generateInvoicePdf(invoice);
+          setInvoicePdfPath(company_id, invId, pdfPath);
+          appendAudit('invoice_generated', { company_id, invoice_id: invId }, company_id);
+        } catch (e) {
+          console.warn('[invoice] pdf generate failed:', e?.message || e);
+        }
+        try {
+          const comp = getCompanyById(company_id) || company || { id: company_id };
+          const to = getCompanyAdminEmail(company_id, comp);
+          if (to) sendPaymentSuccess({ to, company: comp, amount_usd, credits, balance: newBalance, invoice_id: invId, payment_reference_id: reference_id });
+        } catch {}
+      } catch (e) {
+        console.warn('[stripe:confirm-session] post-processing failed:', e?.message || e);
+      }
+    });
+
+    return res.json({ ok: true, already_applied: false, credits: newBalance });
+  } catch (e) {
+    console.error('[stripe:confirm-session] error:', e);
+    return res.status(500).json({ error: 'Failed to confirm session', details: String(e?.message || e) });
+  }
 })
 
 // Emergency fallback endpoint for manual credit application when Stripe API fails
@@ -1970,6 +2070,70 @@ app.post('/api/billing/credits/apply-manual', requireRole(['super_admin']), asyn
     return res.status(500).json({ error: 'Failed to apply credits manually', details: String(e?.message || e) })
   }
 })
+
+// Resolve pending credits — finds any paid Stripe sessions not yet processed
+app.post('/api/billing/stripe/resolve-pending', requireRole(['company_admin']), async (req, res) => {
+  try {
+    if (PAYMENT_PROVIDER !== 'stripe') return res.status(503).json({ error: 'Stripe disabled' });
+    const company_id = req.user?.company_id;
+    if (!company_id) return res.status(403).json({ error: 'Invalid company' });
+
+    const sessions = await listRecentCheckoutSessions({ company_id, limit: 20 });
+    if (!sessions.length) return res.json({ ok: true, resolved: 0, message: 'No recent Stripe sessions found' });
+
+    let resolved = 0;
+    let lastBalance = 0;
+
+    for (const session of sessions) {
+      const sessionId = String(session.id || '').trim();
+      if (!sessionId) continue;
+      if (session.payment_status !== 'paid') continue;
+
+      const meta = session.metadata || {};
+      const credits = Number(meta.creditAmount || meta.credits || '');
+      if (!Number.isInteger(credits) || credits <= 0) continue;
+
+      const reference_id = `stripe:${sessionId}`;
+      const exists = getTransactionByReferenceId(company_id, reference_id);
+      if (exists) {
+        lastBalance = Number(exists.credits || 0);
+        continue;
+      }
+
+      const amount_usd = Number(session.amount_total || 0) ? (Number(session.amount_total) / 100) : credits;
+      const user_id = Number(meta.userId || meta.user_id || '');
+
+      try {
+        const result = applyStripeCheckoutCreditsOnce({
+          company_id,
+          user_id: Number.isInteger(user_id) && user_id > 0 ? user_id : null,
+          session_id: sessionId,
+          amount_usd,
+          credits,
+          reference_id
+        });
+        if (result?.applied) {
+          resolved++;
+          lastBalance = Number(result?.credits || 0);
+          console.log('[stripe:resolve-pending] applied credits', { company_id, session_id: sessionId, credits, balance: lastBalance });
+        }
+      } catch (e) {
+        console.warn('[stripe:resolve-pending] failed for session', { session_id: sessionId, error: String(e?.message || e) });
+      }
+    }
+
+    if (resolved > 0) {
+      try {
+        io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: lastBalance });
+      } catch {}
+    }
+
+    return res.json({ ok: true, resolved, balance: lastBalance, message: resolved > 0 ? `Applied ${resolved} pending credit purchase(s)` : 'No pending credits found' });
+  } catch (e) {
+    console.error('[stripe:resolve-pending] error:', e);
+    return res.status(500).json({ error: 'Failed to resolve pending credits', details: String(e?.message || e) });
+  }
+});
 
 // Stripe Webhook (raw body needed)
 async function stripeWebhookHandler(req, res) {
