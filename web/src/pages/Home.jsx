@@ -662,11 +662,11 @@ export default function Home() {
           </div>
 
           <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-slate-600">
-              © 2026 Time Tracker System. Built with precision for enterprise teams.
+            <p className="text-xs text-slate-500">
+              Copyright © {new Date().getFullYear()} Time Tracker System. All rights reserved.
             </p>
-            <p className="text-xs text-slate-600">
-              Developed by{' '}
+            <p className="text-xs text-slate-500">
+              Built by{' '}
               <a href="https://github.com/IamHammadDevX/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 font-medium">
                 Hammad
               </a>
