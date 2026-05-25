@@ -1222,8 +1222,9 @@ app.post('/api/employees/timezone', requireRole(['manager', 'company_admin']), (
       if (!teamEmails.includes(target.email)) return res.status(403).json({ error: 'Forbidden: not your team' })
     }
 
+    const oldTz = target.timezone || getEmployeeTimezone(target.email, company_id) || 'UTC'
     const tz = setEmployeeTimezone(target.email, company_id, timezone)
-    appendAudit('employee_timezone_updated', { actorId: req.user?.uid || req.user?.sub, employeeEmail: target.email, timezone: tz }, company_id)
+    appendAudit('employee_timezone_updated', { actorId: req.user?.uid || req.user?.sub, employeeEmail: target.email, oldTimezone: oldTz, timezone: tz }, company_id)
     res.json({ ok: true, email: target.email, timezone: tz })
   } catch (e) {
     res.status(500).json({ error: 'Failed to update timezone' })
@@ -1417,11 +1418,27 @@ app.get('/api/admin/audit-logs', requireRole(['company_admin']), (req, res) => {
       const d = l?.details || {}
       const actorName = actorUser?.full_name || actorUser?.name || actorUser?.email || String(getActorKey(d) || 'Actor')
       const targetName = targetUser?.full_name || targetUser?.name || targetUser?.email || String(getEmployeeKey(d) || 'Employee')
+      const secsToLabel = (s) => {
+        if (s == null) return 'none'
+        const m = Math.floor(Number(s) / 60)
+        const sec = Number(s) % 60
+        return m > 0 ? `${m}min${sec > 0 ? ` ${sec}sec` : ''}` : `${sec}sec`
+      }
       switch (String(l?.type || '')) {
-        case 'employee_timezone_updated':
-          return `${actorName} updated ${targetName} timezone to ${d.timezone || 'UTC'}`
-        case 'interval_set':
-          return `${actorName} set capture interval for ${targetName} to ${d.intervalMinutes || '?'}m`
+        case 'employee_timezone_updated': {
+          const oldVal = d.oldTimezone || null
+          const newVal = d.timezone || 'UTC'
+          return oldVal && oldVal !== newVal
+            ? `${actorName} changed ${targetName} timezone from ${oldVal} to ${newVal}`
+            : `${actorName} set ${targetName} timezone to ${newVal}`
+        }
+        case 'interval_set': {
+          const oldVal = secsToLabel(d.oldIntervalSeconds)
+          const newVal = secsToLabel(d.intervalSeconds)
+          return oldVal !== 'none' && oldVal !== newVal
+            ? `${actorName} changed ${targetName} capture interval from ${oldVal} to ${newVal}`
+            : `${actorName} set ${targetName} capture interval to ${newVal}`
+        }
         case 'company_profile_updated':
           return `${actorName} updated company profile`
         case 'live_view_start':
@@ -2339,10 +2356,11 @@ app.post('/api/capture-interval', requireRole(['manager', 'company_admin']), (re
       if (!teamEmails.includes(employeeId)) return res.status(403).json({ error: 'Forbidden: not your team' });
     }
   const intervals = JSON.parse(fs.readFileSync(intervalsFile, 'utf-8'));
+  const oldSecs = intervals[employeeId] || null
   intervals[employeeId] = secs;
   fs.writeFileSync(intervalsFile, JSON.stringify(intervals, null, 2));
   // Audit
-  appendAudit('interval_set', { actorId: req.user?.uid || req.user?.sub, employeeId, intervalSeconds: secs }, company_id);
+  appendAudit('interval_set', { actorId: req.user?.uid || req.user?.sub, employeeId, oldIntervalSeconds: oldSecs, intervalSeconds: secs }, company_id);
   // Notify the employee in real-time via Socket.IO so their desktop reflects and starts tracking
   try {
     io.to(userRoom(employeeId)).emit('interval:assigned', { employeeId, intervalSeconds: secs });
