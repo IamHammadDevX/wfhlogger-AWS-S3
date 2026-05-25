@@ -422,6 +422,39 @@ export function recordEmployeeTempPassword(company_id, employee_email, temp_pass
   return rec
 }
 
+export function updateEmployeeTempPassword(company_id, employee_email, new_password) {
+  const now = new Date().toISOString()
+  if (db) {
+    // Find latest row for this employee and update password
+    const latest = db.prepare('SELECT id FROM employee_creds WHERE company_id = ? AND employee_email = ? ORDER BY created_at DESC LIMIT 1').get(company_id, employee_email)
+    if (latest) {
+      db.prepare('UPDATE employee_creds SET temp_password = ?, created_at = ? WHERE id = ?').run(new_password, now, latest.id)
+      return { id: latest.id, company_id, employee_email, temp_password: new_password, created_at: now }
+    }
+    // No existing row — insert new
+    const stmt = db.prepare('INSERT INTO employee_creds (company_id, employee_email, temp_password, created_at) VALUES (?, ?, ?, ?)')
+    const info = stmt.run(company_id, employee_email, new_password, now)
+    return { id: info.lastInsertRowid, company_id, employee_email, temp_password: new_password, created_at: now }
+  }
+  const file = path.resolve(process.cwd(), DATA_DIR, 'employee_creds.sqlite.json')
+  if (!fs.existsSync(file)) fs.writeFileSync(file, '[]')
+  const arr = JSON.parse(fs.readFileSync(file, 'utf-8'))
+  const existing = arr.filter(r => r.company_id == company_id && r.employee_email === employee_email)
+  if (existing.length > 0) {
+    // Update latest matching record
+    const last = existing.sort((a, b) => a.id > b.id ? -1 : 1)[0]
+    last.temp_password = new_password
+    last.created_at = now
+    fs.writeFileSync(file, JSON.stringify(arr, null, 2))
+    return last
+  }
+  const id = (arr[arr.length - 1]?.id || 0) + 1
+  const rec = { id, company_id, employee_email, temp_password: new_password, created_at: now }
+  arr.push(rec)
+  fs.writeFileSync(file, JSON.stringify(arr, null, 2))
+  return rec
+}
+
 export function listEmployeeTempPasswords(company_id) {
   if (db) {
     return db.prepare('SELECT employee_email, temp_password, created_at FROM employee_creds WHERE company_id = ? ORDER BY created_at DESC').all(company_id)

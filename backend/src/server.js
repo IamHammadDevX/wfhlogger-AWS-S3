@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, updateEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
@@ -2640,9 +2640,9 @@ app.post('/api/employee/change-password', requireRole(['employee']), (req, res) 
     // Update password
     upsertEmployeePassword(email, new_password, company_id);
 
-    // Record updated password in employee_creds so manager/admin can see it
+    // Update existing password row so manager sees one entry, not duplicates
     try {
-      recordEmployeeTempPassword(company_id, email, new_password);
+      updateEmployeeTempPassword(company_id, email, new_password);
     } catch {}
 
     // Emit socket event so manager/admin knows password changed
