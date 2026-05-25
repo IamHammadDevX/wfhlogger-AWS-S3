@@ -37,6 +37,9 @@ export default function Setup() {
   const [inviteTimezone, setInviteTimezone] = useState('UTC')
   const [inviteIntervalSeconds, setInviteIntervalSeconds] = useState(180)
   const [inviteMsg, setInviteMsg] = useState('')
+  const [inviteManagerId, setInviteManagerId] = useState('')
+  const [managers, setManagers] = useState([])
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
   const [creds, setCreds] = useState([])
   const [teamEmployees, setTeamEmployees] = useState([])
   const [employeeTzDraft, setEmployeeTzDraft] = useState({})
@@ -55,17 +58,34 @@ export default function Setup() {
     return map
   }, [])
 
+  // Detect current role
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('token')
+      const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+      const role = (payload.role === 'super_admin' && payload.company_id != null) ? 'company_admin' : payload.role
+      setIsCompanyAdmin(role === 'company_admin')
+    } catch {}
+  }, [])
+
   const loadAll = async () => {
     const BASE = await resolveApiBase()
     API = BASE
     const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    const [orgRes, balRes, credsRes, employeesRes, intervalsRes] = await Promise.allSettled([
+    const [orgRes, balRes, credsRes, employeesRes, intervalsRes, mgrRes] = await Promise.allSettled([
       axios.get(`${BASE}/api/team`, { headers }).catch(() => axios.get(`${BASE}/api/org`, { headers })),
       axios.get(`${BASE}/api/billing/balance`, { headers }),
       axios.get(`${BASE}/api/employees/initial-creds`, { headers }),
       axios.get(`${BASE}/api/employees`, { headers }),
       axios.get(`${BASE}/api/capture-intervals`, { headers }),
+      axios.get(`${BASE}/api/admin/managers`, { headers }).catch(() => ({ data: { managers: [] } })),
     ])
+
+    // Load managers list for company admin
+    try {
+      const mgrData = mgrRes.status === 'fulfilled' ? (mgrRes.value?.data?.managers || []) : []
+      setManagers(mgrData)
+    } catch {}
 
     try {
       const orgData = orgRes.status === 'fulfilled' ? orgRes.value?.data : null
@@ -137,17 +157,20 @@ export default function Setup() {
     try {
       const BASE = await resolveApiBase()
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      const body = { email: inviteEmail, name: inviteName, country: inviteCountry, timezone: inviteTimezone, managerId: null, password: null }
+      const managerId = isCompanyAdmin ? (inviteManagerId || null) : null
+      const body = { email: inviteEmail, name: inviteName, country: inviteCountry, timezone: inviteTimezone, managerId, password: null }
       // Call /api/employees directly to create the user
       const r = await axios.post(`${BASE}/api/employees`, body, { headers })
       const login = r.data?.login
       await axios.post(`${BASE}/api/capture-interval`, { employeeId: login?.email || inviteEmail, intervalSeconds: Number(inviteIntervalSeconds) }, { headers })
-      setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}`)
+      const mgrName = managers.find(m => String(m.id) === String(inviteManagerId))?.full_name || ''
+      setInviteMsg(`Employee created! Email: ${login?.email}, Temp Password: ${login?.tempPassword}${mgrName ? `, Manager: ${mgrName}` : ''}`)
       setInviteEmail('')
       setInviteName('')
       setInviteCountry('United States')
       setInviteTimezone('UTC')
       setInviteIntervalSeconds(180)
+      setInviteManagerId('')
       try { 
         refreshCredits()
         await loadAll()
@@ -286,6 +309,23 @@ export default function Setup() {
               <CountrySelect value={inviteCountry} onChange={e => setInviteCountry(e.target.value)} required />
               <TimezoneSelect value={inviteTimezone} onChange={e => setInviteTimezone(e.target.value)} required />
             </div>
+
+            {isCompanyAdmin && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Assign to Manager</label>
+                <select
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                  value={inviteManagerId}
+                  onChange={e => setInviteManagerId(e.target.value)}
+                >
+                  <option value="">— No manager —</option>
+                  {managers.map(m => (
+                    <option key={m.id} value={m.id}>{m.full_name || m.email} {m.organization?.name ? `(${m.organization.name})` : ''}</option>
+                  ))}
+                </select>
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Select which manager this employee reports to. Only the assigned manager can see this employee.</div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Screenshot interval</label>
