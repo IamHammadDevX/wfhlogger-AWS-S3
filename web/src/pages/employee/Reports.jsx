@@ -57,18 +57,38 @@ export default function EmployeeReports() {
       // Add the new report to the list
       setReports(prev => [response.data, ...prev])
       
-      // Download the report (force browser download)
+      // Download the report via blob (works across domains)
       if (response.data.download_url) {
-        const link = document.createElement('a')
-        const url = response.data.download_url.startsWith('/')
-          ? getApiBaseSync() + response.data.download_url
-          : response.data.download_url
-        link.href = url
-        const fname = response.data.download_url.split('/').pop()
-        link.setAttribute('download', fname || 'report')
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        try {
+          const token = localStorage.getItem('token')
+          const dlUrl = response.data.download_url.startsWith('/')
+            ? getApiBaseSync() + response.data.download_url
+            : response.data.download_url
+          const dlResp = await axios.get(dlUrl, {
+            responseType: 'blob',
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          const blob = dlResp.data
+          const link = document.createElement('a')
+          link.href = URL.createObjectURL(blob)
+          const fname = response.data.download_url.split('/').pop() || 'report.csv'
+          link.setAttribute('download', fname)
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(link.href)
+        } catch (dlErr) {
+          console.warn('[reports] blob download failed, falling back to direct URL')
+          const link = document.createElement('a')
+          const url = response.data.download_url.startsWith('/')
+            ? getApiBaseSync() + response.data.download_url
+            : response.data.download_url
+          link.href = url
+          link.setAttribute('download', response.data.download_url.split('/').pop() || 'report')
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        }
       }
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || 'Failed to generate report'
@@ -190,16 +210,6 @@ export default function EmployeeReports() {
               <label className="flex items-center">
                 <input
                   type="radio"
-                  value="pdf"
-                  checked={format === 'pdf'}
-                  onChange={(e) => setFormat(e.target.value)}
-                  className="mr-2"
-                />
-                <span className="text-sm text-slate-700 dark:text-slate-300">PDF</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
                   value="csv"
                   checked={format === 'csv'}
                   onChange={(e) => setFormat(e.target.value)}
@@ -260,13 +270,35 @@ export default function EmployeeReports() {
                   </div>
                   <div className="flex items-center gap-2">
                     {report.download_url && (
-                      <a
-                        href={report.download_url.startsWith('/') ? (getApiBaseSync() + report.download_url) : report.download_url}
-                        download
+                      <button
+                        onClick={async () => {
+                          try {
+                            const token = localStorage.getItem('token')
+                            const url = report.download_url.startsWith('/')
+                              ? getApiBaseSync() + report.download_url
+                              : report.download_url
+                            const resp = await axios.get(url, {
+                              responseType: 'blob',
+                              headers: { Authorization: `Bearer ${token}` }
+                            })
+                            const link = document.createElement('a')
+                            link.href = URL.createObjectURL(resp.data)
+                            link.setAttribute('download', url.split('/').pop() || 'report')
+                            document.body.appendChild(link)
+                            link.click()
+                            document.body.removeChild(link)
+                            URL.revokeObjectURL(link.href)
+                          } catch {
+                            const url = report.download_url.startsWith('/')
+                              ? getApiBaseSync() + report.download_url
+                              : report.download_url
+                            window.open(url, '_blank')
+                          }
+                        }}
                         className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                       >
                         Download
-                      </a>
+                      </button>
                     )}
                     {report.expires_at && (
                       <span className="text-xs text-slate-500 dark:text-slate-400">

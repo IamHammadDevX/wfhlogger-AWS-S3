@@ -2640,9 +2640,14 @@ app.post('/api/employee/change-password', requireRole(['employee']), (req, res) 
     // Update password
     upsertEmployeePassword(email, new_password, company_id);
 
+    // Record updated password in employee_creds so manager/admin can see it
+    try {
+      recordEmployeeTempPassword(company_id, email, new_password);
+    } catch {}
+
     // Emit socket event so manager/admin knows password changed
     try {
-      io.to(`company:${company_id}`).emit('employee:password_changed', { email, company_id });
+      io.to(`company:${company_id}`).emit('employee:password_changed', { email, company_id, new_password });
     } catch {}
 
     console.log('[employee:change-password] password changed for', email);
