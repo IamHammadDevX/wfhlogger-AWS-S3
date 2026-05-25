@@ -165,6 +165,49 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
+      {/* Manual Requests */}
+      {(summary?.approved_requests?.length > 0 || summary?.rejected_requests?.length > 0) && (
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Time Requests</h2>
+          </div>
+          <div className="p-6 space-y-3">
+            {summary.approved_requests?.map(r => (
+              <div key={r.id} className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-900/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <div>
+                    <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Manual Request Approved</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                      {r.date} · {r.start_time} - {r.end_time} · {formatHours(r.duration / 3600)} · {r.reason}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                  Approved
+                </span>
+              </div>
+            ))}
+            {summary.rejected_requests?.map(r => (
+              <div key={r.id} className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-900/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800 dark:text-red-200">Manual Request Rejected</p>
+                    <p className="text-xs text-red-600 dark:text-red-400">
+                      {r.date} · {r.start_time} - {r.end_time} · {formatHours(r.duration / 3600)} · {r.reason}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                  Rejected
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Recent Activity */}
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
         <div className="p-6 border-b border-slate-200 dark:border-slate-700">

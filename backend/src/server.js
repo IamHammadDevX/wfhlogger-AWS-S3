@@ -2445,9 +2445,9 @@ app.get('/api/employee/dashboard-summary', requireRole(['employee']), (req, res)
     }, 0);
 
     const toHours = (secs) => Number((secs/3600).toFixed(1));
-    const daily_hours = toHours(daySeconds + manualSeconds);
-    const weekly_hours = toHours(weekSeconds + manualSeconds);
-    const monthly_hours = toHours(monthSeconds + manualSeconds);
+    const daily_hours = toHours(daySeconds);
+    const weekly_hours = toHours(weekSeconds);
+    const monthly_hours = toHours(monthSeconds);
 
     const recent_sessions = sessions.slice().sort((a,b)=> (a.startedAt < b.startedAt?1:-1)).slice(0,5).map(s => {
       const startMs = new Date(s.startedAt).getTime();
@@ -2459,7 +2459,26 @@ app.get('/api/employee/dashboard-summary', requireRole(['employee']), (req, res)
       return { start_time_utc: s.startedAt, end_time_utc: s.endedAt, start_time_local: formatLocalDateTime(startMs, userTimezone, { withSeconds: true }), end_time_local: s.endedAt ? formatLocalDateTime(Date.parse(s.endedAt), userTimezone, { withSeconds: true }) : null, duration: active, idle_time: idle, productivity_status: status, timezone: userTimezone };
     });
 
-    res.json({ daily_hours, weekly_hours, monthly_hours, productivity_score: Math.round(Math.min(100, Math.max(0, (daily_hours/8)*100))), recent_sessions, timezone: userTimezone });
+    // Build approved/rejected requests with duration info
+    const formatRequest = (r) => {
+      const tz = String(r.timezone || userTimezone || 'UTC').trim() || 'UTC'
+      const startUtc = r.start_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(r.date, r.start_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      const endUtc = r.end_utc || (() => {
+        const ms = parseLocalDateTimeToUtcMs(r.date, r.end_time, tz)
+        return ms == null ? null : toIsoZ(ms)
+      })()
+      const duration = (startUtc && endUtc) ? Math.max(0, Math.floor((Date.parse(endUtc) - Date.parse(startUtc)) / 1000)) : 0
+      return { id: r.id, date: r.date, start_time: r.start_time, end_time: r.end_time, reason: r.reason, status: r.status, duration, timezone: tz, start_utc: startUtc, end_utc: endUtc, created_at: r.created_at, action_at: r.action_at }
+    }
+
+    const approved_requests = approvedManual.map(formatRequest)
+    const allRequests = getTimeRequests(company_id, req.user?.uid) || []
+    const rejected_requests = allRequests.filter(r => r.status === 'rejected').map(formatRequest)
+
+    res.json({ daily_hours, weekly_hours, monthly_hours, approved_requests, rejected_requests, recent_sessions, timezone: userTimezone });
   } catch (e) {
     console.error('[employee:summary] error:', e);
     res.status(500).json({ error: 'Failed to load summary' });
@@ -2592,6 +2611,45 @@ app.put('/api/employee/profile', requireRole(['employee']), (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// Employee Change Password
+app.post('/api/employee/change-password', requireRole(['employee']), (req, res) => {
+  try {
+    const { current_password, new_password } = req.body || {};
+    const email = req.user?.sub;
+    const company_id = req.user?.company_id;
+
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    // Verify current password
+    const user = getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (!verifyPassword(user, current_password)) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Update password
+    upsertEmployeePassword(email, new_password, company_id);
+
+    // Emit socket event so manager/admin knows password changed
+    try {
+      io.to(`company:${company_id}`).emit('employee:password_changed', { email, company_id });
+    } catch {}
+
+    console.log('[employee:change-password] password changed for', email);
+    res.json({ ok: true, message: 'Password changed successfully' });
+  } catch (e) {
+    console.error('[employee:change-password] error:', e);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 });
 

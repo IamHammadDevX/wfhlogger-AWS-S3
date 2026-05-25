@@ -8,6 +8,12 @@ export default function EmployeeProfile() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState('')
   const [timezone, setTimezone] = useState('')
+  const [pwCurrent, setPwCurrent] = useState('')
+  const [pwNew, setPwNew] = useState('')
+  const [pwConfirm, setPwConfirm] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError, setPwError] = useState('')
+  const [pwSuccess, setPwSuccess] = useState('')
 
   useEffect(() => {
     fetchProfile()
@@ -55,6 +61,44 @@ export default function EmployeeProfile() {
       setError(`Error: ${msg}`)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const changePassword = async (e) => {
+    e.preventDefault()
+    setPwError('')
+    setPwSuccess('')
+    if (!pwCurrent || !pwNew || !pwConfirm) {
+      setPwError('All password fields are required')
+      return
+    }
+    if (pwNew.length < 6) {
+      setPwError('New password must be at least 6 characters')
+      return
+    }
+    if (pwNew !== pwConfirm) {
+      setPwError('New passwords do not match')
+      return
+    }
+    try {
+      setPwSaving(true)
+      const token = localStorage.getItem('token')
+      await axios.post('/api/employee/change-password', {
+        current_password: pwCurrent,
+        new_password: pwNew
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setPwSuccess('Password changed successfully!')
+      setPwCurrent('')
+      setPwNew('')
+      setPwConfirm('')
+      setTimeout(() => setPwSuccess(''), 3000)
+    } catch (err) {
+      const msg = err?.response?.data?.error || err.message || 'Failed to change password'
+      setPwError(`Error: ${msg}`)
+    } finally {
+      setPwSaving(false)
     }
   }
 
@@ -235,26 +279,61 @@ export default function EmployeeProfile() {
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
         <div className="p-6 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Account Security</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Manage your account security settings</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Change your password</p>
         </div>
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium text-slate-900 dark:text-white">Password</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Change your account password</p>
+        <form onSubmit={changePassword} className="p-6 space-y-4">
+          {pwSuccess && (
+            <div className="bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 p-3 rounded-lg border border-green-100 dark:border-green-900/50 text-sm">
+              {pwSuccess}
             </div>
+          )}
+          {pwError && (
+            <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-3 rounded-lg border border-red-100 dark:border-red-900/50 text-sm">
+              {pwError}
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Current Password</label>
+            <input
+              type="password"
+              value={pwCurrent}
+              onChange={e => setPwCurrent(e.target.value)}
+              placeholder="Enter current password"
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">New Password</label>
+              <input
+                type="password"
+                value={pwNew}
+                onChange={e => setPwNew(e.target.value)}
+                placeholder="Min 6 characters"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Confirm New Password</label>
+              <input
+                type="password"
+                value={pwConfirm}
+                onChange={e => setPwConfirm(e.target.value)}
+                placeholder="Re-enter new password"
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
             <button
-              type="button"
-              onClick={() => {
-                // Redirect to password change page or show modal
-                alert('Password change functionality would be implemented here. Contact your administrator for password changes.')
-              }}
-              className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors font-medium"
+              type="submit"
+              disabled={pwSaving}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              Change Password
+              {pwSaving ? 'Changing...' : 'Change Password'}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )
