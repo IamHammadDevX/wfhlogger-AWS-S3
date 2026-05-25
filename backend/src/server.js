@@ -2445,7 +2445,7 @@ app.get('/api/employee/dashboard-summary', requireRole(['employee']), (req, res)
     }, 0);
 
     const toHours = (secs) => Number((secs/3600).toFixed(1));
-    const daily_hours = toHours(daySeconds);
+    const daily_hours = toHours(daySeconds + manualSeconds);
     const weekly_hours = toHours(weekSeconds + manualSeconds);
     const monthly_hours = toHours(monthSeconds + manualSeconds);
 
