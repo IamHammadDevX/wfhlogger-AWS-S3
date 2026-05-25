@@ -25,7 +25,7 @@ except Exception:
 
 
 # Default configuration
-DEFAULT_BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:4000')
+DEFAULT_BACKEND_URL = os.environ.get('BACKEND_URL', 'https://backend.wfhlogger.com')
 SCREENSHOT_INTERVAL_SECONDS = int(os.environ.get('SCREENSHOT_INTERVAL_SECONDS', '180'))
 LIVE_VIEW_INTERVAL_SECONDS = 2
 HEARTBEAT_INTERVAL_SECONDS = int(os.environ.get('HEARTBEAT_INTERVAL_SECONDS', '60'))
@@ -166,11 +166,6 @@ class TimeTrackerApp:
         # Form
         form_frame = ttk.Frame(self.current_frame)
         form_frame.pack(fill=tk.X)
-
-        # Server Input
-        ttk.Label(form_frame, text="Server Address", style='Muted.TLabel').pack(anchor='w', pady=(0, 4))
-        srv_entry = ttk.Entry(form_frame, textvariable=self.server_url)
-        srv_entry.pack(fill=tk.X, pady=(0, 12))
 
         # Credentials
         ttk.Label(form_frame, text="Email", style='Muted.TLabel').pack(anchor='w', pady=(0, 4))
