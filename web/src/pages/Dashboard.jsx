@@ -73,17 +73,14 @@ export default function Dashboard() {
     return () => { s.off('uploads:cleanup_done', refreshShots); s.off('uploads:new', refreshShots) }
   }, [])
 
-  // Load managers for super admin team switcher
+  // Load managers for admin/manager team switcher
   useEffect(() => {
     try {
       const token = localStorage.getItem('token')
-      const payload = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-      if (payload?.role === 'super_admin') {
-        const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        resolveApiBase().then((BASE)=>{
-          axios.get(`${BASE}/api/admin/managers`, { headers }).then(r => setManagers(r.data?.managers || []))
-        })
-      }
+      const headers = { Authorization: `Bearer ${token}` }
+      resolveApiBase().then((BASE)=>{
+        axios.get(`${BASE}/api/admin/managers`, { headers }).then(r => setManagers(r.data?.managers || [])).catch(() => {})
+      })
     } catch {}
   }, [])
 
@@ -171,7 +168,7 @@ export default function Dashboard() {
         <Stat label={(role === 'super_admin' || role === 'company_admin') ? "Company" : "Active Team"} value={team?.name || 'Not configured'} />
         <Stat label="Total Employees" value={filteredEmployees.length} />
         <Stat label="Recent Screenshots" value={filteredFiles.length} />
-        <Stat label="Managers" value={managers.length} />
+        {role === 'company_admin' && <Stat label="Managers" value={managers.length} />}
       </section>
 
       {/* Quick actions */}

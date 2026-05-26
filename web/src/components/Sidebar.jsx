@@ -119,7 +119,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 <div className="px-3 mb-2 mt-6 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Management
                 </div>
-                <NavItem to="/report" icon={Icons.Reports} label="Reports" />
+                {role === 'employee' && <NavItem to="/report" icon={Icons.Reports} label="Reports" />}
                 <NavItem to="/time-tracking" icon={Icons.TimeTracking} label="Time Tracking" />
                 <NavItem to="/activity" icon={Icons.Activity} label="Activity Logs" />
                 <NavItem to="/requests" icon={Icons.Requests} label="Requests" />
