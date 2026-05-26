@@ -14,7 +14,6 @@ export default function Requests() {
 
   const isManagerOrAdmin = role === 'manager' || role === 'company_admin'
   const colCount = isManagerOrAdmin ? 6 : 4
-  const requestsPg = usePagination(requests, 10, [role, requests.length, selectedEmployee])
 
   useEffect(() => {
     resolveApiBase().then(base => {
