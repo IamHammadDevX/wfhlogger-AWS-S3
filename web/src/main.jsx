@@ -17,7 +17,8 @@ import SACompanies from './pages/platform/SACompanies.jsx'
 import SARevenue from './pages/platform/SARevenue.jsx'
 import SACredits from './pages/platform/SACredits.jsx'
 import LiveView from './pages/LiveView.jsx'
-import Report from './pages/Report.jsx'
+// Report page merged into TimeTracking
+// import Report from './pages/Report.jsx'
 import Activity from './pages/Activity.jsx'
 import Setup from './pages/Setup.jsx'
 import TimeTracking from './pages/TimeTracking.jsx'
@@ -204,7 +205,7 @@ function AppRoutes() {
       <Route path="/:companySlug/report" element={
         <ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}>
           <TenantGuard>
-            <RoleElement employee={<EmployeeReports />} managerOrAdmin={<Report />} />
+            <RoleElement employee={<EmployeeReports />} managerOrAdmin={<TimeTracking />} />
           </TenantGuard>
         </ProtectedRoute>
       } />
