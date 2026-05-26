@@ -12,7 +12,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
 import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, updateEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
-import PDFDocument from 'pdfkit'
+
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
@@ -2827,7 +2827,7 @@ app.get('/api/employee/reports/:filename/download', requireRole(['employee']), a
 });
 
 // Report generation (CSV)
-app.post('/api/employee/generate-report', requireRole(['employee']), async (req, res) => {
+app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) => {
   try {
     const { report_type, start_date, end_date, format } = req.body || {};
     const email = req.user?.sub;
@@ -2862,75 +2862,10 @@ app.post('/api/employee/generate-report', requireRole(['employee']), async (req,
       ]);
     }
 
-    const fmt = (format || 'csv').toLowerCase() === 'pdf' ? 'pdf' : 'csv'
-    const fname = `employee_${email.replace(/[^a-zA-Z0-9]/g,'_')}_${Date.now()}.${fmt}`;
+    const fname = `employee_${email.replace(/[^a-zA-Z0-9]/g,'_')}_${Date.now()}.csv`;
     const outPath = path.join(publicReportsPath, fname);
-
-    if (fmt === 'pdf') {
-      const doc = new PDFDocument({ size: 'A4', margin: 50 });
-      const stream = fs.createWriteStream(outPath);
-      doc.pipe(stream);
-
-      // Title
-      doc.fontSize(18).font('Helvetica-Bold').text('Employee Activity Report', { align: 'center' });
-      doc.moveDown(0.5);
-      doc.fontSize(11).font('Helvetica').text(`Employee: ${full_name || email}`, { align: 'center' });
-      doc.fontSize(10).text(`Period: ${start_date || 'N/A'} — ${end_date || 'N/A'}`, { align: 'center' });
-      doc.fontSize(10).text(`Timezone: ${tz}`, { align: 'center' });
-      doc.moveDown(1);
-
-      // Summary
-      const totalSessions = rows.length;
-      const totalActive = rows.reduce((s, r) => s + parseInt(r[5] || '0'), 0);
-      const totalIdle = rows.reduce((s, r) => s + parseInt(r[6] || '0'), 0);
-      const totalNet = rows.reduce((s, r) => s + parseInt(r[7] || '0'), 0);
-      doc.fontSize(11).font('Helvetica-Bold').text('Summary');
-      doc.fontSize(10).font('Helvetica').text(`Total Sessions: ${totalSessions}`);
-      doc.fontSize(10).text(`Total Active Time: ${Math.floor(totalActive / 3600)}h ${Math.floor((totalActive % 3600) / 60)}m`);
-      doc.fontSize(10).text(`Total Idle Time: ${Math.floor(totalIdle / 3600)}h ${Math.floor((totalIdle % 3600) / 60)}m`);
-      doc.fontSize(10).text(`Total Net Active: ${Math.floor(totalNet / 3600)}h ${Math.floor((totalNet % 3600) / 60)}m`);
-      doc.moveDown(1);
-
-      // Table header
-      const tableTop = doc.y;
-      const cols = ['Start Local', 'End Local', 'Duration', 'Idle', 'Net'];
-      const colWidths = [120, 120, 65, 55, 55];
-      const colX = [50];
-      for (let i = 1; i < cols.length; i++) colX[i] = colX[i-1] + colWidths[i-1];
-
-      doc.fontSize(8).font('Helvetica-Bold');
-      doc.rect(45, tableTop - 4, 420, 14).fill('#2563eb');
-      doc.fill('#ffffff');
-      for (let i = 0; i < cols.length; i++) {
-        doc.text(cols[i], colX[i] + 2, tableTop, { width: colWidths[i] - 2 });
-      }
-      doc.fill('#000000');
-
-      // Table rows
-      doc.fontSize(7).font('Helvetica');
-      let y = tableTop + 14;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        if (y > 760) { doc.addPage(); y = 50; }
-        if (i % 2 === 0) doc.rect(45, y - 2, 420, 12).fill('#f1f5f9');
-        doc.fill('#000000');
-        const dur = Math.floor(parseInt(r[5]) / 60) + 'm';
-        const idle = Math.floor(parseInt(r[6]) / 60) + 'm';
-        const net = Math.floor(parseInt(r[7]) / 60) + 'm';
-        doc.text(r[0].substring(0, 16) || '', colX[0] + 2, y, { width: colWidths[0] - 2 });
-        doc.text(r[1].substring(0, 16) || '', colX[1] + 2, y, { width: colWidths[1] - 2 });
-        doc.text(dur, colX[2] + 2, y, { width: colWidths[2] - 2 });
-        doc.text(idle, colX[3] + 2, y, { width: colWidths[3] - 2 });
-        doc.text(net, colX[4] + 2, y, { width: colWidths[4] - 2 });
-        y += 12;
-      }
-
-      doc.end();
-      await new Promise(r => stream.on('finish', r));
-    } else {
-      const csv = rows.map(r => r.join(',')).join('\n');
-      fs.writeFileSync(outPath, csv);
-    }
+    const csv = rows.map(r => r.join(',')).join('\n');
+    fs.writeFileSync(outPath, csv);
     const file_size = fs.statSync(outPath).size;
 
     const idxFile = path.join(dataPath, 'reports.index.json');
@@ -2940,7 +2875,7 @@ app.post('/api/employee/generate-report', requireRole(['employee']), async (req,
       report_type: report_type || 'detailed_activity',
       start_date: start_date || '',
       end_date: end_date || '',
-      format: fmt,
+      format: 'csv',
       download_url: `${req.protocol}://${req.get('host')}/reports/${fname}`,
     created_at: new Date().toISOString(),
       file_size,

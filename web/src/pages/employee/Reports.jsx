@@ -14,7 +14,7 @@ export default function EmployeeReports() {
     end_date: new Date().toISOString().split('T')[0]
   })
   const [reportType, setReportType] = useState('monthly_summary')
-  const [format, setFormat] = useState('pdf')
+  const [format, setFormat] = useState('csv')
 
   const reportsPg = usePagination(reports, 10, [reports.length])
 
@@ -172,28 +172,7 @@ export default function EmployeeReports() {
         <div className="flex items-center justify-between">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Format</label>
-            <div className="flex gap-4">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  value="pdf"
-                  checked={format === 'pdf'}
-                  onChange={(e) => setFormat(e.target.value)}
-                  className="mr-2"
-                />
-                <span className="text-sm text-slate-700 dark:text-slate-300">PDF</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  value="csv"
-                  checked={format === 'csv'}
-                  onChange={(e) => setFormat(e.target.value)}
-                  className="mr-2"
-                />
-                <span className="text-sm text-slate-700 dark:text-slate-300">CSV</span>
-              </label>
-            </div>
+            <span className="text-sm text-slate-700 dark:text-slate-300">CSV</span>
           </div>
           <button
             onClick={generateReport}
