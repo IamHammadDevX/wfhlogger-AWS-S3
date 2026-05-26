@@ -2736,6 +2736,36 @@ app.get('/api/employee/reports', requireRole(['employee']), (req, res) => {
   }
 });
 
+// Report download with auth + proper Content-Disposition
+app.get('/api/employee/reports/:filename/download', requireRole(['employee']), async (req, res) => {
+  try {
+    // Support both JWT header (from middleware) and query param fallback
+    let email = req.user?.sub
+    if (!email && req.query?.token) {
+      try {
+        const payload = jwt.verify(String(req.query.token), JWT_SECRET)
+        email = payload?.sub || payload?.email
+      } catch {}
+    }
+    if (!email) return res.status(401).json({ error: 'Unauthorized' })
+    const fname = String(req.params.filename || '').replace(/\.\./g, '').replace(/[\/\\]/g, '')
+    if (!fname) return res.status(400).json({ error: 'Invalid filename' })
+    const filePath = path.join(publicReportsPath, fname)
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' })
+    // Verify the file belongs to this user via reports index
+    const idxFile = path.join(dataPath, 'reports.index.json')
+    let index = []
+    try { index = JSON.parse(fs.readFileSync(idxFile, 'utf-8')) } catch {}
+    const match = index.find(r => r.email === email && r.download_url && r.download_url.includes(fname))
+    if (!match) return res.status(403).json({ error: 'Forbidden' })
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`)
+    res.setHeader('Content-Type', 'text/csv')
+    res.sendFile(filePath)
+  } catch (e) {
+    res.status(500).json({ error: 'Download failed' })
+  }
+});
+
 // Report generation (CSV)
 app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) => {
   try {

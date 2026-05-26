@@ -57,38 +57,22 @@ export default function EmployeeReports() {
       // Add the new report to the list
       setReports(prev => [response.data, ...prev])
       
-      // Download the report via blob (works across domains)
+      // Download the report via authenticated endpoint
       if (response.data.download_url) {
-        try {
-          const token = localStorage.getItem('token')
-          const dlUrl = response.data.download_url.startsWith('/')
-            ? getApiBaseSync() + response.data.download_url
-            : response.data.download_url
-          const dlResp = await axios.get(dlUrl, {
-            responseType: 'blob',
-            headers: { Authorization: `Bearer ${token}` }
-          })
-          const blob = dlResp.data
-          const link = document.createElement('a')
-          link.href = URL.createObjectURL(blob)
-          const fname = response.data.download_url.split('/').pop() || 'report.csv'
-          link.setAttribute('download', fname)
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          URL.revokeObjectURL(link.href)
-        } catch (dlErr) {
-          console.warn('[reports] blob download failed, falling back to direct URL')
-          const link = document.createElement('a')
-          const url = response.data.download_url.startsWith('/')
-            ? getApiBaseSync() + response.data.download_url
-            : response.data.download_url
-          link.href = url
-          link.setAttribute('download', response.data.download_url.split('/').pop() || 'report')
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-        }
+        const fname = response.data.download_url.split('/').pop() || 'report.csv'
+        const token = localStorage.getItem('token')
+        const base = getApiBaseSync()
+        const resp = await axios.get(`${base}/api/employee/reports/${encodeURIComponent(fname)}/download`, {
+          responseType: 'blob',
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(resp.data)
+        link.setAttribute('download', fname)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(link.href)
       }
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || 'Failed to generate report'
@@ -274,25 +258,25 @@ export default function EmployeeReports() {
                         onClick={async () => {
                           try {
                             const token = localStorage.getItem('token')
-                            const url = report.download_url.startsWith('/')
-                              ? getApiBaseSync() + report.download_url
-                              : report.download_url
-                            const resp = await axios.get(url, {
+                            const fname = report.download_url.split('/').pop() || 'report.csv'
+                            const base = getApiBaseSync()
+                            const resp = await axios.get(`${base}/api/employee/reports/${encodeURIComponent(fname)}/download`, {
                               responseType: 'blob',
                               headers: { Authorization: `Bearer ${token}` }
                             })
                             const link = document.createElement('a')
                             link.href = URL.createObjectURL(resp.data)
-                            link.setAttribute('download', url.split('/').pop() || 'report')
+                            link.setAttribute('download', fname)
                             document.body.appendChild(link)
                             link.click()
                             document.body.removeChild(link)
                             URL.revokeObjectURL(link.href)
                           } catch {
-                            const url = report.download_url.startsWith('/')
-                              ? getApiBaseSync() + report.download_url
-                              : report.download_url
-                            window.open(url, '_blank')
+                            // Final fallback: navigate directly
+                            const token = localStorage.getItem('token')
+                            const fname = report.download_url.split('/').pop() || 'report.csv'
+                            const base = getApiBaseSync()
+                            window.location.href = `${base}/api/employee/reports/${encodeURIComponent(fname)}/download?token=${encodeURIComponent(token)}`
                           }
                         }}
                         className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
