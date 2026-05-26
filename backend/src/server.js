@@ -12,6 +12,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
 import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, updateEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
+import PDFDocument from 'pdfkit'
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
 import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
@@ -2826,7 +2827,7 @@ app.get('/api/employee/reports/:filename/download', requireRole(['employee']), a
 });
 
 // Report generation (CSV)
-app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) => {
+app.post('/api/employee/generate-report', requireRole(['employee']), async (req, res) => {
   try {
     const { report_type, start_date, end_date, format } = req.body || {};
     const email = req.user?.sub;
@@ -2866,7 +2867,6 @@ app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) 
     const outPath = path.join(publicReportsPath, fname);
 
     if (fmt === 'pdf') {
-      const PDFDocument = (await import('pdfkit')).default;
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
       const stream = fs.createWriteStream(outPath);
       doc.pipe(stream);
