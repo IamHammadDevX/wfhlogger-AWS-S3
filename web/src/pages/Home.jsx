@@ -126,6 +126,7 @@ export default function Home() {
   const heroScale = useTransform(scrollYProgress, [0, 0.35], [1, 0.95])
 
   const [currentTime, setCurrentTime] = useState('')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   useEffect(() => {
     const update = () => setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
     update()
@@ -146,7 +147,7 @@ export default function Home() {
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
-        className="fixed top-3 inset-x-3 z-40 mx-auto max-w-6xl rounded-2xl border border-white/20 bg-white/70 backdrop-blur-xl shadow-sm"
+        className="fixed top-2 sm:top-3 inset-x-2 sm:inset-x-3 z-40 mx-auto max-w-6xl rounded-xl sm:rounded-2xl border border-white/20 bg-white/70 backdrop-blur-xl shadow-sm"
       >
         <div className="flex items-center justify-between px-5 py-3">
           <Link to="/" className="flex items-center gap-2.5">
@@ -158,6 +159,7 @@ export default function Home() {
             <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">TimeTracker</span>
           </Link>
 
+          {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Features</a>
             <a href="#testimonials" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Testimonials</a>
@@ -165,6 +167,21 @@ export default function Home() {
             <Link to="/docs" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Docs</Link>
             <Link to="/contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Contact</Link>
           </div>
+
+          {/* Mobile Hamburger */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            aria-label="Toggle menu"
+          >
+            <svg className="w-5 h-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
 
           <div className="flex items-center gap-3">
             <Link to="/login" className="hidden sm:inline text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
@@ -180,11 +197,30 @@ export default function Home() {
         </div>
       </motion.nav>
 
-      <main>
+      {/* Mobile Nav Drawer */}
+      {mobileMenuOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed top-16 inset-x-3 z-50 mx-auto max-w-6xl rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl md:hidden"
+        >
+          <div className="p-4 flex flex-col gap-2">
+            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">Features</a>
+            <a href="#testimonials" onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">Testimonials</a>
+            <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">Pricing</a>
+            <Link to="/docs" onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">Docs</Link>
+            <Link to="/contact" onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">Contact</Link>
+            <hr className="my-1 border-slate-100" />
+            <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">Log In</Link>
+          </div>
+        </motion.div>
+      )}
+
+      <main onClick={() => mobileMenuOpen && setMobileMenuOpen(false)}>
         {/* Hero Section */}
         <motion.section
           style={{ opacity: heroOpacity, scale: heroScale }}
-          className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-28 pb-20 overflow-hidden"
+          className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-24 sm:pt-28 pb-16 sm:pb-20 overflow-hidden"
         >
           {/* Background Effects */}
           <div className="absolute inset-0 pointer-events-none">
@@ -208,7 +244,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.7 }}
-              className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.05]"
+              className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.1] sm:leading-[1.05]"
             >
               <span className="text-slate-900">Productivity tracking for </span>
               <br />
@@ -277,7 +313,7 @@ export default function Home() {
                   </div>
 
                   {/* Dashboard Content — flex row */}
-                  <div className="flex" style={{ minHeight: '520px' }}>
+                  <div className="flex flex-col md:flex-row min-h-[400px] md:min-h-[520px]">  
                     {/* Sidebar */}
                     <div className="w-[200px] bg-[#0a0d1a]/80 border-r border-white/[0.04] p-4 hidden md:flex flex-col gap-1 shrink-0">
                       <div className="flex items-center gap-2.5 px-3 py-3 mb-3 border-b border-white/[0.04]">
@@ -309,19 +345,19 @@ export default function Home() {
                     </div>
 
                     {/* Main Content Area */}
-                    <div className="flex-1 p-5 md:p-6 overflow-hidden">
+                    <div className="flex-1 p-3 sm:p-5 md:p-6 overflow-hidden">
                       {/* Header Row */}
-                      <div className="flex items-center justify-between mb-6">
-                        <div>
-                          <h3 className="text-sm font-semibold text-white/90">Dashboard</h3>
-                          <p className="text-[11px] text-slate-400 mt-0.5">{currentTime} • {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                      <div className="flex items-center justify-between mb-6 gap-2">
+                        <div className="min-w-0">
+                          <h3 className="text-xs sm:text-sm font-semibold text-white/90 truncate">Dashboard</h3>
+                          <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">{currentTime} • {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
+                        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                          <div className="relative hidden xs:block">
                             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
                             <input
                               placeholder="Search..."
-                              className="w-40 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] pl-8 pr-3 text-xs text-white/80 placeholder:text-slate-500 outline-none focus:border-blue-500/30 transition-colors"
+                              className="w-28 sm:w-40 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] pl-8 pr-3 text-xs text-white/80 placeholder:text-slate-500 outline-none focus:border-blue-500/30 transition-colors"
                             />
                           </div>
                           <div className="relative">
@@ -335,7 +371,7 @@ export default function Home() {
                       </div>
 
                       {/* Stats Cards */}
-                      <div className="grid grid-cols-3 gap-3 mb-5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-5">
                         {[
                           { label: 'Total Hours', value: '164h 32m', change: '+12%', icon: Clock, color: 'blue' },
                           { label: 'Active Employees', value: '24', change: '+3', icon: UserCheck, color: 'emerald' },
@@ -358,7 +394,7 @@ export default function Home() {
                       </div>
 
                       {/* Bottom Row: Chart + Activity */}
-                      <div className="flex gap-4">
+                      <div className="flex flex-col lg:flex-row gap-4">
                         {/* Productivity Chart */}
                         <div className="flex-1 rounded-xl bg-white/[0.03] border border-white/[0.06] p-4">
                           <div className="flex items-center justify-between mb-4">
@@ -391,7 +427,7 @@ export default function Home() {
                         </div>
 
                         {/* Recent Activity */}
-                        <div className="w-[240px] shrink-0 rounded-xl bg-white/[0.03] border border-white/[0.06] p-4">
+                        <div className="w-full lg:w-[240px] shrink-0 rounded-xl bg-white/[0.03] border border-white/[0.06] p-4">
                           <div className="flex items-center justify-between mb-4">
                             <h4 className="text-xs font-semibold text-white/70">Live Activity</h4>
                             <div className="flex items-center gap-1.5">
@@ -448,13 +484,13 @@ export default function Home() {
         </motion.section>
 
         {/* Features Section */}
-        <section id="features" className="relative px-6 py-28">
+          <section id="features" className="relative px-4 sm:px-6 py-16 sm:py-28">
           <div className="max-w-7xl mx-auto">
             <FadeUp className="text-center mb-16">
               <span className="inline-block px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium border border-blue-200/50 mb-4">
                 Platform Features
               </span>
-              <h2 className="text-4xl md:text-5xl font-bold text-slate-900">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900">
                 Everything you need to{' '}
                 <span className="bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent">
                   track productivity
@@ -466,7 +502,7 @@ export default function Home() {
               </p>
             </FadeUp>
 
-            <StaggerContainer className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {features.map((f, i) => (
                 <StaggerItem key={i}>
                   <motion.div
@@ -486,7 +522,7 @@ export default function Home() {
         </section>
 
         {/* Stats Section */}
-        <section className="relative px-6 py-20 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 overflow-hidden">
+          <section className="relative px-4 sm:px-6 py-16 sm:py-20 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 overflow-hidden">
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 blur-[100px] rounded-full" />
             <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 blur-[100px] rounded-full" />
@@ -504,7 +540,7 @@ export default function Home() {
               {stats.map((s, i) => (
                 <StaggerItem key={i}>
                   <div className="text-center">
-                    <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                    <div className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
                       <Counter from={0} to={s.value} suffix={s.suffix} decimals={s.decimals || 0} />
                     </div>
                     <div className="mt-2 text-sm text-slate-500 font-medium">{s.label}</div>
@@ -516,13 +552,13 @@ export default function Home() {
         </section>
 
         {/* Testimonials Section */}
-        <section id="testimonials" className="relative px-6 py-28">
+        <section id="testimonials" className="relative px-4 sm:px-6 py-16 sm:py-28">
           <div className="max-w-7xl mx-auto">
             <FadeUp className="text-center mb-16">
               <span className="inline-block px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium border border-indigo-200/50 mb-4">
                 Testimonials
               </span>
-              <h2 className="text-4xl md:text-5xl font-bold text-slate-900">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-slate-900">
                 Loved by{' '}
                 <span className="bg-gradient-to-r from-indigo-600 to-purple-500 bg-clip-text text-transparent">
                   teams like yours
@@ -530,7 +566,7 @@ export default function Home() {
               </h2>
             </FadeUp>
 
-            <StaggerContainer className="grid md:grid-cols-3 gap-6">
+            <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {testimonials.map((t, i) => (
                 <StaggerItem key={i}>
                   <motion.div
@@ -560,14 +596,14 @@ export default function Home() {
         </section>
 
         {/* CTA Section */}
-        <section id="pricing" className="relative px-6 py-28 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 overflow-hidden">
+        <section id="pricing" className="relative px-4 sm:px-6 py-16 sm:py-28 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 overflow-hidden">
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-1/2 left-1/3 w-[400px] h-[400px] bg-white/5 blur-[100px] rounded-full" />
             <div className="absolute bottom-0 right-1/3 w-[300px] h-[300px] bg-blue-300/10 blur-[80px] rounded-full" />
           </div>
           <div className="relative z-10 max-w-4xl mx-auto text-center">
             <FadeUp>
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-6">
                 Ready to transform your team's productivity?
               </h2>
               <p className="text-lg text-blue-100/80 max-w-2xl mx-auto mb-10">
@@ -596,8 +632,8 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="bg-[#0f0f1a] text-slate-400">
-        <div className="max-w-7xl mx-auto px-6 py-16">
-          <div className="grid md:grid-cols-4 gap-10 mb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
             <div className="md:col-span-1">
               <Link to="/" className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
