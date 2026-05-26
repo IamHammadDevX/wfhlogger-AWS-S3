@@ -141,6 +141,9 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 {role === 'company_admin' && (
                   <NavItem to="/admin" icon={Icons.Admin} label="Administration" />
                 )}
+                {role === 'company_admin' && (
+                  <NavItem to="/audit-logs" icon={Icons.Admin} label="Audit Logs" />
+                )}
                 <NavItem to="/downloads" icon={Icons.Downloads} label="Downloads" />
               </>
             )}

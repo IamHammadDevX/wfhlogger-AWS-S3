@@ -43,9 +43,7 @@ export default function Setup() {
   const [creds, setCreds] = useState([])
   const [teamEmployees, setTeamEmployees] = useState([])
   const [employeeTzDraft, setEmployeeTzDraft] = useState({})
-  const [tzSaving, setTzSaving] = useState('')
   const [intervalDraft, setIntervalDraft] = useState({})
-  const [intervalSaving, setIntervalSaving] = useState('')
   const [credits, setCredits] = useState(0)
   const [intervalsByEmail, setIntervalsByEmail] = useState({})
 
@@ -184,37 +182,51 @@ export default function Setup() {
     }
   }
 
-  const saveEmployeeTimezone = async (email) => {
+  const [savingEmail, setSavingEmail] = useState('')
+
+  const saveEmployee = async (email) => {
     try {
-      setTzSaving(email)
+      setSavingEmail(email)
+      setMsg('')
+      setInviteMsg('')
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
       const base = await resolveApiBase()
-      const timezone = employeeTzDraft[email] ?? (teamEmployees.find(u => u.email === email)?.timezone || 'UTC')
-      await axios.post(`${base}/api/employees/timezone`, { email, timezone }, { headers })
-      setTeamEmployees(prev => prev.map(x => x.email === email ? { ...x, timezone } : x))
+
+      // Save timezone if changed
+      const tz = employeeTzDraft[email]
+      if (tz) {
+        await axios.post(`${base}/api/employees/timezone`, { email, timezone: tz }, { headers }).catch(() => {})
+        setTeamEmployees(prev => prev.map(x => x.email === email ? { ...x, timezone: tz } : x))
+      }
+
+      // Save interval if changed
+      const secs = Number(intervalDraft[email])
+      if (Number.isFinite(secs) && secs > 0) {
+        await axios.post(`${base}/api/capture-interval`, { employeeId: email, intervalSeconds: secs }, { headers }).catch(() => {})
+        setIntervalsByEmail(prev => ({ ...prev, [email]: secs }))
+      }
+
+      setMsg('Employee settings saved.')
+      setTimeout(() => setMsg(''), 3000)
     } catch (e) {
-      setInviteMsg(e?.response?.data?.error || 'Failed to update timezone')
+      setInviteMsg(e?.response?.data?.error || e?.message || 'Failed to save')
     } finally {
-      setTzSaving('')
+      setSavingEmail('')
     }
   }
 
-  const saveEmployeeInterval = async (email) => {
+  const removeEmployee = async (email) => {
+    if (!confirm(`Are you sure you want to remove ${email} and all their data?`)) return
     try {
-      setIntervalSaving(email)
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
       const base = await resolveApiBase()
-      const secs = Number(intervalDraft[email])
-      if (!Number.isFinite(secs) || secs <= 0) {
-        throw new Error('Select a valid interval')
-      }
-      await axios.post(`${base}/api/capture-interval`, { employeeId: email, intervalSeconds: secs }, { headers })
-      setIntervalsByEmail(prev => ({ ...prev, [email]: secs }))
-      setMsg('Monitoring settings saved.')
+      await axios.delete(`${base}/api/employees/${encodeURIComponent(email)}`, { headers })
+      setMsg(`Employee ${email} removed.`)
+      setTimeout(() => setMsg(''), 3000)
+      await loadAll()
+      try { refreshCredits() } catch {}
     } catch (e) {
-      setInviteMsg(e?.response?.data?.error || e?.message || 'Failed to update interval')
-    } finally {
-      setIntervalSaving('')
+      setInviteMsg(e?.response?.data?.error || 'Failed to remove employee')
     }
   }
 
@@ -236,7 +248,7 @@ export default function Setup() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard icon={Building2} label="Organization" value={teamName || '—'} />
+        <StatCard icon={Building2} label="Team" value={teamName || '—'} />
         <StatCard icon={Users} label="Employees" value={String(teamEmployees.length)} />
         <StatCard icon={Clock} label="Available credits" value={String(credits)} />
       </div>
@@ -263,14 +275,14 @@ export default function Setup() {
                 </span>
                 <div>
                   <div className="text-lg font-bold text-slate-900 dark:text-white">Workspace details</div>
-                  <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Update your organization name.</div>
+                  <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Update your Team name.</div>
                 </div>
               </div>
             </div>
           </div>
           <form onSubmit={saveTeam} className="mt-5 space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Organization name</label>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Team name</label>
               <input
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
                 value={teamName}
@@ -415,22 +427,21 @@ export default function Setup() {
                       </td>
                       <td className="px-4 py-3">{u.createdAt_local || (u.createdAt ? new Date(u.createdAt).toLocaleString() : '—')}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-2">
                           <button
                             type="button"
-                            disabled={tzSaving === email}
-                            onClick={() => saveEmployeeTimezone(email)}
+                            disabled={savingEmail === email}
+                            onClick={() => saveEmployee(email)}
                             className="inline-flex items-center justify-center px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-70"
                           >
-                            {tzSaving === email ? 'Saving…' : 'Save TZ'}
+                            {savingEmail === email ? 'Saving…' : 'Save'}
                           </button>
                           <button
                             type="button"
-                            disabled={intervalSaving === email}
-                            onClick={() => saveEmployeeInterval(email)}
-                            className="inline-flex items-center justify-center px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-70"
+                            onClick={() => removeEmployee(email)}
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-xl border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-900/20"
                           >
-                            {intervalSaving === email ? 'Saving…' : 'Save interval'}
+                            Remove
                           </button>
                         </div>
                       </td>

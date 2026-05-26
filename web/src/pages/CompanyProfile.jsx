@@ -98,9 +98,10 @@ export default function CompanyProfile() {
               <input className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100" value={company.name} onChange={e=>setCompany(prev=>({ ...prev, name: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Company Logo</label>
-              <div className="grid grid-cols-1 sm:grid-cols-[auto,1fr] items-center gap-5">
-                <div className="w-24 h-24 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-xl overflow-hidden">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Company Logo</label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                {/* Logo Preview */}
+                <div className="w-24 h-24 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg overflow-hidden shrink-0">
                   {previewLogo ? (
                     <img src={previewLogo} alt="Logo" className="w-full h-full object-cover" />
                   ) : (
@@ -109,20 +110,44 @@ export default function CompanyProfile() {
                     </div>
                   )}
                 </div>
-                <div>
-                  <div
-                    className={`rounded-xl border-2 border-dashed ${dragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-300 dark:border-slate-600'} p-4 text-sm text-slate-600 dark:text-slate-300`}
+                {/* Upload Zone */}
+                <div className="flex-1 w-full">
+                  <label
+                    className={`relative flex flex-col items-center justify-center w-full min-h-[100px] rounded-xl border-2 border-dashed cursor-pointer transition-all ${
+                      dragActive
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                    }`}
                     onDragEnter={e => { e.preventDefault(); setDragActive(true) }}
                     onDragOver={e => { e.preventDefault(); setDragActive(true) }}
                     onDragLeave={e => { e.preventDefault(); setDragActive(false) }}
                     onDrop={e => { e.preventDefault(); setDragActive(false); if (e.dataTransfer.files?.[0]) setLogoFile(e.dataTransfer.files[0]) }}
                   >
-                    <div className="flex items-center gap-3">
-                      <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>setLogoFile(e.target.files?.[0]||null)} />
-                      <span>Drag & drop or choose a file</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={e => setLogoFile(e.target.files?.[0] || null)}
+                    />
+                    <div className="flex flex-col items-center gap-2 py-4 px-4 text-center">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">Click to upload</span>
+                        <span className="text-sm text-slate-500 dark:text-slate-400"> or drag and drop</span>
+                      </div>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">PNG, JPG or WEBP — up to 2MB</p>
+                      {logoFile && (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          {logoFile.name}
+                        </div>
+                      )}
                     </div>
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">PNG, JPG, or WEBP up to 2MB.</p>
-                  </div>
+                  </label>
                 </div>
               </div>
             </div>

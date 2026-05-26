@@ -1352,6 +1352,64 @@ app.delete('/api/admin/managers/:id', requireRole(['company_admin']), (req, res)
   }
 });
 
+// ---- Company Admin: Update manager (e.g. replace manager, reassign employees) ----
+app.put('/api/admin/managers/:id', requireRole(['company_admin']), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, full_name, country, timezone, reassign_to_id } = req.body || {};
+    const company_id = req.user?.company_id;
+
+    // Find the manager
+    let manager = null;
+    if (db) {
+      manager = db.prepare("SELECT * FROM users WHERE id = ? AND role = 'manager' AND company_id = ?").get(id, company_id);
+    } else {
+      try {
+        const arr = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), DATA_DIR, 'users.sqlite.json'), 'utf-8'));
+        manager = arr.find(u => String(u.id) === String(id) && u.role === 'manager' && u.company_id == company_id);
+      } catch {}
+    }
+    if (!manager) return res.status(404).json({ error: 'Manager not found' });
+
+    // Update manager fields
+    if (db) {
+      if (email) db.prepare('UPDATE users SET email = ? WHERE id = ?').run(email, id);
+      if (full_name) db.prepare('UPDATE users SET full_name = ? WHERE id = ?').run(full_name, id);
+    } else {
+      try {
+        const arr = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), DATA_DIR, 'users.sqlite.json'), 'utf-8'));
+        const idx = arr.findIndex(u => String(u.id) === String(id));
+        if (idx >= 0) {
+          if (email) arr[idx].email = email;
+          if (full_name) arr[idx].full_name = full_name;
+          fs.writeFileSync(path.resolve(process.cwd(), DATA_DIR, 'users.sqlite.json'), JSON.stringify(arr, null, 2));
+        }
+      } catch {}
+    }
+
+    // If reassign_to_id is provided, reassign all employees from this manager to another
+    if (reassign_to_id && String(reassign_to_id) !== String(id)) {
+      const users = readUsers();
+      let changed = 0;
+      const updated = users.map(u => {
+        if (u.role === 'employee' && u.company_id == company_id && (String(u.managerId) === String(id) || String(u.managerId) === manager.email)) {
+          changed++;
+          return { ...u, managerId: reassign_to_id };
+        }
+        return u;
+      });
+      if (changed > 0) writeUsers(updated);
+      console.log(`[admin:update_manager] reassigned ${changed} employees from manager ${id} to ${reassign_to_id}`);
+    }
+
+    appendAudit('manager_updated', { actorId: req.user?.uid || req.user?.sub, managerId: id, newEmail: email || manager.email, reassignToId: reassign_to_id || null }, company_id);
+    res.json({ ok: true, message: 'Manager updated successfully' });
+  } catch (e) {
+    console.error('[admin:update_manager] error:', e);
+    res.status(500).json({ error: 'Failed to update manager' });
+  }
+});
+
 // ---- Super Admin: Audit logs ----
 app.get('/api/admin/audit-logs', requireRole(['company_admin']), (req, res) => {
   try {
