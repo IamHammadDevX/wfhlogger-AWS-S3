@@ -54,26 +54,8 @@ export default function EmployeeReports() {
         headers: { Authorization: `Bearer ${token}` }
       })
       
-      // Add the new report to the list
+      // Add the new report to the list (user can download from history)
       setReports(prev => [response.data, ...prev])
-      
-      // Download the report via authenticated endpoint
-      if (response.data.download_url) {
-        const fname = response.data.download_url.split('/').pop() || 'report.csv'
-        const token = localStorage.getItem('token')
-        const base = getApiBaseSync()
-        const resp = await axios.get(`${base}/api/employee/reports/${encodeURIComponent(fname)}/download`, {
-          responseType: 'blob',
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        const link = document.createElement('a')
-        link.href = URL.createObjectURL(resp.data)
-        link.setAttribute('download', fname)
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(link.href)
-      }
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || 'Failed to generate report'
       setError(`Error: ${msg}`)
@@ -191,6 +173,16 @@ export default function EmployeeReports() {
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Format</label>
             <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="pdf"
+                  checked={format === 'pdf'}
+                  onChange={(e) => setFormat(e.target.value)}
+                  className="mr-2"
+                />
+                <span className="text-sm text-slate-700 dark:text-slate-300">PDF</span>
+              </label>
               <label className="flex items-center">
                 <input
                   type="radio"
