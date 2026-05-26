@@ -171,7 +171,7 @@ export default function Dashboard() {
         <Stat label={(role === 'super_admin' || role === 'company_admin') ? "Company" : "Active Team"} value={team?.name || 'Not configured'} />
         <Stat label="Total Employees" value={filteredEmployees.length} />
         <Stat label="Recent Screenshots" value={filteredFiles.length} />
-        <Stat label="System Status" value={loading ? 'Loading…' : 'Operational'} />
+        <Stat label="Managers" value={managers.length} />
       </section>
 
       {/* Quick actions */}

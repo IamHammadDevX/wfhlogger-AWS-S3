@@ -364,6 +364,7 @@ export default function Setup() {
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
+                {isCompanyAdmin && <th className="px-4 py-3">Manager</th>}
                 <th className="px-4 py-3">Timezone</th>
                 <th className="px-4 py-3">Screenshot interval</th>
                 <th className="px-4 py-3">Created</th>
@@ -372,16 +373,20 @@ export default function Setup() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {teamEmployeesPg.total === 0 ? (
-                <tr><td colSpan="6" className="px-4 py-8 text-center text-slate-400 dark:text-slate-500">No employees yet</td></tr>
+                <tr><td colSpan={isCompanyAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-400 dark:text-slate-500">No employees yet</td></tr>
               ) : (
                 teamEmployeesPg.pageItems.map((u) => {
                   const email = u.email
                   const intervalValue = intervalDraft[email] ?? intervalsByEmail[email] ?? ''
                   const intervalText = typeof intervalValue === 'number' ? (intervalLabelBySeconds.get(intervalValue) || `${intervalValue}s`) : ''
+                  const mgrName = isCompanyAdmin && u.managerId
+                    ? (managers.find(m => String(m.id) === String(u.managerId) || String(m.email) === String(u.managerId))?.full_name || managers.find(m => String(m.id) === String(u.managerId) || String(m.email) === String(u.managerId))?.email || 'Unknown')
+                    : null
                   return (
                     <tr key={email} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                       <td className="px-4 py-3 text-slate-900 dark:text-white font-medium">{u.name || '—'}</td>
                       <td className="px-4 py-3">{email}</td>
+                      {isCompanyAdmin && <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{mgrName || '—'}</td>}
                       <td className="px-4 py-3">
                         <TimezoneSelect
                           label=""
@@ -451,7 +456,7 @@ export default function Setup() {
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 sm:p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white">Initial credentials</div>
+            <div className="text-lg font-bold text-slate-900 dark:text-white">Credentials</div>
             <div className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Use these only for first login.</div>
           </div>
         </div>
@@ -461,7 +466,7 @@ export default function Setup() {
             <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-semibold uppercase text-xs">
               <tr>
                 <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Initial password</th>
+                <th className="px-4 py-3">Password</th>
                 <th className="px-4 py-3">Created</th>
               </tr>
             </thead>
