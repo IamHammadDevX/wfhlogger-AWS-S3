@@ -92,7 +92,7 @@ coverage.xml
 # =====================================================
 
 # PyInstaller / binary outputs
-# *.exe
+*.exe
 *.msi
 *.dll
 *.so
