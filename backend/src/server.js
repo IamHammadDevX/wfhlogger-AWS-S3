@@ -2826,7 +2826,7 @@ app.get('/api/employee/reports/:filename/download', requireRole(['employee']), a
 });
 
 // Report generation (CSV)
-app.post('/api/employee/generate-report', requireRole(['employee']), (req, res) => {
+app.post('/api/employee/generate-report', requireRole(['employee']), async (req, res) => {
   try {
     const { report_type, start_date, end_date, format } = req.body || {};
     const email = req.user?.sub;
