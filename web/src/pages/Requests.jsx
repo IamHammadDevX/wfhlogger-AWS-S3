@@ -6,16 +6,21 @@ import { usePagination } from '../hooks/usePagination.js'
 
 export default function Requests() {
   const [requests, setRequests] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [selectedEmployee, setSelectedEmployee] = useState('')
   const [loading, setLoading] = useState(true)
   const [apiBase, setApiBase] = useState('')
   const [role, setRole] = useState('')
 
-  const colCount = (role === 'manager' || role === 'company_admin') ? 6 : 4
-  const requestsPg = usePagination(requests, 10, [role, requests.length])
+  const isManagerOrAdmin = role === 'manager' || role === 'company_admin'
+  const colCount = isManagerOrAdmin ? 6 : 4
+  const requestsPg = usePagination(requests, 10, [role, requests.length, selectedEmployee])
 
   useEffect(() => {
     resolveApiBase().then(base => {
       setApiBase(base)
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      axios.get(`${base}/api/employees`, { headers }).then(r => setEmployees(r.data.users || [])).catch(() => {})
       fetchRequests(base)
     })
     
@@ -56,6 +61,11 @@ export default function Requests() {
     }
   }
 
+  const displayRequests = selectedEmployee
+    ? requests.filter(r => r.employee_email === selectedEmployee)
+    : requests
+  const requestsPg = usePagination(displayRequests, 10, [role, displayRequests.length, selectedEmployee])
+
   if (loading) return <div className="p-8 text-slate-500 dark:text-slate-400">Loading...</div>
 
   return (
@@ -63,6 +73,29 @@ export default function Requests() {
       <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-8">
         {role === 'employee' ? 'My Time Requests' : 'Time Adjustment Requests'}
       </h1>
+
+      {/* Employee filter for managers/admins */}
+      {isManagerOrAdmin && (
+        <div className="mb-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Filter by Employee</label>
+              <select className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)}>
+                <option value="">All employees</option>
+                {employees.map(u => (
+                  <option key={u.email} value={u.email}>
+                    {(u.full_name || u.name) ? `${u.full_name || u.name} (${u.email})` : u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="text-sm text-slate-500 dark:text-slate-400 self-center pb-1">
+              {selectedEmployee ? `${displayRequests.length} request(s) for this employee` : `${requests.length} total request(s)`}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
@@ -77,7 +110,7 @@ export default function Requests() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-            {requestsPg.total === 0 ? (
+            {displayRequests.length === 0 ? (
               <tr><td colSpan={colCount} className="px-6 py-8 text-center text-slate-400 dark:text-slate-500">No requests found</td></tr>
             ) : (
               requestsPg.pageItems.map(r => (

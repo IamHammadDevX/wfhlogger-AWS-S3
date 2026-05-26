@@ -8,54 +8,102 @@ let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
 export default function Activity() {
   const [activities, setActivities] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [selectedEmployee, setSelectedEmployee] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const activityPg = usePagination(activities, 10, [activities.length])
+  const activityPg = usePagination(activities, 10, [activities.length, selectedEmployee, fromDate, toDate])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     const headers = { Authorization: `Bearer ${token}` }
-    resolveApiBase().then((BASE)=>{
+    resolveApiBase().then((BASE) => {
       API = BASE
-      // Fetch activity for the last 30 days by default
-      const to = new Date()
-      const from = new Date()
-      from.setDate(from.getDate() - 30)
-      
-      const params = {
-        from: from.toISOString(),
-        to: to.toISOString()
-      }
-
-      axios.get(`${BASE}/api/work/sessions/range`, { headers, params })
-        .then(r => {
-          // Flatten sessions for a simple activity feed
-          const all = []
-          const emps = r.data.employees || []
-          emps.forEach(e => {
-            (e.sessions || []).forEach(s => {
-              // Normalize field names: backend uses startedAt/endedAt, frontend used startTime/endTime
-              all.push({ 
-                ...s, 
-                employee: e.employeeId,
-                startTime: s.startedAt || s.startTime,
-                endTime: s.endedAt || s.endTime
-              })
-            })
-          })
-          all.sort((a,b) => new Date(b.startTime) - new Date(a.startTime))
-          setActivities(all)
-        })
-        .catch(() => setActivities([]))
-        .finally(() => setLoading(false))
+      axios.get(`${BASE}/api/employees`, { headers }).then(r => setEmployees(r.data.users || [])).catch(() => {})
+      fetchActivity(BASE, '', '', '')
     })
   }, [])
+
+  const fetchActivity = async (base, empId, from, to) => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const headers = { Authorization: `Bearer ${token}` }
+      const now = new Date()
+      const thirtyAgo = new Date()
+      thirtyAgo.setDate(thirtyAgo.getDate() - 30)
+      
+      const toEnd = to ? new Date(`${to}T23:59:59`).toISOString() : now.toISOString()
+      const fromStart = from ? new Date(`${from}T00:00:00`).toISOString() : thirtyAgo.toISOString()
+
+      const params = { from: fromStart, to: toEnd }
+      if (empId) params.employeeId = empId
+
+      const r = await axios.get(`${API}/api/work/sessions/range`, { headers, params })
+      const all = []
+      const emps = r.data.employees || []
+      emps.forEach(e => {
+        (e.sessions || []).forEach(s => {
+          all.push({ 
+            ...s, 
+            employee: e.employeeId,
+            startTime: s.startedAt || s.startTime,
+            endTime: s.endedAt || s.endTime
+          })
+        })
+      })
+      all.sort((a,b) => new Date(b.startTime) - new Date(a.startTime))
+      setActivities(all)
+    } catch {
+      setActivities([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSearch = () => fetchActivity(API, selectedEmployee, fromDate, toDate)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Activity Log</h1>
-        <p className="mt-1 text-slate-500 dark:text-slate-400">Recent work sessions (Last 30 days).</p>
+        <p className="mt-1 text-slate-500 dark:text-slate-400">Work sessions filtered by employee and date range.</p>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Employee</label>
+            <select className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)}>
+              <option value="">All employees</option>
+              {employees.map(u => (
+                <option key={u.email} value={u.email}>
+                  {(u.full_name || u.name) ? `${u.full_name || u.name} (${u.email})` : u.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">From Date</label>
+            <input type="date" className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              value={fromDate} onChange={e => setFromDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">To Date</label>
+            <input type="date" className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              value={toDate} onChange={e => setToDate(e.target.value)} />
+          </div>
+          <div>
+            <button onClick={handleSearch}
+              className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors">
+              Search
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
