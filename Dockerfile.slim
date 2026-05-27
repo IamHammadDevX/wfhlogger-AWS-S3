@@ -1,6 +1,0 @@
-FROM node:20-alpine
-RUN apk add --no-cache php83 php83-cli
-WORKDIR  /app
-COPY entrypoint.sh ./
-EXPOSE 4000 8080
-CMD ["sh","-c","node backend/src/bootstrap.js & php83 -S 0.0.0.0:8080 -t /app & wait"]
