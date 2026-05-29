@@ -493,7 +493,24 @@ app.post('/api/auth/signup', (req, res) => {
     // Generate Token
     const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: company.id, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC' }, JWT_SECRET, { expiresIn: '8h' });
     
-    // Give some initial free credits? No, strict.
+    // Send welcome email to new company admin
+    try {
+      const baseUrl = String(process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '')
+      const slug = String(companyName || 'company').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'company'
+      const loginUrl = `${baseUrl}/${slug}/login`
+      sendNewUserCreated(email, {
+        name: fullName,
+        email,
+        role: 'company_admin',
+        teamName: companyName,
+        password,
+        loginUrl,
+        companyName,
+        companyId: company.id,
+      });
+    } catch (emailErr) {
+      console.warn('[auth:signup] welcome email failed:', emailErr);
+    }
     
     res.status(201).json({ token, company, user: { id: user.id, email: user.email, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC', role: user.role } });
   } catch (e) {
@@ -1156,6 +1173,8 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
        if (manager && manager.email && manager.email !== adminEmail) {
          sendNewUserCreated(manager.email, emailData);
        }
+       // Send welcome email to the employee themselves
+       sendNewUserCreated(email, emailData);
     } catch (emailErr) {
        console.warn('[employees:create] failed to send emails:', emailErr);
     }
@@ -3950,6 +3969,21 @@ app.post('/api/platform/companies/:company_id/grant-credits', requireRole(['supe
 
     try { appendAudit('company_free_credits_granted', { company_id, credits, reason, actorId: req.user?.uid || req.user?.sub, actorEmail }, company_id) } catch {}
     try { io.to(`company:${company_id}`).emit('company:credits_updated', { company_id, balance: newBalance }) } catch {}
+
+    // Send email to company admin about free credits
+    try {
+      const adminEmail = getCompanyAdminEmail(company_id, company)
+      if (adminEmail) {
+        sendPaymentSuccess({
+          to: adminEmail,
+          company: { name: company.name, id: company_id, logo_url: company.logo_url },
+          amount_usd: 0,
+          credits,
+          balance: newBalance,
+          description: reason || 'Free credits grant'
+        })
+      }
+    } catch {}
 
     res.json({ ok: true, company_id, balance: newBalance, reference_id: ref })
   } catch (e) {
