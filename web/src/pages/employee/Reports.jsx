@@ -13,7 +13,6 @@ export default function EmployeeReports() {
     start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0]
   })
-  const [reportType, setReportType] = useState('monthly_summary')
   const [format, setFormat] = useState('csv')
 
   const reportsPg = usePagination(reports, 10, [reports.length])
@@ -46,7 +45,6 @@ export default function EmployeeReports() {
       const token = localStorage.getItem('token')
       
       const response = await axios.post('/api/employee/generate-report', {
-        report_type: reportType,
         start_date: dateRange.start_date,
         end_date: dateRange.end_date,
         format: format
@@ -54,8 +52,25 @@ export default function EmployeeReports() {
         headers: { Authorization: `Bearer ${token}` }
       })
       
-      // Add the new report to the list (user can download from history)
+      // Add the new report to the list
       setReports(prev => [response.data, ...prev])
+      
+      // Auto-download the report
+      if (response.data.download_url) {
+        const fname = response.data.download_url.split('/').pop() || 'report.csv'
+        const base = getApiBaseSync()
+        const resp = await axios.get(`${base}/api/employee/reports/${encodeURIComponent(fname)}/download`, {
+          responseType: 'blob',
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(resp.data)
+        link.setAttribute('download', fname)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(link.href)
+      }
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || 'Failed to generate report'
       setError(`Error: ${msg}`)
@@ -135,7 +150,7 @@ export default function EmployeeReports() {
       <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Generate New Report</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Start Date</label>
             <input
@@ -153,19 +168,6 @@ export default function EmployeeReports() {
               onChange={(e) => setDateRange(prev => ({ ...prev, end_date: e.target.value }))}
               className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Report Type</label>
-            <select
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-            >
-              <option value="daily_summary">Daily Summary</option>
-              <option value="weekly_summary">Weekly Summary</option>
-              <option value="monthly_summary">Monthly Summary</option>
-              <option value="detailed_activity">Detailed Activity</option>
-            </select>
           </div>
         </div>
 
@@ -209,8 +211,8 @@ export default function EmployeeReports() {
                       </svg>
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900 dark:text-white capitalize">
-                        {report.report_type?.replace('_', ' ')} Report
+                      <h3 className="font-medium text-slate-900 dark:text-white">
+                        Activity Report
                       </h3>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
                         {formatDate(report.start_date)} - {formatDate(report.end_date)} • {report.format?.toUpperCase()}
