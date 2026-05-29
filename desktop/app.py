@@ -579,10 +579,12 @@ class TimeTrackerApp:
         s_spin = ttk.Frame(start_col, style='Surface.TFrame')
         s_spin.pack(fill='x')
         
-        start_h = tk.Spinbox(s_spin, from_=0, to=23, width=3, format="%02.0f", wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        start_h_values = [f"{i:02d}" for i in range(24)]
+        start_m_values = [f"{i:02d}" for i in range(60)]
+        start_h = tk.Spinbox(s_spin, values=start_h_values, width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
         start_h.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
         ttk.Label(s_spin, text=":", background='white', font=('Segoe UI', 11, 'bold')).pack(side='left')
-        start_m = tk.Spinbox(s_spin, from_=0, to=59, width=3, format="%02.0f", wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        start_m = tk.Spinbox(s_spin, values=start_m_values, width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
         start_m.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
 
         # End Time
@@ -593,10 +595,10 @@ class TimeTrackerApp:
         e_spin = ttk.Frame(end_col, style='Surface.TFrame')
         e_spin.pack(fill='x')
         
-        end_h = tk.Spinbox(e_spin, from_=0, to=23, width=3, format="%02.0f", wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        end_h = tk.Spinbox(e_spin, values=[f"{i:02d}" for i in range(24)], width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
         end_h.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
         ttk.Label(e_spin, text=":", background='white', font=('Segoe UI', 11, 'bold')).pack(side='left')
-        end_m = tk.Spinbox(e_spin, from_=0, to=59, width=3, format="%02.0f", wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        end_m = tk.Spinbox(e_spin, values=[f"{i:02d}" for i in range(60)], width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
         end_m.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
         
         # Reason
