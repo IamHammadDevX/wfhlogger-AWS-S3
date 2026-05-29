@@ -492,6 +492,23 @@ export function listManagerTempPasswords(company_id) {
   return arr.filter(r => r.company_id == company_id).map(r => ({ manager_email: r.manager_email, temp_password: r.temp_password, created_at: r.created_at }))
 }
 
+export function deleteManagerTempPassword(managerEmail) {
+  // Always delete from SQLite if available
+  if (db) {
+    db.prepare('DELETE FROM manager_creds WHERE manager_email = ?').run(managerEmail)
+  }
+  // Always delete from JSON fallback too
+  const file = path.resolve(process.cwd(), DATA_DIR, 'manager_creds.sqlite.json')
+  if (fs.existsSync(file)) {
+    try {
+      let arr = JSON.parse(fs.readFileSync(file, 'utf-8'))
+      arr = arr.filter(r => r.manager_email !== managerEmail)
+      fs.writeFileSync(file, JSON.stringify(arr, null, 2))
+    } catch {}
+  }
+  return true
+}
+
 export function setInvoicePdfPath(company_id, invoice_id, pdf_path) {
   if (db) {
     const stmt = db.prepare('UPDATE invoices SET pdf_path = ? WHERE company_id = ? AND invoice_id = ?')

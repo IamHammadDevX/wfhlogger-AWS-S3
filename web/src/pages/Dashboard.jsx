@@ -164,7 +164,7 @@ export default function Dashboard() {
       )}
 
       {/* Stats */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className={`grid gap-6 ${role === 'company_admin' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1'}`}>
         <Stat label={(role === 'super_admin' || role === 'company_admin') ? "Company" : "Active Team"} value={team?.name || 'Not configured'} />
         <Stat label="Total Employees" value={filteredEmployees.length} />
         <Stat label="Recent Screenshots" value={filteredFiles.length} />

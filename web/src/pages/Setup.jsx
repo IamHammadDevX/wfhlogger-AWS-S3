@@ -254,18 +254,32 @@ export default function Setup() {
       </div>
 
       {msg && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300">
+        <div className={`rounded-xl border px-4 py-3 text-sm ${
+          msg.toLowerCase().includes('error') || msg.toLowerCase().includes('failed')
+            ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300'
+        }`}>
           {msg}
         </div>
       )}
 
       {inviteMsg && (
-        <div className={`rounded-xl border px-4 py-3 text-sm ${inviteMsg.toLowerCase().includes('error') || inviteMsg.toLowerCase().includes('failed') ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300'}`}>
+        <div className={`rounded-xl border px-4 py-3 text-sm ${
+          (() => {
+            const m = inviteMsg.toLowerCase()
+            if (m.includes('error') || m.includes('failed') || m.includes('already exists') || m.includes('insufficient') || m.includes('exist') || m.includes('cannot') || m.includes('invalid') || m.includes('not found'))
+              return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300'
+            if (m.includes('warning') || m.includes('already'))
+              return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300'
+            return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300'
+          })()
+        }`}>
           {inviteMsg}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
+        {!isCompanyAdmin && (
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -299,6 +313,7 @@ export default function Setup() {
             </button>
           </form>
         </div>
+        )}
 
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 sm:p-6">
           <div className="flex items-center gap-2">

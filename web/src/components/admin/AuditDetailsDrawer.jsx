@@ -1,15 +1,7 @@
 import React from 'react'
-import { X, Copy } from 'lucide-react'
+import { X } from 'lucide-react'
 
 export function AuditDetailsDrawer({ open, onClose, log }) {
-  const detailsText = React.useMemo(() => {
-    try {
-      return JSON.stringify(log?.details || {}, null, 2)
-    } catch {
-      return ''
-    }
-  }, [log])
-
   if (!open) return null
 
   return (
@@ -49,26 +41,6 @@ export function AuditDetailsDrawer({ open, onClose, log }) {
 
             <Section title="Summary">
               <div className="text-sm text-slate-700 dark:text-slate-200">{log?.summary || '-'}</div>
-            </Section>
-
-            <Section title="Raw Details">
-              <div className="flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(detailsText)
-                    } catch {}
-                  }}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold border border-slate-200 hover:bg-slate-50 text-slate-700 dark:border-slate-700 dark:hover:bg-slate-800 dark:text-slate-200"
-                >
-                  <Copy className="w-4 h-4" />
-                  Copy
-                </button>
-              </div>
-              <pre className="mt-3 text-xs leading-relaxed p-3 rounded-xl bg-slate-50 text-slate-800 border border-slate-200 overflow-auto dark:bg-slate-950 dark:text-slate-100 dark:border-slate-800">
-                {detailsText}
-              </pre>
             </Section>
           </div>
         </div>

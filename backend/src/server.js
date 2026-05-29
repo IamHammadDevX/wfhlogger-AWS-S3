@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, updateEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, updateEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, deleteManagerTempPassword, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
@@ -1167,7 +1167,7 @@ app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res)
         company_id,
         amount_usd: 1,
         credits: 1,
-        description: 'Employee activation (first 30 days)',
+        description: 'Employee activation',
         reference_id: `emp_${loginUser.id}`
       })
       try { ensureEmployeeBillingSchedule({ company_id, employee_id: loginUser.id, start_at: new Date().toISOString() }) } catch {}
@@ -1295,9 +1295,20 @@ app.get('/api/admin/managers/creds', requireRole(['company_admin']), (req, res) 
 app.get('/api/employees/initial-creds', requireRole(['manager','company_admin']), (req, res) => {
   try {
     const company_id = req.user?.company_id
-    const rows = listEmployeeTempPasswords(company_id)
+    const role = req.user?.role
+    const email = req.user?.sub
+    let rows = listEmployeeTempPasswords(company_id)
+
+    // Managers should only see credentials for their own employees
+    if (role === 'manager') {
+      const teamEmails = getTeamEmailsForManager(req.user?.uid || email, company_id)
+      const myEmails = new Set(teamEmails)
+      rows = rows.filter(r => myEmails.has(r.employee_email))
+    }
+
     res.json({ creds: rows })
   } catch (e) {
+    console.error('[initial-creds] error:', e)
     res.status(500).json({ error: 'Failed to load credentials' })
   }
 })
@@ -1343,6 +1354,8 @@ app.delete('/api/admin/managers/:id', requireRole(['company_admin']), (req, res)
 
     // Delete orgs tied to this manager
     try { deleteOrganizationByManagerId(id); } catch {}
+    // Delete manager creds
+    try { if (exists.email) deleteManagerTempPassword(exists.email); } catch {}
     // Delete manager login
     const ok = deleteUserById(id);
     if (!ok) return res.status(500).json({ error: 'Failed to delete manager' });
@@ -1533,6 +1546,12 @@ app.get('/api/admin/audit-logs', requireRole(['company_admin']), (req, res) => {
         targetEmployee: asTargetEmployee(targetUser),
         summary: buildSummary(l, actorUser, targetUser),
       }
+    })
+    // Sort most recent first
+    logs.sort((a, b) => {
+      const aTs = a?.ts ? Date.parse(a.ts) : 0
+      const bTs = b?.ts ? Date.parse(b.ts) : 0
+      return bTs - aTs
     })
     res.json({ logs });
   } catch (e) {
@@ -3828,6 +3847,49 @@ app.get('/api/platform/metrics', requireRole(['super_admin']), (req, res) => {
     res.json({ total_companies, total_revenue, per_company, country_distribution, timezone_distribution, growth })
   } catch (e) {
     res.status(500).json({ error: 'Failed to load platform metrics' })
+  }
+})
+
+app.get('/api/platform/revenue-by-country', requireRole(['super_admin']), (req, res) => {
+  try {
+    const { from, to } = req.query || {}
+    const companies = listCompanies()
+    const fromMs = from ? new Date(String(from)).getTime() : null
+    const toMs = to ? new Date(String(to)).getTime() + 86400000 : null
+
+    const countryMap = {}
+    for (const c of companies) {
+      const country = (c.name ? null : 'Unknown')
+      // Get company admin to find country
+      const users = listAllUsers().filter(u => u.company_id == c.id)
+      const companyCountry = users.find(u => u.country)?.country || 'Unknown'
+      const tx = getTransactions(c.id) || []
+      let revenue = 0
+      for (const t of tx) {
+        if (t.type !== 'credit') continue
+        const tMs = new Date(t.created_at).getTime()
+        if (fromMs && tMs < fromMs) continue
+        if (toMs && tMs > toMs) continue
+        revenue += Number(t.amount) || 0
+      }
+      if (!countryMap[companyCountry]) countryMap[companyCountry] = { country: companyCountry, revenue: 0, companies: 0, transactions: 0 }
+      countryMap[companyCountry].revenue += revenue
+      countryMap[companyCountry].companies += 1
+      countryMap[companyCountry].transactions += tx.filter(t => {
+        if (t.type !== 'credit') return false
+        const tMs = new Date(t.created_at).getTime()
+        if (fromMs && tMs < fromMs) return false
+        if (toMs && tMs > toMs) return false
+        return true
+      }).length
+    }
+
+    const rows = Object.values(countryMap).sort((a, b) => b.revenue - a.revenue)
+    const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0)
+    res.json({ rows, totalRevenue, from: from || null, to: to || null })
+  } catch (e) {
+    console.error('[platform:revenue-by-country] error:', e)
+    res.status(500).json({ error: 'Failed to load revenue by country' })
   }
 })
 

@@ -237,8 +237,8 @@ export default function TimeTracking() {
           <Search className="w-5 h-5 text-slate-500" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Filters</span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div className="md:col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+          <div className="sm:col-span-2 md:col-span-2">
             <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Employee</label>
             <select className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
               value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)}>
@@ -260,20 +260,20 @@ export default function TimeTracking() {
             <input type="date" className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
               value={toDate} onChange={e => setToDate(e.target.value)} />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={search} disabled={loading}
-              className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-70 inline-flex items-center gap-2">
-              <Clock className="w-4 h-4" />{loading ? 'Searching...' : 'Search'}
-            </button>
-            <button onClick={downloadZip} disabled={!selectedEmployee}
-              className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-50 inline-flex items-center gap-1.5 text-sm">
-              <Download className="w-4 h-4" />ZIP
-            </button>
-            <button onClick={() => setDriveModalOpen(true)} disabled={!selectedEmployee}
-              className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-50 inline-flex items-center gap-1.5 text-sm">
-              <HardDrive className="w-4 h-4" />Drive
-            </button>
-          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-4">
+          <button onClick={search} disabled={loading}
+            className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-70 inline-flex items-center gap-2">
+            <Clock className="w-4 h-4" />{loading ? 'Searching...' : 'Search'}
+          </button>
+          <button onClick={downloadZip} disabled={!selectedEmployee}
+            className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-50 inline-flex items-center gap-1.5 text-sm">
+            <Download className="w-4 h-4" />ZIP
+          </button>
+          <button onClick={() => setDriveModalOpen(true)} disabled={!selectedEmployee}
+            className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-50 inline-flex items-center gap-1.5 text-sm">
+            <HardDrive className="w-4 h-4" />Drive
+          </button>
         </div>
       </div>
 
@@ -444,7 +444,7 @@ export default function TimeTracking() {
         </div>
       )}
 
-      <ImageViewerModal open={viewerOpen} onClose={() => setViewerOpen(false)} images={viewerImages} initialIndex={viewerIndex} />
+      <ImageViewerModal open={viewerOpen} onClose={() => setViewerOpen(false)} images={viewerImages} index={viewerIndex} onIndexChange={setViewerIndex} />
     </div>
   )
 }

@@ -64,31 +64,50 @@ export default function Admin() {
     loadManagerCreds()
   }, [])
 
-  const removeManager = async (id) => {
-    setMsg(''); setError('')
+  const [removingManager, setRemovingManager] = useState(null)
+  const [removeReassign, setRemoveReassign] = useState('')
+  const [removeSaving, setRemoveSaving] = useState(false)
+
+  const openRemove = (m) => {
+    setRemovingManager(m)
+    setRemoveReassign('')
+    setError('')
+  }
+
+  const confirmRemove = async () => {
+    if (!removingManager) return
+    setRemoveSaving(true)
+    setError('')
     try {
       const token = localStorage.getItem('token')
       const headers = { Authorization: `Bearer ${token}` }
       const BASE = await resolveApiBase()
-      await axios.delete(`${BASE}/api/admin/managers/${id}`, { headers })
+      // If reassign selected, move employees first
+      if (removeReassign) {
+        await axios.put(`${BASE}/api/admin/managers/${removingManager.id}`, { reassign_to_id: removeReassign }, { headers })
+      }
+      // Then delete the manager
+      await axios.delete(`${BASE}/api/admin/managers/${removingManager.id}`, { headers })
       setMsg('Manager removed')
+      setRemovingManager(null)
       loadManagers()
+      loadManagerCreds()
     } catch (e) {
       setError(e?.response?.data?.error || e.message)
+    } finally {
+      setRemoveSaving(false)
     }
   }
 
   const [editingManager, setEditingManager] = useState(null)
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
-  const [editReassign, setEditReassign] = useState('')
   const [editSaving, setEditSaving] = useState(false)
 
   const openEdit = (m) => {
     setEditingManager(m)
     setEditName(m.full_name || '')
     setEditEmail(m.email || '')
-    setEditReassign('')
   }
 
   const saveEdit = async () => {
@@ -101,7 +120,6 @@ export default function Admin() {
       const body = {}
       if (editName && editName !== editingManager.full_name) body.full_name = editName
       if (editEmail && editEmail !== editingManager.email) body.email = editEmail
-      if (editReassign) body.reassign_to_id = editReassign
       if (Object.keys(body).length === 0) { setEditingManager(null); setEditSaving(false); return }
       await axios.put(`${BASE}/api/admin/managers/${editingManager.id}`, body, { headers })
       setMsg('Manager updated successfully')
@@ -195,7 +213,7 @@ export default function Admin() {
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{m.employeeCount}</td>
                     <td className="px-6 py-4 text-right whitespace-nowrap">
                       <button className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-semibold mr-3" onClick={()=>openEdit(m)} type="button">Edit</button>
-                      <button className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-semibold" onClick={()=>removeManager(m.id)} type="button">Remove</button>
+                      <button className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-semibold" onClick={()=>openRemove(m)} type="button">Remove</button>
                     </td>
                   </tr>
                 ))
@@ -267,23 +285,52 @@ export default function Admin() {
             <div className="p-6 space-y-4">
               <TextField label="Full Name" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Manager name" />
               <TextField label="Email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="manager@example.com" />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Reassign Employees To</label>
-                <select className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                  value={editReassign} onChange={e => setEditReassign(e.target.value)}>
-                  <option value="">— Keep employees with this manager —</option>
-                  {managers.filter(m => String(m.id) !== String(editingManager.id)).map(m => (
-                    <option key={m.id} value={m.id}>{m.full_name || m.email} ({m.organization?.name || 'No team'})</option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Select another manager to move employees to. Useful when replacing a manager.</p>
-              </div>
               {error && <div className="text-red-600 dark:text-red-400 text-sm">{error}</div>}
             </div>
             <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
               <button onClick={() => setEditingManager(null)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
               <button onClick={saveEdit} disabled={editSaving} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-70">
                 {editSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Manager Modal */}
+      {removingManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onMouseDown={(e) => { if (e.target === e.currentTarget) setRemovingManager(null) }}>
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="text-base font-bold text-slate-900 dark:text-white">Remove Manager</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{removingManager.email}</div>
+              </div>
+              <button onClick={() => setRemovingManager(null)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                This will permanently remove this manager. If they have employees, reassign them first.
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Reassign Employees To</label>
+                <select className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                  value={removeReassign} onChange={e => setRemoveReassign(e.target.value)}>
+                  <option value="">— Remove employees too —</option>
+                  {managers.filter(m => String(m.id) !== String(removingManager.id)).map(m => (
+                    <option key={m.id} value={m.id}>{m.full_name || m.email} ({m.organization?.name || 'No team'})</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Select a manager to move employees to before deletion.</p>
+              </div>
+              {error && <div className="text-red-600 dark:text-red-400 text-sm">{error}</div>}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+              <button onClick={() => setRemovingManager(null)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800">Cancel</button>
+              <button onClick={confirmRemove} disabled={removeSaving} className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-70 inline-flex items-center gap-2">
+                {removeSaving ? 'Removing...' : 'Remove Manager'}
               </button>
             </div>
           </div>
