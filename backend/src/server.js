@@ -1314,7 +1314,7 @@ app.get('/api/admin/managers', requireRole(['company_admin']), (req, res) => {
       const org = getOrganizationByManagerId(m.id) || null;
       // Extra check: ensure org belongs to company
       const orgData = (org && org.company_id == company_id) ? { id: org.id, name: org.name } : null;
-      const count = employees.filter(e => e.managerId === m.id || e.managerId === m.email).length;
+      const count = employees.filter(e => String(e.managerId) === String(m.id) || String(e.managerId) === String(m.email)).length;
       return { id: m.id, email: m.email, full_name: m.full_name || '', employeeCount: count, organization: orgData };
     });
     res.json({ managers: enriched });
@@ -1392,10 +1392,12 @@ app.put('/api/admin/managers/:id', requireRole(['company_admin']), (req, res) =>
     if (reassign_to_id && String(reassign_to_id) !== String(id)) {
       const users = readUsers();
       let changed = 0;
+      // Normalize to number to match SQLite id type
+      const targetId = Number(reassign_to_id);
       const updated = users.map(u => {
         if (u.role === 'employee' && u.company_id == company_id && (String(u.managerId) === String(id) || String(u.managerId) === manager.email)) {
           changed++;
-          return { ...u, managerId: reassign_to_id };
+          return { ...u, managerId: targetId };
         }
         return u;
       });
