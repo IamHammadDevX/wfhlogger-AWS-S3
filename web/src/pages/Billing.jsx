@@ -138,19 +138,19 @@ export default function Billing() {
   if (loading && balance === undefined) return <div className="p-8 text-slate-500 dark:text-slate-400">Loading...</div>
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold text-slate-800 dark:text-white mb-8">Billing & Payments</h1>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white mb-6 sm:mb-8">Billing & Payments</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex justify-between items-center">
-            <div>
+          <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="w-full sm:w-auto">
               <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Available Credits</h2>
-              <div className="text-4xl font-bold text-slate-900 dark:text-white">{displayCredits}</div>
+              <div className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">{displayCredits}</div>
               <p className="text-sm text-slate-400 dark:text-slate-500 mt-2">$1.00 / active employee / month</p>
               {resolveMsg && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{resolveMsg}</p>}
             </div>
-            <div className="text-right flex flex-col items-end gap-2">
+            <div className="text-left sm:text-right flex flex-row sm:flex-col items-center sm:items-end gap-2 flex-wrap w-full sm:w-auto">
               <div className="text-xs text-slate-500 dark:text-slate-400">Secured by</div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
                 <span className="font-semibold">Stripe</span>
@@ -170,7 +170,7 @@ export default function Billing() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+          <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Add Credits</h2>
             {error && <div className="mb-4 text-red-600 dark:text-red-400 text-sm">{error}</div>}
             {!error && creditsError && <div className="mb-4 text-red-600 dark:text-red-400 text-sm">{creditsError}</div>}
@@ -191,19 +191,19 @@ export default function Billing() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
               <input
                 type="number"
                 min="1"
                 step="1"
                 value={amount}
                 onChange={e => setAmount(Math.max(1, Number(e.target.value) || 1))}
-                className="w-40 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="w-full sm:w-40 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               />
               <button
                 onClick={() => handleAddCredits(amount)}
                 disabled={processing}
-                className={`px-5 py-2 rounded-lg font-semibold transition ${processing ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 dark:hover:bg-blue-500'}`}
+                className={`px-5 py-2 rounded-lg font-semibold transition text-center ${processing ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 dark:hover:bg-blue-500'}`}
               >
                 {processing ? 'Redirecting…' : 'Secure Checkout'}
               </button>
@@ -227,45 +227,75 @@ export default function Billing() {
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-6">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-4 sm:gap-6">
           <button className={`text-sm font-semibold ${tab==='transactions' ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300'}`} onClick={()=>setTab('transactions')}>Transactions</button>
           <button className={`text-sm font-semibold ${tab==='invoices' ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300'}`} onClick={()=>setTab('invoices')}>Invoices</button>
         </div>
         {tab === 'transactions' ? (
           <div>
-            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-3">Date</th>
-                  <th className="px-6 py-3">Description</th>
-                  <th className="px-6 py-3">Type</th>
-                  <th className="px-6 py-3">Amount</th>
-                  <th className="px-6 py-3">Credits</th>
-                  <th className="px-6 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {historyPg.total === 0 ? (
-                  <tr><td colSpan="6" className="px-6 py-8 text-center text-slate-400 dark:text-slate-500">No transactions yet</td></tr>
-                ) : (
-                  historyPg.pageItems.map(t => (
-                    <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="px-6 py-3">{new Date(t.created_at).toLocaleDateString()}</td>
-                      <td className="px-6 py-3">{t.description}</td>
-                      <td className="px-6 py-3">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${t.type === 'credit' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-                          {t.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3">${Number(t.amount).toFixed(2)}</td>
-                      <td className="px-6 py-3">{t.credits > 0 ? `+${t.credits}` : t.credits}</td>
-                      <td className="px-6 py-3 capitalize">{t.status}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <div className="px-6 pb-5">
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-3">Date</th>
+                    <th className="px-3 sm:px-6 py-3">Description</th>
+                    <th className="px-3 sm:px-6 py-3">Type</th>
+                    <th className="px-3 sm:px-6 py-3">Amount</th>
+                    <th className="px-3 sm:px-6 py-3">Credits</th>
+                    <th className="px-3 sm:px-6 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {historyPg.total === 0 ? (
+                    <tr><td colSpan="6" className="px-3 sm:px-6 py-8 text-center text-slate-400 dark:text-slate-500">No transactions yet</td></tr>
+                  ) : (
+                    historyPg.pageItems.map(t => (
+                      <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap">{new Date(t.created_at).toLocaleDateString()}</td>
+                        <td className="px-3 sm:px-6 py-3 min-w-[120px]">{t.description}</td>
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${t.type === 'credit' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                            {t.type}
+                          </span>
+                        </td>
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap">${Number(t.amount).toFixed(2)}</td>
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap">{t.credits > 0 ? `+${t.credits}` : t.credits}</td>
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap capitalize">{t.status}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-3 p-3">
+              {historyPg.total === 0 ? (
+                <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-sm">No transactions yet</div>
+              ) : (
+                historyPg.pageItems.map(t => (
+                  <div key={t.id} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{new Date(t.created_at).toLocaleDateString()}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${t.type === 'credit' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                        {t.type}
+                      </span>
+                    </div>
+                    <div className="text-sm font-medium text-slate-900 dark:text-white">{t.description}</div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 dark:text-slate-400">
+                        Amount: <strong className="text-slate-900 dark:text-white">${Number(t.amount).toFixed(2)}</strong>
+                      </span>
+                      <span className="text-slate-500 dark:text-slate-400">
+                        Credits: <strong className="text-slate-900 dark:text-white">{t.credits > 0 ? `+${t.credits}` : t.credits}</strong>
+                      </span>
+                      <span className={`capitalize font-semibold ${t.status === 'completed' || t.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}>{t.status}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-3 sm:px-6 pb-5">
               <Pagination
                 page={historyPg.page}
                 pageCount={historyPg.pageCount}
@@ -277,47 +307,87 @@ export default function Billing() {
           </div>
         ) : (
           <div>
-            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-3">Invoice ID</th>
-                  <th className="px-6 py-3">Date</th>
-                  <th className="px-6 py-3">Amount</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {invoicesPg.total === 0 ? (
-                  <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-400 dark:text-slate-500">No invoices yet</td></tr>
-                ) : (
-                  invoicesPg.pageItems.map(inv => (
-                    <tr key={inv.invoice_id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="px-6 py-3">{inv.invoice_id}</td>
-                      <td className="px-6 py-3">{new Date(inv.invoice_date).toLocaleDateString()}</td>
-                      <td className="px-6 py-3">${Number(inv.total_amount || 0).toFixed(2)}</td>
-                      <td className="px-6 py-3 capitalize">{inv.payment_status || 'paid'}</td>
-                      <td className="px-6 py-3">
-                        <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" onClick={async ()=>{
-                          const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                          const base = await resolveApiBase()
-                          const res = await axios.get(`${base}/api/billing/invoices/${inv.invoice_id}/download`, { headers, responseType: 'blob' })
-                          const url = URL.createObjectURL(res.data)
-                          const a = document.createElement('a')
-                          a.href = url
-                          a.download = `${inv.invoice_id}.pdf`
-                          document.body.appendChild(a)
-                          a.click()
-                          a.remove()
-                          URL.revokeObjectURL(url)
-                        }}>Download</button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <div className="px-6 pb-5">
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 font-medium uppercase text-xs">
+                  <tr>
+                    <th className="px-3 sm:px-6 py-3">Invoice ID</th>
+                    <th className="px-3 sm:px-6 py-3">Date</th>
+                    <th className="px-3 sm:px-6 py-3">Amount</th>
+                    <th className="px-3 sm:px-6 py-3">Status</th>
+                    <th className="px-3 sm:px-6 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {invoicesPg.total === 0 ? (
+                    <tr><td colSpan="5" className="px-3 sm:px-6 py-8 text-center text-slate-400 dark:text-slate-500">No invoices yet</td></tr>
+                  ) : (
+                    invoicesPg.pageItems.map(inv => (
+                      <tr key={inv.invoice_id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap font-mono text-xs">{inv.invoice_id}</td>
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap">{new Date(inv.invoice_date).toLocaleDateString()}</td>
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap">${Number(inv.total_amount || 0).toFixed(2)}</td>
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap capitalize">{inv.payment_status || 'paid'}</td>
+                        <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
+                          <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" onClick={async ()=>{
+                            const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                            const base = await resolveApiBase()
+                            const res = await axios.get(`${base}/api/billing/invoices/${inv.invoice_id}/download`, { headers, responseType: 'blob' })
+                            const url = URL.createObjectURL(res.data)
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = `${inv.invoice_id}.pdf`
+                            document.body.appendChild(a)
+                            a.click()
+                            a.remove()
+                            URL.revokeObjectURL(url)
+                          }}>Download</button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-3 p-3">
+              {invoicesPg.total === 0 ? (
+                <div className="py-8 text-center text-slate-400 dark:text-slate-500 text-sm">No invoices yet</div>
+              ) : (
+                invoicesPg.pageItems.map(inv => (
+                  <div key={inv.invoice_id} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-semibold text-slate-900 dark:text-white truncate max-w-[60%]">{inv.invoice_id}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold capitalize ${(inv.payment_status || 'paid') === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                        {inv.payment_status || 'paid'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {new Date(inv.invoice_date).toLocaleDateString()}
+                      </span>
+                      <span className="font-bold text-slate-900 dark:text-white">${Number(inv.total_amount || 0).toFixed(2)}</span>
+                    </div>
+                    <button className="w-full mt-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-xs font-semibold"
+                      onClick={async ()=>{
+                        const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                        const base = await resolveApiBase()
+                        const res = await axios.get(`${base}/api/billing/invoices/${inv.invoice_id}/download`, { headers, responseType: 'blob' })
+                        const url = URL.createObjectURL(res.data)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `${inv.invoice_id}.pdf`
+                        document.body.appendChild(a)
+                        a.click()
+                        a.remove()
+                        URL.revokeObjectURL(url)
+                      }}>Download PDF</button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-3 sm:px-6 pb-5">
               <Pagination
                 page={invoicesPg.page}
                 pageCount={invoicesPg.pageCount}

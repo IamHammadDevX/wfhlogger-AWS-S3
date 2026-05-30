@@ -16,8 +16,8 @@ export default function Contact() {
               <IconWrap><Mail className="w-5 h-5" /></IconWrap>
               <div>
                 <div className="text-sm font-bold text-slate-900 dark:text-slate-100">Email</div>
-                <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">support@timetracker.com</div>
-                <div className="text-sm text-slate-600 dark:text-slate-300">sales@timetracker.com</div>
+                <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">support@wfhlogger.com</div>
+                <div className="text-sm text-slate-600 dark:text-slate-300">sales@wfhlogger.com</div>
               </div>
             </div>
           </Card>
@@ -35,7 +35,7 @@ export default function Contact() {
               <IconWrap><ShieldCheck className="w-5 h-5" /></IconWrap>
               <div>
                 <div className="text-sm font-bold text-slate-900 dark:text-slate-100">Security</div>
-                <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">Report security issues to security@timetracker.com.</div>
+                <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">Report security issues to security@wfhlogger.com.</div>
               </div>
             </div>
           </Card>

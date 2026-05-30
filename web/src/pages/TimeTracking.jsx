@@ -4,6 +4,7 @@ import { resolveApiBase } from '../api.js'
 import Pagination from '../components/ui/Pagination.jsx'
 import { usePagination } from '../hooks/usePagination.js'
 import ImageViewerModal from '../components/ui/ImageViewerModal.jsx'
+import DriveQuotaBadge from '../components/ui/DriveQuotaBadge.jsx'
 import { Clock, Download, HardDrive, Search, Users } from 'lucide-react'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -274,15 +275,23 @@ export default function TimeTracking() {
             className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-50 inline-flex items-center gap-1.5 text-sm">
             <HardDrive className="w-4 h-4" />Drive
           </button>
+          {selectedEmployee && driveQuota?.connected && (
+            <DriveQuotaBadge quota={driveQuota} size="sm" />
+          )}
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard icon={Clock} label="Net Working" value={formatDuration(overall.netSeconds)} />
         <StatCard icon={Clock} label="Idle Time" value={formatDuration(overall.idleSeconds)} />
         <StatCard icon={Clock} label="Active Time" value={formatDuration(overall.activeSeconds)} />
         <StatCard icon={Users} label="Sessions" value={String(overall.sessionsCount)} sub={focusEmail ? focusName || focusEmail : ''} />
+        {driveQuota?.connected && (
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
+            <DriveQuotaBadge quota={driveQuota} size="lg" />
+          </div>
+        )}
       </div>
 
       {/* Sessions Tab */}

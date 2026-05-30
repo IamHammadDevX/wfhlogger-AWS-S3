@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useTheme } from '../../ThemeContext.jsx'
 import axios from 'axios'
 import { getSocket } from '../../socket.js'
+import { getApiBaseSync } from '../../api.js'
+import DriveQuotaBadge from '../../components/ui/DriveQuotaBadge.jsx'
 
 export default function EmployeeDashboard() {
   const { theme, toggleTheme } = useTheme()
@@ -9,9 +11,17 @@ export default function EmployeeDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [timezone, setTimezone] = useState('UTC')
+  const [driveQuota, setDriveQuota] = useState(null)
 
   useEffect(() => {
     fetchDashboardSummary()
+    // Fetch own drive quota
+    const token = localStorage.getItem('token')
+    const headers = { Authorization: `Bearer ${token}` }
+    const base = getApiBaseSync()
+    axios.get(`${base}/api/drive/quota/self`, { headers })
+      .then(r => setDriveQuota(r.data?.quota || null))
+      .catch(() => {})
   }, [])
   useEffect(() => {
     const s = getSocket()
@@ -205,6 +215,13 @@ export default function EmployeeDashboard() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Drive Storage */}
+      {driveQuota && (
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+          <DriveQuotaBadge quota={driveQuota} size="lg" />
         </div>
       )}
 

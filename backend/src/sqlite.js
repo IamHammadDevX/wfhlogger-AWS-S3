@@ -37,7 +37,9 @@ try {
     billing_address TEXT,
     admin_contact_email TEXT,
     updated_at TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    is_active INTEGER DEFAULT 0,
+    activation_token TEXT
   );
 
   CREATE TABLE IF NOT EXISTS users (
@@ -195,6 +197,17 @@ try {
       db.exec("ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'UTC'")
       console.log('[sqlite] Migrated users table: added timezone')
     }
+    // Migration: Add is_active and activation_token to companies
+    const compInfo = db.prepare("PRAGMA table_info(companies)").all()
+    if (!compInfo.find(c => c.name === 'is_active')) {
+      db.exec("ALTER TABLE companies ADD COLUMN is_active INTEGER DEFAULT 1")
+      console.log('[sqlite] Migrated companies table: added is_active')
+    }
+    if (!compInfo.find(c => c.name === 'activation_token')) {
+      db.exec("ALTER TABLE companies ADD COLUMN activation_token TEXT")
+      console.log('[sqlite] Migrated companies table: added activation_token')
+    }
+
     const orgInfo = db.prepare("PRAGMA table_info(organizations)").all()
     if (!orgInfo.find(c => c.name === 'company_id')) {
       db.exec("ALTER TABLE organizations ADD COLUMN company_id INTEGER REFERENCES companies(id)")
@@ -331,23 +344,40 @@ export function listAllUsers() {
 
 export function createCompany({ name }) {
   const now = new Date().toISOString()
+  const activation_token = crypto.randomBytes(32).toString('hex')
   if (db) {
     const billing_email = arguments[0]?.billing_email || null
     const admin_contact_email = arguments[0]?.admin_contact_email || null
     const logo_url = arguments[0]?.logo_url || null
-    const stmt = db.prepare('INSERT INTO companies (name, created_at, plan, credits, updated_at, billing_email, admin_contact_email, logo_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    const info = stmt.run(name, now, 'free', 0, now, billing_email, admin_contact_email, logo_url)
-    return { id: info.lastInsertRowid, name, created_at: now, plan: 'free', credits: 0, updated_at: now, billing_email, admin_contact_email, logo_url }
+    const stmt = db.prepare('INSERT INTO companies (name, created_at, plan, credits, updated_at, billing_email, admin_contact_email, logo_url, is_active, activation_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)')
+    const info = stmt.run(name, now, 'free', 0, now, billing_email, admin_contact_email, logo_url, activation_token)
+    return { id: info.lastInsertRowid, name, created_at: now, plan: 'free', credits: 0, updated_at: now, billing_email, admin_contact_email, logo_url, is_active: 0, activation_token }
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
   const id = (arr[arr.length - 1]?.id || 0) + 1
   const billing_email = arguments[0]?.billing_email || null
   const admin_contact_email = arguments[0]?.admin_contact_email || null
   const logo_url = arguments[0]?.logo_url || null
-  const record = { id, name, created_at: now, plan: 'free', credits: 0, updated_at: now, billing_email, admin_contact_email, logo_url }
+  const record = { id, name, created_at: now, plan: 'free', credits: 0, updated_at: now, billing_email, admin_contact_email, logo_url, is_active: 0, activation_token }
   arr.push(record)
   fs.writeFileSync(fallbacks.companies, JSON.stringify(arr, null, 2))
   return record
+}
+
+export function activateCompany(token) {
+  if (db) {
+    const company = db.prepare('SELECT * FROM companies WHERE activation_token = ?').get(token)
+    if (!company) return null
+    db.prepare('UPDATE companies SET is_active = 1, activation_token = NULL WHERE id = ?').run(company.id)
+    return { ...company, is_active: 1, activation_token: null }
+  }
+  const arr = JSON.parse(fs.readFileSync(fallbacks.companies, 'utf-8'))
+  const idx = arr.findIndex(c => c.activation_token === token)
+  if (idx < 0) return null
+  arr[idx].is_active = 1
+  arr[idx].activation_token = null
+  fs.writeFileSync(fallbacks.companies, JSON.stringify(arr, null, 2))
+  return arr[idx]
 }
 
 export function getCompanyById(id) {

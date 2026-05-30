@@ -13,15 +13,16 @@ export default function Signup() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [msg, setMsg] = useState('')
 
   const submit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setMsg('')
     try {
       const resp = await axios.post('/api/auth/signup', { companyName, email, fullName, country, timezone, password })
-      localStorage.setItem('token', resp.data.token)
-      location.href = '/dashboard'
+      setMsg(resp.data?.message || 'Workspace created! Check your email for the activation link.')
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || 'Network error'
       setError(`Signup failed: ${msg}.`)
@@ -44,6 +45,14 @@ export default function Signup() {
         </div>
 
         <form onSubmit={submit} className="bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/60 dark:shadow-none rounded-2xl p-8 border border-slate-100 dark:border-slate-700 space-y-6 transition-colors">
+          {msg && (
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg border border-emerald-200 dark:border-emerald-900/50 flex items-start">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {msg}
+            </div>
+          )}
           {error && (
             <div className="p-4 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg border border-red-100 dark:border-red-900/50 flex items-start">
               <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

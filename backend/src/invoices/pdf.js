@@ -44,7 +44,7 @@ export async function generateInvoicePdf(invoice) {
 
   // 1. Header Section
   // Logo / Brand Name (SaaS Provider)
-  doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold').text('Time Tracker SaaS', 50, 50)
+  doc.fillColor(primaryColor).fontSize(20).font('Helvetica-Bold').text('WFHLOGGER', 50, 50)
   
   // Status Pill (Top Right)
   const status = (invoice.payment_status || 'PAID').toUpperCase()
@@ -64,8 +64,8 @@ export async function generateInvoicePdf(invoice) {
   // SaaS Contact Info
   doc.fontSize(9).font('Helvetica').fillColor(secondaryColor)
   doc.text('123 SaaS Street, Tech Valley', 50, 75)
-  doc.text('support@timetracker.com', 50, 88)
-  doc.text('www.timetracker.com', 50, 101)
+  doc.text('support@wfhlogger.com', 50, 88)
+  doc.text('www.wfhlogger.com', 50, 101)
 
   // Invoice Meta (Right side, below pill)
   doc.fontSize(24).font('Helvetica-Bold').fillColor(primaryColor)
@@ -173,7 +173,7 @@ export async function generateInvoicePdf(invoice) {
   hr(footerY)
   doc.fontSize(8).font('Helvetica').fillColor(secondaryColor)
   doc.text('This is a system-generated invoice. If you have any questions, please contact our support team.', 50, footerY + 10, { align: 'center', width: 495 })
-  doc.text('Time Tracker SaaS • 123 SaaS Street • support@timetracker.com', 50, footerY + 22, { align: 'center', width: 495 })
+  doc.text('WFHLOGGER • 123 SaaS Street • support@wfhlogger.com', 50, footerY + 22, { align: 'center', width: 495 })
 
   doc.end()
   return new Promise((resolve) => {

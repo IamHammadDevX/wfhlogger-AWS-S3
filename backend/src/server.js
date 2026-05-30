@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { connectMongo } from './db.js';
-import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, updateEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, deleteManagerTempPassword, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce } from './sqlite.js';
+import { db, getUserByEmail, getSuperAdmin, createUser, verifyPassword, seedDefaultSuperAdmin, createOrganization, listManagers, getOrganizationByManagerId, upsertEmployeePassword, deleteUserById, deleteUserByEmail, deleteOrganizationByManagerId, createCompany, getCompanyById, updateCompanyCredits, createTransaction, getTransactions, getTransactionByReferenceId, createTimeRequest, getTimeRequests, updateTimeRequestStatus, getTimeRequestById, getWorkSessions, creditCompanyWithTransaction, debitCompanyWithTransaction, ensureEmployeeBillingSchedule, updateCompanyProfile, getNextInvoiceNo, createInvoice, listInvoices, getInvoiceByCompany, setInvoicePdfPath, recordEmployeeTempPassword, updateEmployeeTempPassword, listEmployeeTempPasswords, recordManagerTempPassword, listManagerTempPasswords, deleteManagerTempPassword, createPasswordResetToken, verifyResetToken, resetPassword, updateUserProfile, updateUserTimezone, listCompanies, listUsersByCompany, listAllUsers, markWebhookEventProcessed, listWebhookEvents, applyStripeCheckoutCreditsOnce, activateCompany } from './sqlite.js';
 import { generateInvoicePdf } from './invoices/pdf.js'
 
 import { formatLocalDateTime, localDateKey, parseLocalDateTimeToUtcMs, toIsoZ } from './timezone.js'
@@ -18,7 +18,7 @@ import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
 import { createStripeCheckoutSession, verifyStripeWebhookAndExtract, retrieveCheckoutSession, listRecentCheckoutSessions } from './payments/stripe.js';
-import { sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning } from './email.js';
+import { sendEmail, sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning } from './email.js';
 import { runEmployeeMonthlyBilling, getCompanyAdminEmail } from './subscriptionBilling.js'
 import cron from 'node-cron';
 import crypto from 'crypto';
@@ -454,6 +454,14 @@ app.post('/api/auth/login', (req, res) => {
     const ok = verifyPassword(user, password);
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
+    // Check if the company is activated (skip for super_admin)
+    if (effectiveRole !== 'super_admin' && user.company_id) {
+      const company = getCompanyById(user.company_id)
+      if (company && company.is_active != null && company.is_active === 0) {
+        return res.status(403).json({ error: 'Account not activated. Please check your email for the activation link.', needsActivation: true })
+      }
+    }
+
     let tz = (user.timezone || 'UTC')
     const clientTz = String(req.body?.client_timezone || '').trim()
     if ((!tz || tz === 'UTC') && clientTz && clientTz.toUpperCase() !== 'UTC') {
@@ -490,32 +498,61 @@ app.post('/api/auth/signup', (req, res) => {
     // Create Default Team (Organization) linked to company
     createOrganization({ name: `${companyName}`, managerId: user.id, company_id: company.id });
 
-    // Generate Token
-    const token = jwt.sign({ sub: user.email, email: user.email, role: user.role, uid: user.id, company_id: company.id, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC' }, JWT_SECRET, { expiresIn: '8h' });
-    
-    // Send welcome email to new company admin
+    // Send activation email instead of returning a token
     try {
       const baseUrl = String(process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '')
       const slug = String(companyName || 'company').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'company'
       const loginUrl = `${baseUrl}/${slug}/login`
-      sendNewUserCreated(email, {
-        name: fullName,
-        email,
-        role: 'company_admin',
-        teamName: companyName,
-        password,
-        loginUrl,
-        companyName,
-        companyId: company.id,
-      });
+      const activateUrl = `${baseUrl}/api/auth/activate/${company.activation_token}`
+      
+      // Send activation email with nice template
+      const subject = 'Activate your Time Tracker workspace'
+      const text = `Hi ${fullName},\n\nThank you for creating a workspace "${companyName}".\n\nPlease click the link below to activate your account:\n${activateUrl}\n\nOnce activated, you can log in at:\n${loginUrl}\n\nYour temporary credentials:\nEmail: ${email}\nPassword: ${password}\n\nFor security, change your password after first login.\n\n- Time Tracker Team`
+      
+      sendEmail(email, subject, text)
     } catch (emailErr) {
-      console.warn('[auth:signup] welcome email failed:', emailErr);
+      console.warn('[auth:signup] activation email failed:', emailErr);
     }
     
-    res.status(201).json({ token, company, user: { id: user.id, email: user.email, full_name: user.full_name, country: user.country || '', timezone: user.timezone || 'UTC', role: user.role } });
+    res.status(201).json({ ok: true, message: 'Workspace created! Check your email for the activation link.', needsActivation: true, activation_email: email });
   } catch (e) {
     console.error('[auth:signup] error:', e);
     res.status(500).json({ error: 'Signup failed' });
+  }
+});
+
+// Account Activation
+app.get('/api/auth/activate/:token', async (req, res) => {
+  try {
+    const { token } = req.params
+    if (!token) return res.status(400).send('Activation token is required')
+
+    const company = activateCompany(token)
+    if (!company) {
+      return res.status(404).send(`
+        <!doctype html><html><head><meta charset="utf-8"/><title>Activation Failed</title></head>
+        <body style="font-family:system-ui;margin:40px;line-height:1.5;text-align:center;">
+          <h2 style="color:#E11D48;">Activation link invalid or expired</h2>
+          <p style="color:#64748B;">Please contact support for assistance.</p>
+        </body></html>
+      `)
+    }
+
+    const baseUrl = String(process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '')
+    const slug = String(company.name || 'company').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'company'
+    const loginUrl = `${baseUrl}/${slug}/login`
+
+    res.status(200).send(`
+      <!doctype html><html><head><meta charset="utf-8"/><title>Account Activated</title></head>
+      <body style="font-family:system-ui;margin:40px;line-height:1.5;text-align:center;">
+        <h2 style="color:#059669;">Workspace activated!</h2>
+        <p style="color:#334155;margin-bottom:24px;">Your workspace <strong>${company.name}</strong> is now active. You can log in below.</p>
+        <a href="${loginUrl}" style="display:inline-block;padding:12px 24px;background:#2563EB;color:#fff;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">Go to Login</a>
+      </body></html>
+    `)
+  } catch (e) {
+    console.error('[auth:activate] error:', e)
+    res.status(500).send('Activation failed')
   }
 });
 
@@ -880,6 +917,24 @@ async function fetchDriveStorageQuota({ company_id, employeeEmail }) {
     quota_usage_bytes: used,
     quota_remaining_bytes: remaining,
     quota_updated_at: new Date().toISOString(),
+    quota_warned_at: t.quota_warned_at || null,
+  }
+
+  // Send low space warning if usage > 70% and not notified recently
+  const pct = (limit != null && used != null && limit > 0) ? Math.min(100, (used / limit) * 100) : null
+  if (pct != null && pct > 70 && (!t.quota_warned_at || (Date.now() - Date.parse(t.quota_warned_at)) > 24 * 60 * 60 * 1000)) {
+    try {
+      const company = getCompanyById(company_id)
+      const adminEmail = company ? getCompanyAdminEmail(company_id, company) : null
+      const pctDisplay = pct.toFixed(1)
+      const usedDisplay = used >= 1e9 ? `${(used / 1e9).toFixed(2)} GB` : `${(used / 1e6).toFixed(2)} MB`
+      const limitDisplay = limit >= 1e9 ? `${(limit / 1e9).toFixed(2)} GB` : `${(limit / 1e6).toFixed(2)} MB`
+      const subject = `Drive space warning: ${pctDisplay}% used by ${employeeEmail}`
+      const text = `Employee ${employeeEmail} has used ${pctDisplay}% (${usedDisplay} / ${limitDisplay}) of their Google Drive storage.`
+      if (adminEmail) sendEmail(adminEmail, subject, text)
+      sendEmail(employeeEmail, `Your Google Drive is ${pctDisplay}% full`, `You have used ${pctDisplay}% (${usedDisplay} / ${limitDisplay}) of your Google Drive storage. Please free up space to continue capturing screenshots.`)
+      next.quota_warned_at = new Date().toISOString()
+    } catch {}
   }
   if (idx >= 0) tokens[idx] = next
   writeJSON(driveTokensFile, tokens)

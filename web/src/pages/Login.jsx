@@ -74,6 +74,8 @@ export default function Login() {
     } catch (err) {
       if (err.response && err.response.status === 401) {
         setError('Incorrect email or password. Please try again.')
+      } else if (err.response && err.response.status === 403 && err.response.data?.needsActivation) {
+        setError('Account not activated. Please check your email for the activation link.')
       } else if (err.response && err.response.status === 403) {
         setError('Access denied. You do not have permission to login with this role.')
       } else {
