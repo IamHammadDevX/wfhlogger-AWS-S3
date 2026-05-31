@@ -213,7 +213,6 @@ try {
       db.exec("ALTER TABLE organizations ADD COLUMN company_id INTEGER REFERENCES companies(id)")
       console.log('[sqlite] Migrated organizations table: added company_id')
     }
-    const compInfo = db.prepare("PRAGMA table_info(companies)").all()
     const ensureCol = (name, sql) => { if (!compInfo.find(c => c.name === name)) { db.exec(sql); console.log('[sqlite] Migrated companies: added', name) } }
     ensureCol('logo_url', "ALTER TABLE companies ADD COLUMN logo_url TEXT")
     ensureCol('billing_email', "ALTER TABLE companies ADD COLUMN billing_email TEXT")
