@@ -125,6 +125,13 @@ export default function LiveView() {
     const token = localStorage.getItem('token')
     const headers = { Authorization: `Bearer ${token}` }
     let decoded = null
+    let userRole = ''
+    try { decoded = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch {}
+    if (decoded) {
+      userRole = (decoded.role === 'super_admin' && decoded.company_id != null) ? 'company_admin' : decoded.role
+    }
+    setRole(userRole || '')
+
     resolveApiBase().then((BASE)=>{
       axios.get(`${BASE}/api/employees`, { headers }).then(r => {
         const users = Array.isArray(r.data?.users) ? r.data.users : []
@@ -136,13 +143,13 @@ export default function LiveView() {
         setOnlineEmployees(list)
         setFilteredOnline(list)
       }).catch(()=>{})
+      // Load managers list for company_admin
+      if (userRole === 'company_admin') {
+        axios.get(`${BASE}/api/admin/managers`, { headers }).then(r => {
+          setManagers(r.data?.managers || [])
+        }).catch(() => {})
+      }
     })
-    let r = ''
-    try { decoded = JSON.parse(atob((token || '').split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch {}
-    if (decoded) {
-      r = (decoded.role === 'super_admin' && decoded.company_id != null) ? 'company_admin' : decoded.role
-    }
-    setRole(r || '')
   }, [])
 
   useEffect(() => {
@@ -230,7 +237,7 @@ export default function LiveView() {
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3">
-          {managers.length > 0 && (
+          {role === 'company_admin' && (
             <select 
               className="border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors" 
               value={selectedManager} 
@@ -238,7 +245,7 @@ export default function LiveView() {
             >
               <option value="">All Managers</option>
               {managers.map(m => (
-                <option key={m.id} value={m.id}>{m.email} ({m.organization?.name || '-'})</option>
+                <option key={m.id} value={m.id}>{m.full_name || m.email} {m.organization?.name ? `(${m.organization.name})` : ''}</option>
               ))}
             </select>
           )}
