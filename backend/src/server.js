@@ -1783,6 +1783,26 @@ app.post('/api/requests', requireRole(['employee']), (req, res) => {
       reason
     });
 
+    // Send email to the employee's manager only
+    try {
+      const employeeEmail = req.user?.sub || ''
+      const users = readUsers()
+      const employeeData = users.find(u => String(u.email).toLowerCase() === String(employeeEmail).toLowerCase() && u.company_id == company_id)
+      if (employeeData?.managerId) {
+        const managers = listManagers(company_id)
+        const manager = managers.find(m => String(m.id) === String(employeeData.managerId) || String(m.email).toLowerCase() === String(employeeData.managerId).toLowerCase())
+        const managerEmail = manager?.email || null
+        if (managerEmail) {
+          const employeeName = employeeData.name || employeeEmail
+          const subject = `Time request from ${employeeName}`
+          const body = `${employeeName} has submitted a manual time request.\n\nDate: ${date}\nTime: ${start_time} - ${end_time}\nTimezone: ${tz}\nReason: ${reason}\n\nPlease review and respond in the Time Tracker app.`
+          sendEmail(managerEmail, subject, body)
+        }
+      }
+    } catch (emailErr) {
+      console.warn('[requests:create] failed to notify manager:', emailErr)
+    }
+
     res.json({ request });
   } catch (e) {
     console.error('[requests:create]', e);
