@@ -482,7 +482,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // Signup (Multi-tenant)
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   try {
     const { companyName, email, password, fullName, country, timezone } = req.body || {};
     if (!companyName || !email || !password || !fullName || !country || !timezone) return res.status(400).json({ error: 'All fields are required' });
