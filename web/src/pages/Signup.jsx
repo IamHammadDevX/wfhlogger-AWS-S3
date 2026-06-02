@@ -44,15 +44,37 @@ export default function Signup() {
           <p className="mt-2 text-slate-500 dark:text-slate-400">Start your company time tracking</p>
         </div>
 
-        <form onSubmit={submit} className="bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/60 dark:shadow-none rounded-2xl p-8 border border-slate-100 dark:border-slate-700 space-y-6 transition-colors">
-          {msg && (
-            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg border border-emerald-200 dark:border-emerald-900/50 flex items-start">
-              <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {msg}
+        {/* Success Popup */}
+        {msg && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl p-8 text-center space-y-5">
+              <div className="mx-auto w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Workspace Created!</h2>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Check your email <strong className="text-slate-900 dark:text-slate-200">{email}</strong> for the activation link. Click the link to activate your workspace and log in.
+                </p>
+              </div>
+              <a
+                href={`https://mail.google.com`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block w-full px-5 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition"
+              >
+                Open Gmail
+              </a>
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                Didn't receive the email? Check your spam folder.
+              </p>
             </div>
-          )}
+          </div>
+        )}
+
+        <form onSubmit={submit} className={`bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/60 dark:shadow-none rounded-2xl p-8 border border-slate-100 dark:border-slate-700 space-y-6 transition-colors ${msg ? 'hidden' : ''}`}>
           {error && (
             <div className="p-4 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg border border-red-100 dark:border-red-900/50 flex items-start">
               <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

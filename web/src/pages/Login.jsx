@@ -10,9 +10,14 @@ export default function Login() {
   const [role, setRole] = useState('company_admin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activated, setActivated] = useState('')
 
   useEffect(() => {
     const params = new URLSearchParams(routerLocation.search)
+    if (params.get('activated') === 'true') {
+      setActivated('Workspace activated! You can now log in.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
     const token = params.get('token')
     if (!token) return
     try {
@@ -101,6 +106,14 @@ export default function Login() {
         </div>
 
         <form onSubmit={submit} className="bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/60 dark:shadow-none rounded-2xl p-8 border border-slate-100 dark:border-slate-700 space-y-6 transition-colors">
+          {activated && (
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg border border-emerald-200 dark:border-emerald-900/50 flex items-start">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {activated}
+            </div>
+          )}
           {error && (
             <div className="p-4 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg border border-red-100 dark:border-red-900/50 flex items-start">
               <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

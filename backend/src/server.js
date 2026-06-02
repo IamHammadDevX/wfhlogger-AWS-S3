@@ -540,16 +540,9 @@ app.get('/api/auth/activate/:token', async (req, res) => {
 
     const baseUrl = String(process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '')
     const slug = String(company.name || 'company').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'company'
-    const loginUrl = `${baseUrl}/${slug}/login`
+    const loginUrl = `${baseUrl}/${slug}/login?activated=true`
 
-    res.status(200).send(`
-      <!doctype html><html><head><meta charset="utf-8"/><title>Account Activated</title></head>
-      <body style="font-family:system-ui;margin:40px;line-height:1.5;text-align:center;">
-        <h2 style="color:#059669;">Workspace activated!</h2>
-        <p style="color:#334155;margin-bottom:24px;">Your workspace <strong>${company.name}</strong> is now active. You can log in below.</p>
-        <a href="${loginUrl}" style="display:inline-block;padding:12px 24px;background:#2563EB;color:#fff;text-decoration:none;border-radius:12px;font-weight:700;font-size:14px;">Go to Login</a>
-      </body></html>
-    `)
+    res.redirect(301, loginUrl)
   } catch (e) {
     console.error('[auth:activate] error:', e)
     res.status(500).send('Activation failed')
