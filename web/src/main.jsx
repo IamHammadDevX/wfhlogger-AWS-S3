@@ -196,6 +196,10 @@ function AppRoutes() {
       <Route path="/employee/profile" element={<Navigate to="/profile" replace />} />
       
       {/* Tenant-scoped routes */}
+      <Route path="/:companySlug/login" element={<Login />} />
+      <Route path="/:companySlug/signup" element={<Signup />} />
+      <Route path="/:companySlug/forgot-password" element={<ForgotPassword />} />
+      <Route path="/:companySlug/reset-password" element={<ResetPassword />} />
       <Route path="/:companySlug/dashboard" element={
         <ProtectedRoute allowedRoles={['employee', 'manager', 'company_admin']}>
           <TenantGuard>

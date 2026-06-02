@@ -18,7 +18,7 @@ import bcrypt from 'bcryptjs';
 // Razorpay disabled (kept for future re-enable)
 // import { createOrder, verifySignature } from './payment.js';
 import { createStripeCheckoutSession, verifyStripeWebhookAndExtract, retrieveCheckoutSession, listRecentCheckoutSessions } from './payments/stripe.js';
-import { sendEmail, sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning } from './email.js';
+import { sendEmail, sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning, sendActivationEmail } from './email.js';
 import { runEmployeeMonthlyBilling, getCompanyAdminEmail } from './subscriptionBilling.js'
 import cron from 'node-cron';
 import crypto from 'crypto';
@@ -505,11 +505,7 @@ app.post('/api/auth/signup', (req, res) => {
       const loginUrl = `${baseUrl}/${slug}/login`
       const activateUrl = `${baseUrl}/api/auth/activate/${company.activation_token}`
       
-      // Send activation email with nice template
-      const subject = 'Activate your Time Tracker workspace'
-      const text = `Hi ${fullName},\n\nThank you for creating a workspace "${companyName}".\n\nPlease click the link below to activate your account:\n${activateUrl}\n\nOnce activated, you can log in at:\n${loginUrl}\n\nYour temporary credentials:\nEmail: ${email}\nPassword: ${password}\n\nFor security, change your password after first login.\n\n- Time Tracker Team`
-      
-      sendEmail(email, subject, text)
+      await sendActivationEmail(email, { fullName, companyName, activateUrl, loginUrl, password })
     } catch (emailErr) {
       console.warn('[auth:signup] activation email failed:', emailErr);
     }

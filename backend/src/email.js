@@ -495,3 +495,33 @@ Link expires in 1 hour.`;
   })
   return sendEmail(to, subject, text, html, { attachments })
 }
+
+export function sendActivationEmail(to, { fullName, companyName, activateUrl, loginUrl, password }) {
+  const safeBrand = process.env.EMAIL_BRAND_NAME || 'Time Tracker';
+  const subject = `Activate your ${safeBrand} workspace`;
+  const text = `Hi ${fullName},\n\nThank you for creating a workspace "${companyName}".\n\nPlease click the link below to activate your account:\n${activateUrl}\n\nOnce activated, you can log in at:\n${loginUrl}\n\nYour temporary credentials:\nEmail: ${to}\nPassword: ${password}\n\nFor security, change your password after first login.\n\n- ${safeBrand} Team`;
+
+  const { html, attachments } = renderEmail({
+    companyName,
+    companyId: null,
+    companyLogoUrl: '',
+    title: 'Welcome! Activate your workspace',
+    tone: 'blue',
+    preheader: `Activate "${companyName}" workspace`,
+    blocks: [
+      `Hi <strong>${escapeHtml(fullName)}</strong>,`,
+      `Thank you for creating a workspace <strong>"${escapeHtml(companyName)}"</strong>. Please click the button below to activate your account and get started.`,
+      `<div style="margin-top:6px;padding:12px;border:1px solid #E2E8F0;border-radius:12px;background:#fff;">
+        <div style="font-size:11px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Temporary Credentials</div>
+        <div style="margin-top:6px;font-size:13px;">
+          <div><span style="color:#64748B;">Email:</span> <strong>${escapeHtml(to)}</strong></div>
+          <div style="margin-top:2px;"><span style="color:#64748B;">Password:</span> <strong>${escapeHtml(password)}</strong></div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:#94A3B8;">⚠️ Change your password after first login.</div>
+      </div>`,
+      `Once activated, you can log in at: <a href="${escapeHtml(loginUrl)}" style="color:#2563EB;">${escapeHtml(loginUrl)}</a>`
+    ],
+    cta: { label: 'Activate workspace', url: activateUrl }
+  })
+  return sendEmail(to, subject, text, html, { attachments })
+}
