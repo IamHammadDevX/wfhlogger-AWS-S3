@@ -64,7 +64,7 @@ export default function Downloads() {
             </div>
             <ol className="text-sm text-slate-700 dark:text-slate-300 space-y-2 list-decimal list-inside marker:text-blue-600">
               <li><strong>Download</strong> the file above and double-click it to install.</li>
-              <li>Open the app (like <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">http://localhost:4000</span>), then sign in.</li>
+              <li>Open the app, then sign in with provided credentials.</li>
               <li>If Windows shows a SmartScreen warning, just click <strong>"Run anyway"</strong> — it's safe.</li>
             </ol>
           </div>
