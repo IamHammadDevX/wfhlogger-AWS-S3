@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTheme } from '../ThemeContext'
 import { useCredits } from '../CreditsContext.jsx'
+import { resolveApiBase } from '../api.js'
+import axios from 'axios'
 
 // Icons
 const Icons = {
@@ -26,6 +28,26 @@ export default function Sidebar({ isOpen, setIsOpen }) {
   const { pathname } = useLocation()
   const { theme, toggleTheme } = useTheme()
   const { credits } = useCredits()
+  
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    const fetchCount = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return
+        const base = await resolveApiBase()
+        const { data } = await axios.get(`${base}/api/requests/pending-count`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!cancelled) setPendingCount(data.count || 0)
+      } catch {}
+    }
+    fetchCount()
+    const interval = setInterval(fetchCount, 30000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [])
   
   const role = useMemo(() => {
     try {
@@ -52,7 +74,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
     }
   }, [])
 
-  const NavItem = ({ to, icon: Icon, label }) => {
+  const NavItem = ({ to, icon: Icon, label, badge }) => {
     const isActive = pathname === to
     return (
       <Link
@@ -64,7 +86,14 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
         }`}
       >
-        {Icon ? <Icon /> : <Icons.Dashboard />}
+        <div className="relative">
+          {Icon ? <Icon /> : <Icons.Dashboard />}
+          {badge > 0 && (
+            <span className="absolute -top-2 -right-2.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full leading-none">
+              {badge > 5 ? '5+' : badge}
+            </span>
+          )}
+        </div>
         {label}
       </Link>
     )
@@ -122,7 +151,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
                 {role === 'employee' && <NavItem to="/report" icon={Icons.Reports} label="Reports" />}
                 <NavItem to="/time-tracking" icon={Icons.TimeTracking} label="Time Tracking" />
                 <NavItem to="/activity" icon={Icons.Activity} label="Activity Logs" />
-                <NavItem to="/requests" icon={Icons.Requests} label="Requests" />
+                <NavItem to="/requests" icon={Icons.Requests} label="Requests" badge={pendingCount} />
               </>
             )}
             

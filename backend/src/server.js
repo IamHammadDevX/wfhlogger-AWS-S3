@@ -1848,6 +1848,27 @@ app.get('/api/requests', requireRole(['manager', 'company_admin', 'employee']), 
   }
 });
 
+// Lightweight pending count for sidebar badge
+app.get('/api/requests/pending-count', requireRole(['manager', 'company_admin', 'employee']), (req, res) => {
+  try {
+    const { company_id, role, uid } = req.user;
+    let requests = getTimeRequests(company_id);
+    if (role === 'employee') {
+      requests = requests.filter(r => r.employee_id == uid);
+    } else if (role === 'manager') {
+      const teamEmails = getTeamEmailsForManager(uid, company_id);
+      const teamIds = new Set(teamEmails.map(em => {
+        try { const u = getUserByEmail(em); return u?.id || null } catch { return null }
+      }).filter(Boolean));
+      requests = requests.filter(r => teamIds.has(r.employee_id));
+    }
+    const pending = requests.filter(r => r.status === 'pending').length;
+    res.json({ count: pending });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
 app.post('/api/requests/:id/:action', requireRole(['manager', 'company_admin']), (req, res) => {
   try {
     const { id, action } = req.params; // action: approve or reject
