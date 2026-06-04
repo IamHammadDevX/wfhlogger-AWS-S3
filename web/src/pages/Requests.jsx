@@ -8,6 +8,8 @@ export default function Requests() {
   const [requests, setRequests] = useState([])
   const [employees, setEmployees] = useState([])
   const [selectedEmployee, setSelectedEmployee] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [apiBase, setApiBase] = useState('')
   const [role, setRole] = useState('')
@@ -60,10 +62,19 @@ export default function Requests() {
     }
   }
 
-  const displayRequests = selectedEmployee
-    ? requests.filter(r => r.employee_email === selectedEmployee)
-    : requests
-  const requestsPg = usePagination(displayRequests, 10, [role, displayRequests.length, selectedEmployee])
+  const displayRequests = (() => {
+    let filtered = selectedEmployee
+      ? requests.filter(r => r.employee_email === selectedEmployee)
+      : requests
+    if (fromDate) {
+      filtered = filtered.filter(r => r.date >= fromDate)
+    }
+    if (toDate) {
+      filtered = filtered.filter(r => r.date <= toDate)
+    }
+    return filtered
+  })()
+  const requestsPg = usePagination(displayRequests, 10, [role, displayRequests.length, selectedEmployee, fromDate, toDate])
 
   if (loading) return <div className="p-8 text-slate-500 dark:text-slate-400">Loading...</div>
 
@@ -76,8 +87,8 @@ export default function Requests() {
       {/* Employee filter for managers/admins */}
       {isManagerOrAdmin && (
         <div className="mb-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
+            <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Filter by Employee</label>
               <select className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)}>
@@ -89,9 +100,28 @@ export default function Requests() {
                 ))}
               </select>
             </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400 self-center pb-1">
-              {selectedEmployee ? `${displayRequests.length} request(s) for this employee` : `${requests.length} total request(s)`}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">From Date</label>
+              <input type="date" className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                value={fromDate} onChange={e => setFromDate(e.target.value)} />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">To Date</label>
+              <input type="date" className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                value={toDate} onChange={e => setToDate(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setSelectedEmployee(''); setFromDate(''); setToDate('') }}
+                className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 hover:text-rose-600 dark:hover:text-rose-400 transition-colors text-sm inline-flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                Reset
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+            {displayRequests.length} request(s)
+            {selectedEmployee && ' for selected employee'}
+            {(fromDate || toDate) && ` · ${fromDate || '…'} to ${toDate || '…'}`}
           </div>
         </div>
       )}
