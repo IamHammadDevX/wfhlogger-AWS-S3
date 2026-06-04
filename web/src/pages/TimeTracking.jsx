@@ -267,6 +267,13 @@ export default function TimeTracking() {
             className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-70 inline-flex items-center gap-2">
             <Clock className="w-4 h-4" />{loading ? 'Searching...' : 'Search'}
           </button>
+          <button onClick={() => {
+            setSelectedEmployee(''); setFromDate(''); setToDate('')
+            setGrouped([]); setFiles([]); setMsg(''); setFocusedEmployee('')
+          }} className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 hover:text-rose-600 dark:hover:text-rose-400 inline-flex items-center gap-1.5 text-sm transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            Reset
+          </button>
           <button onClick={downloadZip} disabled={!selectedEmployee}
             className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-50 inline-flex items-center gap-1.5 text-sm">
             <Download className="w-4 h-4" />ZIP
