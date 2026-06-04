@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { resolveApiBase } from '../api.js'
 
 export default function Downloads() {
@@ -7,6 +7,18 @@ export default function Downloads() {
   useEffect(() => {
     resolveApiBase().then(setApiBase)
   }, [])
+
+  const role = useMemo(() => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return ''
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+      const raw = payload?.role || ''
+      return (raw === 'super_admin' && payload?.company_id != null) ? 'company_admin' : raw
+    } catch { return '' }
+  }, [])
+
+  const isEmployee = role === 'employee'
 
   const downloadUrl = `${apiBase}/downloads/TimeTrackerSetup.exe`
   const pyUrl = `${apiBase}/downloads/TimeTracker.py`
@@ -31,8 +43,8 @@ export default function Downloads() {
               Download TimeTrackerSetup.exe
             </a>
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-500">v1.0.0 • Windows 10/11 • 64-bit</p>
-          </div>
-          <div className="p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
+        </div>
+        {!isEmployee && <div className="p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
             <div className="flex items-center gap-3 mb-4">
               <span className="inline-flex w-10 h-10 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
@@ -44,7 +56,7 @@ export default function Downloads() {
               Download TimeTracker.py
             </a>
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-500">Requires Python ≥ 3.10</p>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -71,7 +83,7 @@ export default function Downloads() {
         </div>
 
         {/* Other platforms using .py script */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {!isEmployee && <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Windows .py */}
           <details className="group bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden open:ring-2 open:ring-violet-500/30">
             <summary className="cursor-pointer px-5 py-4 flex items-center gap-3 text-sm font-semibold text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors">
@@ -130,7 +142,7 @@ export default function Downloads() {
               <p className="text-xs text-slate-500 dark:text-slate-400 pt-1">⚠️ Go to <strong>System Settings → Privacy → Screen Recording</strong> and allow your terminal.</p>
             </div>
           </details>
-        </div>
+        </div>}
       </div>
     </div>
   )
