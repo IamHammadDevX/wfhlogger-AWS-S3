@@ -579,12 +579,33 @@ class TimeTrackerApp:
         s_spin = ttk.Frame(start_col, style='Surface.TFrame')
         s_spin.pack(fill='x')
         
+        def clamp_h(*_):
+            val = start_h_var.get()
+            if val.isdigit():
+                v = int(val)
+                if v > 23: start_h_var.set("23")
+            elif val not in ('',):
+                start_h_var.set("00")
+        def clamp_m(*_):
+            val = start_m_var.get()
+            if val.isdigit():
+                v = int(val)
+                if v > 59: start_m_var.set("59")
+            elif val not in ('',):
+                start_m_var.set("00")
+        
+        start_h_var, start_m_var = tk.StringVar(value="09"), tk.StringVar(value="00")
+        start_h_var.trace_add('write', clamp_h)
+        start_m_var.trace_add('write', clamp_m)
+        
         start_h_values = [f"{i:02d}" for i in range(24)]
         start_m_values = [f"{i:02d}" for i in range(60)]
-        start_h = tk.Spinbox(s_spin, values=start_h_values, width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        start_h = tk.Spinbox(s_spin, values=start_h_values, width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white',
+                             textvariable=start_h_var)
         start_h.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
         ttk.Label(s_spin, text=":", background='white', font=('Segoe UI', 11, 'bold')).pack(side='left')
-        start_m = tk.Spinbox(s_spin, values=start_m_values, width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        start_m = tk.Spinbox(s_spin, values=start_m_values, width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white',
+                             textvariable=start_m_var)
         start_m.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
 
         # End Time
@@ -595,10 +616,31 @@ class TimeTrackerApp:
         e_spin = ttk.Frame(end_col, style='Surface.TFrame')
         e_spin.pack(fill='x')
         
-        end_h = tk.Spinbox(e_spin, values=[f"{i:02d}" for i in range(24)], width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        end_h_var, end_m_var = tk.StringVar(value="17"), tk.StringVar(value="00")
+        
+        def clamp_end_h(*_):
+            val = end_h_var.get()
+            if val.isdigit():
+                v = int(val)
+                if v > 23: end_h_var.set("23")
+            elif val not in ('',):
+                end_h_var.set("17")
+        def clamp_end_m(*_):
+            val = end_m_var.get()
+            if val.isdigit():
+                v = int(val)
+                if v > 59: end_m_var.set("59")
+            elif val not in ('',):
+                end_m_var.set("00")
+        end_h_var.trace_add('write', clamp_end_h)
+        end_m_var.trace_add('write', clamp_end_m)
+        
+        end_h = tk.Spinbox(e_spin, values=[f"{i:02d}" for i in range(24)], width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white',
+                           textvariable=end_h_var)
         end_h.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
         ttk.Label(e_spin, text=":", background='white', font=('Segoe UI', 11, 'bold')).pack(side='left')
-        end_m = tk.Spinbox(e_spin, values=[f"{i:02d}" for i in range(60)], width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white')
+        end_m = tk.Spinbox(e_spin, values=[f"{i:02d}" for i in range(60)], width=3, wrap=True, font=('Segoe UI', 11), relief='flat', bg='white',
+                           textvariable=end_m_var)
         end_m.pack(side='left', fill='x', expand=True, padx=2, ipady=4)
         
         # Reason
@@ -608,9 +650,20 @@ class TimeTrackerApp:
         
         # Actions
         def submit():
+            try:
+                sh = int(start_h.get())
+                sm = int(start_m.get())
+                eh = int(end_h.get())
+                em = int(end_m.get())
+            except (ValueError, TypeError):
+                messagebox.showerror('Error', 'Please enter valid numbers for start and end time.')
+                return
+            if not (0 <= sh <= 23 and 0 <= sm <= 59 and 0 <= eh <= 23 and 0 <= em <= 59):
+                messagebox.showerror('Error', 'Time must be in 24-hour format (00-23 for hours, 00-59 for minutes).')
+                return
             d = date_entry.get_date().strftime('%Y-%m-%d')
-            s = f"{int(start_h.get()):02d}:{int(start_m.get()):02d}"
-            e = f"{int(end_h.get()):02d}:{int(end_m.get()):02d}"
+            s = f"{sh:02d}:{sm:02d}"
+            e = f"{eh:02d}:{em:02d}"
             r = reason_entry.get("1.0", "end-1c")
             
             if not r.strip():
