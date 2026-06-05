@@ -310,11 +310,12 @@ export { db }
 
 export function getUserByEmail(email) {
   if (db) {
-    const stmt = db.prepare('SELECT * FROM users WHERE lower(email) = lower(?)')
+    const stmt = db.prepare('SELECT * FROM users WHERE lower(email) = lower(?) ORDER BY id DESC')
     return stmt.get(email)
   }
   const arr = JSON.parse(fs.readFileSync(fallbacks.users, 'utf-8'))
-  return arr.find(u => String(u.email).toLowerCase() === String(email).toLowerCase())
+  const matches = arr.filter(u => String(u.email).toLowerCase() === String(email).toLowerCase())
+  return matches.length > 0 ? matches[matches.length - 1] : undefined
 }
 
 export function listCompanies() {
@@ -786,7 +787,7 @@ export function deleteUserById(id) {
 
 export function deleteUserByEmail(email) {
   if (db) {
-    const del = db.prepare("DELETE FROM users WHERE email = ?")
+    const del = db.prepare("DELETE FROM users WHERE lower(email) = lower(?)")
     const info = del.run(email)
     return info.changes > 0
   }

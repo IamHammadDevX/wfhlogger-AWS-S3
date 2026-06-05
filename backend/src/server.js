@@ -1683,6 +1683,8 @@ app.delete('/api/employees/:email', requireRole(['manager', 'company_admin']), (
     const remaining = allUsers.filter(u => String(u.email).toLowerCase() !== String(email).toLowerCase());
     writeUsers(remaining);
     try { deleteUserByEmail(email); } catch {}
+    // Clean up any temp password records for this employee
+    try { db?.prepare('DELETE FROM employee_creds WHERE lower(employee_email) = lower(?)').run(email); } catch {}
     // Terminate any ongoing live streams for this employee
     try {
       liveStreamOn.set(email, false);
