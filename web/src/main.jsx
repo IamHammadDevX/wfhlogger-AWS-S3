@@ -23,6 +23,7 @@ import Activity from './pages/Activity.jsx'
 import Setup from './pages/Setup.jsx'
 import TimeTracking from './pages/TimeTracking.jsx'
 import Downloads from './pages/Downloads.jsx'
+import SuperAdminLogin from './pages/SuperAdminLogin.jsx'
 import Home from './pages/Home.jsx'
 import Admin from './pages/Admin.jsx'
 import AuditLogs from './pages/AuditLogs.jsx'
@@ -148,6 +149,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/super-admin/login" element={<SuperAdminLogin />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />

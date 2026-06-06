@@ -177,11 +177,15 @@ export default function Login() {
                 value={role} 
                 onChange={e=>setRole(e.target.value)}
               >
-                <option value="super_admin">Super Admin</option>
                 <option value="company_admin">Company Admin</option>
                 <option value="manager">Manager</option>
                 <option value="employee">Employee</option>
               </select>
+              <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+                <Link to="/super-admin/login" className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+                  Super Admin? Login here →
+                </Link>
+              </p>
             </div>
           </div>
 
