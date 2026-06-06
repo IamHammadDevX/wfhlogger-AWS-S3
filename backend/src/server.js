@@ -1685,6 +1685,26 @@ app.delete('/api/employees/:email', requireRole(['manager', 'company_admin']), (
     try { deleteUserByEmail(email); } catch {}
     // Clean up any temp password records for this employee
     try { db?.prepare('DELETE FROM employee_creds WHERE lower(employee_email) = lower(?)').run(email); } catch {}
+    try {
+      const ecredFile = path.resolve(process.cwd(), DATA_DIR, 'employee_creds.sqlite.json')
+      if (fs.existsSync(ecredFile)) {
+        let arr = JSON.parse(fs.readFileSync(ecredFile, 'utf-8'))
+        const before = arr.length
+        arr = arr.filter(r => String(r.employee_email).toLowerCase() !== String(email).toLowerCase())
+        if (arr.length !== before) fs.writeFileSync(ecredFile, JSON.stringify(arr, null, 2))
+      }
+    } catch {}
+    // Also clean up manager_creds in case this was a manager-level employee reference
+    try { db?.prepare('DELETE FROM manager_creds WHERE lower(manager_email) = lower(?)').run(email); } catch {}
+    try {
+      const mcredFile = path.resolve(process.cwd(), DATA_DIR, 'manager_creds.sqlite.json')
+      if (fs.existsSync(mcredFile)) {
+        let arr = JSON.parse(fs.readFileSync(mcredFile, 'utf-8'))
+        const before = arr.length
+        arr = arr.filter(r => String(r.manager_email).toLowerCase() !== String(email).toLowerCase())
+        if (arr.length !== before) fs.writeFileSync(mcredFile, JSON.stringify(arr, null, 2))
+      }
+    } catch {}
     // Terminate any ongoing live streams for this employee
     try {
       liveStreamOn.set(email, false);
