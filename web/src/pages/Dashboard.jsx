@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { resolveApiBase } from '../api.js'
 import { getSocket } from '../socket.js'
 import ImageViewerModal from '../components/ui/ImageViewerModal.jsx'
-import DriveQuotaBadge from '../components/ui/DriveQuotaBadge.jsx'
+import StorageQuotaBadge from '../components/ui/StorageQuotaBadge.jsx'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
 
@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [selectedManager, setSelectedManager] = useState('')
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState(0)
-  const [driveQuotas, setDriveQuotas] = useState([])
+  const [storageQuotas, setStorageQuotas] = useState([])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -47,7 +47,7 @@ export default function Dashboard() {
         .catch(() => axios.get(`${BASE}/api/org`, { headers }).then(rr => setTeam(rr.data?.organization || null)).catch(()=>{}))
       const getUsers = axios.get(`${BASE}/api/employees`, { headers }).then(r => { const list = r.data.users || []; setEmployees(list); setEmployeesCount(list.length) }).catch(()=> { setEmployees([]); setEmployeesCount(0) })
       const getFiles = axios.get(`${BASE}/api/uploads/list`, { headers }).then(r => setRecentFiles((r.data.files || []).slice(-6).reverse())).catch(()=>{})
-      const getQuotas = axios.get(`${BASE}/api/drive/quota/list`, { headers }).then(r => setDriveQuotas(r.data?.quotas || [])).catch(() => {})
+      const getQuotas = axios.get(`${BASE}/api/storage/quota/list`, { headers }).then(r => setStorageQuotas(r.data?.quotas || [])).catch(() => {})
       Promise.allSettled([getTeamReq, getUsers, getFiles, getQuotas]).finally(() => setLoading(false))
     })
   }, [])
@@ -197,23 +197,23 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Drive Storage Overview */}
-      {role !== 'employee' && driveQuotas.length > 0 && (
+      {/* Storage Overview */}
+      {role !== 'employee' && storageQuotas.length > 0 && (
         <section className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-            <h2 className="font-bold text-slate-900 dark:text-white">Drive Storage</h2>
+            <h2 className="font-bold text-slate-900 dark:text-white">Storage</h2>
           </div>
           <div className="p-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {driveQuotas.filter(q => q.connected).map(q => (
+              {storageQuotas.filter(q => q.connected).map(q => (
                 <div key={q.employee_id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                   <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate mb-2" title={q.employee_id}>{q.employee_id}</div>
-                  <DriveQuotaBadge quota={q} size="sm" />
+                  <StorageQuotaBadge quota={q} size="sm" />
                 </div>
               ))}
-              {driveQuotas.filter(q => !q.connected).length > 0 && (
+              {storageQuotas.filter(q => !q.connected).length > 0 && (
                 <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-center text-[10px] text-slate-400">
-                  {driveQuotas.filter(q => !q.connected).length} not connected
+                  {storageQuotas.filter(q => !q.connected).length} not connected
                 </div>
               )}
             </div>

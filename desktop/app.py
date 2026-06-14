@@ -298,18 +298,6 @@ class TimeTrackerApp:
             messagebox.showerror('Error', f'Unable to open browser for {url}')
 
     def start_tracking(self):
-        try:
-            headers = { 'Authorization': f'Bearer {self.token}' }
-            r = requests.get(f'{self.backend_url}/api/drive/status', headers=headers, timeout=5)
-            if not r.json().get('connected'):
-                sr = requests.get(f'{self.backend_url}/api/drive/oauth/start', headers=headers, timeout=5)
-                u = (sr.json() or {}).get('url')
-                if u: webbrowser.open(u)
-                messagebox.showinfo('Connect Drive', 'Please connect Google Drive to start tracking.')
-                return
-        except Exception:
-            messagebox.showerror('Drive Required', 'Google Drive connection required.')
-            return
         self.tracking = True
         self._stop_event.clear()
         
@@ -425,117 +413,11 @@ class TimeTrackerApp:
             self._connect_socket(email)
             self._fetch_capture_interval()
 
-        self._gate_login_on_drive_space(token, finalize_login)
+        finalize_login()
         
         # Auto-start live view - REMOVED for on-demand only
         # self.live_view_active = True
         # self._start_live_loop()
-
-    def _drive_quota_self(self, token):
-        try:
-            headers = { 'Authorization': f'Bearer {token}' }
-            r = requests.get(f'{self.backend_url}/api/drive/quota/self', headers=headers, timeout=8)
-            if not r.ok:
-                return None
-            return (r.json() or {}).get('quota')
-        except Exception:
-            return None
-
-    def _is_drive_full(self, quota):
-        try:
-            if not quota or not quota.get('connected'):
-                return False
-            remaining = quota.get('remaining_bytes', None)
-            if remaining is not None:
-                return float(remaining) <= 0
-            limit = quota.get('limit_bytes', None)
-            used = quota.get('used_bytes', None)
-            if limit is None or used is None:
-                return False
-            return float(used) >= float(limit)
-        except Exception:
-            return False
-
-    def _gate_login_on_drive_space(self, token, on_ok):
-        quota = self._drive_quota_self(token)
-        if not self._is_drive_full(quota):
-            on_ok()
-            return
-
-        win = tk.Toplevel(self.root)
-        win.title('Google Drive Full')
-        win.geometry('440x240')
-        win.configure(bg=self.color_bg)
-        win.resizable(False, False)
-        try:
-            win.transient(self.root)
-            win.grab_set()
-        except Exception:
-            pass
-
-        header = ttk.Frame(win, style='Surface.TFrame', padding=(20, 16))
-        header.pack(fill='x', padx=16, pady=(16, 0))
-        ttk.Label(header, text='Google Drive storage is full', style='Surface.TLabel', font=('Segoe UI', 14, 'bold')).pack(anchor='w')
-        ttk.Label(header, text='Backup your data from Google Drive to login and continue.', style='Surface.TLabel', foreground=self.color_muted, wraplength=380).pack(anchor='w', pady=(6, 0))
-
-        body = ttk.Frame(win, padding=(20, 14))
-        body.pack(fill='both', expand=True, padx=16)
-        status_var = tk.StringVar(value='')
-        status_lbl = ttk.Label(body, textvariable=status_var, style='Muted.TLabel')
-        status_lbl.pack(anchor='w')
-
-        actions = ttk.Frame(win, padding=(20, 14))
-        actions.pack(fill='x', padx=16, pady=(0, 16))
-
-        def open_drive():
-            try:
-                webbrowser.open('https://drive.google.com/drive/quota')
-            except Exception:
-                pass
-
-        def close_only():
-            try:
-                win.destroy()
-            except Exception:
-                pass
-
-        def check_again_async():
-            status_var.set('Checking drive space...')
-            btn_check.configure(state='disabled')
-            btn_open.configure(state='disabled')
-            btn_close.configure(state='disabled')
-
-            def worker():
-                q = self._drive_quota_self(token)
-                full = self._is_drive_full(q)
-
-                def done():
-                    btn_check.configure(state='normal')
-                    btn_open.configure(state='normal')
-                    btn_close.configure(state='normal')
-                    if not full:
-                        status_var.set('Drive space is available. Continuing...')
-                        try:
-                            win.destroy()
-                        except Exception:
-                            pass
-                        on_ok()
-                        return
-                    status_var.set('Still full. Backup/delete files and try again.')
-
-                try:
-                    self.root.after(0, done)
-                except Exception:
-                    pass
-
-            threading.Thread(target=worker, daemon=True).start()
-
-        btn_open = ttk.Button(actions, text='Open Google Drive', style='Ghost.TButton', command=open_drive)
-        btn_open.pack(side='left')
-        btn_close = ttk.Button(actions, text='Close', style='Ghost.TButton', command=close_only)
-        btn_close.pack(side='right')
-        btn_check = ttk.Button(actions, text='Check Again', style='Primary.TButton', command=check_again_async)
-        btn_check.pack(side='right', padx=(0, 10))
 
     def request_time(self):
         if not self.token:

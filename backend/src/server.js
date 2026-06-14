@@ -20,6 +20,7 @@ import bcrypt from 'bcryptjs';
 import { createStripeCheckoutSession, verifyStripeWebhookAndExtract, retrieveCheckoutSession, listRecentCheckoutSessions } from './payments/stripe.js';
 import { sendEmail, sendPaymentSuccess, sendLowCreditWarning, sendCreationBlocked, sendSubscriptionDeduction, sendRequestStatus, sendNewUserCreated, sendMonthlyBillingSummary, sendContactFormEmail, sendPasswordResetEmail, sendEmployeeCreatedDeduction, sendAccountSuspensionWarning, sendActivationEmail } from './email.js';
 import { runEmployeeMonthlyBilling, getCompanyAdminEmail } from './subscriptionBilling.js'
+import { uploadScreenshot, getScreenshotStream, getStorageQuota, getCompanyStorageQuota, deleteScreenshotsByEmployee } from './s3.js'
 import cron from 'node-cron';
 import crypto from 'crypto';
 import { Readable } from 'stream';
@@ -40,10 +41,6 @@ function parseAllowedOrigins(raw) {
 const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 const DATA_DIR = process.env.DATA_DIR || 'data';
 const PAYMENT_PROVIDER = (process.env.PAYMENT_PROVIDER || 'stripe').toLowerCase();
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
-const DRIVE_TOKEN_KEY = process.env.DRIVE_TOKEN_KEY || '';
 
 function validateProductionEnv() {
   const env = String(process.env.NODE_ENV || '').toLowerCase()
@@ -93,12 +90,8 @@ if (!fs.existsSync(usersFile)) fs.writeFileSync(usersFile, '[]');
 if (!fs.existsSync(intervalsFile)) fs.writeFileSync(intervalsFile, '{}');
 if (!fs.existsSync(sessionsFile)) fs.writeFileSync(sessionsFile, '[]');
 if (!fs.existsSync(auditFile)) fs.writeFileSync(auditFile, '[]');
-const driveTokensFile = path.join(dataPath, 'drive_tokens.json');
-const folderCacheFile = path.join(dataPath, 'drive_folder_cache.json');
-const screenshotsDriveFile = path.join(dataPath, 'screenshots.drive.json');
-if (!fs.existsSync(driveTokensFile)) fs.writeFileSync(driveTokensFile, '[]');
-if (!fs.existsSync(folderCacheFile)) fs.writeFileSync(folderCacheFile, '[]');
-if (!fs.existsSync(screenshotsDriveFile)) fs.writeFileSync(screenshotsDriveFile, '[]');
+const screenshotsS3File = path.join(dataPath, 'screenshots.s3.json');
+if (!fs.existsSync(screenshotsS3File)) fs.writeFileSync(screenshotsS3File, '[]');
 const transactionsFile = path.join(dataPath, 'transactions.sqlite.json');
 if (!fs.existsSync(transactionsFile)) fs.writeFileSync(transactionsFile, '[]');
 
@@ -156,61 +149,6 @@ function setEmployeeTimezone(email, companyId, timezone) {
 }
 function readJSON(file) { try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch { return []; } }
 function writeJSON(file, obj) { fs.writeFileSync(file, JSON.stringify(obj, null, 2)); }
-function aeadEncrypt(plaintext) {
-  const iv = crypto.randomBytes(12);
-  const key = crypto.createHash('sha256').update(DRIVE_TOKEN_KEY).digest();
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const enc = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, enc]).toString('base64');
-}
-function aeadDecrypt(b64) {
-  const buf = Buffer.from(b64, 'base64');
-  const iv = buf.slice(0, 12);
-  const tag = buf.slice(12, 28);
-  const enc = buf.slice(28);
-  const key = crypto.createHash('sha256').update(DRIVE_TOKEN_KEY).digest();
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  const dec = Buffer.concat([decipher.update(enc), decipher.final()]);
-  return dec.toString('utf8');
-}
-async function googleTokenFromRefresh(refreshToken) {
-  const body = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    client_secret: GOOGLE_CLIENT_SECRET,
-    refresh_token: refreshToken,
-    grant_type: 'refresh_token'
-  });
-  const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-  if (!r.ok) throw new Error('token_refresh_failed');
-  const j = await r.json();
-  return j.access_token;
-}
-async function driveCreateOrFindFolder(accessToken, name, parentId) {
-  const q = `name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder'${parentId ? ` and '${parentId}' in parents` : ''}`;
-  const sr = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`, { headers: { Authorization: `Bearer ${accessToken}` } });
-  const sj = await sr.json();
-  if (Array.isArray(sj.files) && sj.files.length > 0) return sj.files[0].id;
-  const md = { name, mimeType: 'application/vnd.google-apps.folder', parents: parentId ? [parentId] : undefined };
-  const cr = await fetch('https://www.googleapis.com/drive/v3/files', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(md) });
-  const cj = await cr.json();
-  return cj.id;
-}
-async function driveMultipartUpload(accessToken, name, parents, mime, bytes) {
-  const metadata = { name, parents };
-  const boundary = 'foo_bar_baz_' + Date.now();
-  const body = Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`),
-    Buffer.from(JSON.stringify(metadata)),
-    Buffer.from(`\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`),
-    bytes,
-    Buffer.from(`\r\n--${boundary}--`)
-  ]);
-  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
-  const j = await r.json();
-  return j.id;
-}
 function getTeamEmailsForManager(managerKey, companyId){
   const users = readUsers();
   // Accept either manager numeric id or email; resolve both forms
@@ -264,61 +202,6 @@ function verifyPreviewToken(token) {
     return obj
   } catch {
     return null
-  }
-}
-
-function safeDriveFolderName(name) {
-  const s = String(name || '').trim()
-  const cleaned = s.replace(/[\\/]/g, '-').replace(/\s+/g, ' ').trim()
-  return cleaned.slice(0, 120) || 'Unknown'
-}
-
-function getManagerDisplayNameForEmployee(employeeEmail, companyId) {
-  try {
-    let mid = null
-    try {
-      const emp = getUserByEmail(employeeEmail)
-      mid = emp?.managerId || emp?.manager_id || emp?.manager || null
-    } catch {}
-    if (!mid) {
-      try {
-        const arr = readUsers()
-        const rec = arr.find(u => String(u.email || '').toLowerCase() === String(employeeEmail).toLowerCase() && u.company_id == companyId)
-        mid = rec?.managerId || null
-      } catch {}
-    }
-    if (!mid) return 'Unassigned'
-    const allSql = listAllUsers().filter(u => u.company_id == companyId)
-    const midStr = String(mid).trim().toLowerCase()
-    let mgr = allSql.find(u => String(u.id || '').trim().toLowerCase() === midStr) ||
-      allSql.find(u => String(u.uid || '').trim().toLowerCase() === midStr) ||
-      allSql.find(u => String(u.email || '').trim().toLowerCase() === midStr)
-    if (!mgr) {
-      try {
-        const arr = readUsers()
-        const rec = arr.find(u => (String(u.id || '').trim().toLowerCase() === midStr || String(u.email || '').trim().toLowerCase() === midStr) && u.company_id == companyId)
-        if (rec) mgr = { full_name: rec.name || rec.email, email: rec.email }
-      } catch {}
-    }
-    return safeDriveFolderName(mgr?.full_name || mgr?.name || mgr?.email || String(mid))
-  } catch {
-    return 'Unassigned'
-  }
-}
-
-function getEmployeeDisplayName(employeeEmail) {
-  try {
-    let u = null
-    try { u = getUserByEmail(employeeEmail) } catch {}
-    if (u?.full_name || u?.name) return safeDriveFolderName(u?.full_name || u?.name)
-    try {
-      const arr = readUsers()
-      const rec = arr.find(x => String(x.email || '').toLowerCase() === String(employeeEmail).toLowerCase())
-      if (rec?.name) return safeDriveFolderName(rec.name)
-    } catch {}
-    return safeDriveFolderName(u?.email || employeeEmail)
-  } catch {
-    return safeDriveFolderName(employeeEmail)
   }
 }
 
@@ -426,12 +309,6 @@ if (JWT_SECRET === 'dev_secret') {
 }
 if (!ALLOWED_ORIGINS.length) {
   console.warn('[cors] ALLOWED_ORIGINS not set. CORS is wide open (*) for development.');
-}
-if (GOOGLE_CLIENT_ID) {
-  const scope = 'https://www.googleapis.com/auth/drive.file';
-  console.log('[drive] OAuth scope:', scope, '- Non-sensitive, no Google verification needed');
-  console.log('[drive] To allow all users: Go to Google Cloud Console > OAuth consent screen > Publish App');
-  console.log('[drive] Or add test users at: https://console.cloud.google.com/apis/credentials/consent');
 }
 
 // Seed default Super Admin on startup
@@ -845,15 +722,6 @@ app.get('/api/company/slug', requireRole(['employee', 'manager', 'company_admin'
     res.status(500).json({ error: 'Failed to resolve slug' })
   }
 })
-app.get('/api/drive/status', requireRole(['employee']), (req, res) => {
-  try {
-    const tokens = readJSON(driveTokensFile);
-    const found = tokens.find(t => t.employee_id === req.user?.sub && t.company_id == req.user?.company_id);
-    res.json({ connected: !!found && !!found.enc_refresh_token });
-  } catch {
-    res.json({ connected: false });
-  }
-});
 
 function listScopedEmployeeEmails(viewer, company_id) {
   const users = readUsers().filter(u => u.role === 'employee' && u.company_id == company_id)
@@ -864,96 +732,35 @@ function listScopedEmployeeEmails(viewer, company_id) {
   return users.map(u => u.email)
 }
 
-async function fetchDriveStorageQuota({ company_id, employeeEmail }) {
-  const tokens = readJSON(driveTokensFile)
-  const idx = tokens.findIndex(t => String(t.employee_id || '').toLowerCase() === String(employeeEmail || '').toLowerCase() && t.company_id == company_id)
-  const t = idx >= 0 ? tokens[idx] : null
-  if (!t?.enc_refresh_token) return { connected: false, employee_id: employeeEmail }
+// ── S3 Storage Routes ──
 
-  const updatedAtMs = t.quota_updated_at ? Date.parse(t.quota_updated_at) : 0
-  const isFresh = updatedAtMs && (Date.now() - updatedAtMs) < 6 * 60 * 60 * 1000
-  if (isFresh && t.quota_limit_bytes != null && t.quota_usage_bytes != null) {
-    const limit = Number(t.quota_limit_bytes)
-    const used = Number(t.quota_usage_bytes)
-    const remaining = Number.isFinite(limit) ? Math.max(0, limit - used) : null
-    return { connected: true, employee_id: employeeEmail, limit_bytes: limit, used_bytes: used, remaining_bytes: remaining, updated_at: t.quota_updated_at }
-  }
+app.get('/api/storage/status', requireRole(['employee']), (req, res) => {
+  res.json({ connected: true, provider: 's3' })
+})
 
-  const refresh = aeadDecrypt(t.enc_refresh_token)
-  const access = await googleTokenFromRefresh(refresh)
-  const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=storageQuota', { headers: { Authorization: `Bearer ${access}` } })
-  if (!r.ok) {
-    const nowIso = new Date().toISOString()
-    return {
-      connected: true,
-      employee_id: employeeEmail,
-      limit_bytes: null,
-      used_bytes: null,
-      remaining_bytes: null,
-      updated_at: nowIso,
-      quota_status: r.status,
-      needs_reconnect: r.status === 401 || r.status === 403,
-    }
-  }
-  const j = await r.json()
-  const limit = j?.storageQuota?.limit != null ? Number(j.storageQuota.limit) : null
-  const used = j?.storageQuota?.usage != null ? Number(j.storageQuota.usage) : null
-  const remaining = (limit != null && used != null) ? Math.max(0, limit - used) : null
-
-  const next = {
-    ...t,
-    quota_limit_bytes: limit,
-    quota_usage_bytes: used,
-    quota_remaining_bytes: remaining,
-    quota_updated_at: new Date().toISOString(),
-    quota_warned_at: t.quota_warned_at || null,
-  }
-
-  // Send low space warning if usage > 70% and not notified recently
-  const pct = (limit != null && used != null && limit > 0) ? Math.min(100, (used / limit) * 100) : null
-  if (pct != null && pct > 70 && (!t.quota_warned_at || (Date.now() - Date.parse(t.quota_warned_at)) > 24 * 60 * 60 * 1000)) {
-    try {
-      const company = getCompanyById(company_id)
-      const adminEmail = company ? getCompanyAdminEmail(company_id, company) : null
-      const pctDisplay = pct.toFixed(1)
-      const usedDisplay = used >= 1e9 ? `${(used / 1e9).toFixed(2)} GB` : `${(used / 1e6).toFixed(2)} MB`
-      const limitDisplay = limit >= 1e9 ? `${(limit / 1e9).toFixed(2)} GB` : `${(limit / 1e6).toFixed(2)} MB`
-      const subject = `Drive space warning: ${pctDisplay}% used by ${employeeEmail}`
-      const text = `Employee ${employeeEmail} has used ${pctDisplay}% (${usedDisplay} / ${limitDisplay}) of their Google Drive storage.`
-      if (adminEmail) sendEmail(adminEmail, subject, text)
-      sendEmail(employeeEmail, `Your Google Drive is ${pctDisplay}% full`, `You have used ${pctDisplay}% (${usedDisplay} / ${limitDisplay}) of your Google Drive storage. Please free up space to continue capturing screenshots.`)
-      next.quota_warned_at = new Date().toISOString()
-    } catch {}
-  }
-  if (idx >= 0) tokens[idx] = next
-  writeJSON(driveTokensFile, tokens)
-  return { connected: true, employee_id: employeeEmail, limit_bytes: limit, used_bytes: used, remaining_bytes: remaining, updated_at: next.quota_updated_at }
-}
-
-app.get('/api/drive/quota', requireRole(['manager', 'company_admin']), async (req, res) => {
+app.get('/api/storage/quota', requireRole(['manager', 'company_admin']), async (req, res) => {
   try {
     const company_id = req.user?.company_id
     const employeeId = String(req.query?.employeeId || '').trim().toLowerCase()
     if (!employeeId) return res.status(400).json({ error: 'employeeId is required' })
-
     const scoped = listScopedEmployeeEmails(req.user, company_id).map(e => String(e).toLowerCase())
     if (!scoped.includes(employeeId)) return res.status(403).json({ error: 'Forbidden' })
-
-    const out = await fetchDriveStorageQuota({ company_id, employeeEmail: employeeId })
-    res.json({ quota: out })
+    const quota = await getStorageQuota(company_id, employeeId)
+    res.json({ quota })
   } catch (e) {
     res.status(500).json({ error: 'Failed to fetch quota' })
   }
 })
 
-app.get('/api/drive/quota/list', requireRole(['manager', 'company_admin']), async (req, res) => {
+app.get('/api/storage/quota/list', requireRole(['manager', 'company_admin']), async (req, res) => {
   try {
     const company_id = req.user?.company_id
     const emails = listScopedEmployeeEmails(req.user, company_id).map(e => String(e).trim().toLowerCase()).filter(Boolean)
     const out = []
     for (const email of emails) {
       try {
-        out.push(await fetchDriveStorageQuota({ company_id, employeeEmail: email }))
+        const q = await getStorageQuota(company_id, email)
+        out.push(q)
       } catch {
         out.push({ connected: false, employee_id: email })
       }
@@ -964,119 +771,42 @@ app.get('/api/drive/quota/list', requireRole(['manager', 'company_admin']), asyn
   }
 })
 
-app.get('/api/drive/quota/self', requireRole(['employee']), async (req, res) => {
+app.get('/api/storage/quota/self', requireRole(['employee']), async (req, res) => {
   try {
     const company_id = req.user?.company_id
     const email = String(req.user?.sub || '').trim().toLowerCase()
     if (!company_id || !email) return res.status(400).json({ error: 'Missing context' })
-    const quota = await fetchDriveStorageQuota({ company_id, employeeEmail: email })
+    const quota = await getStorageQuota(company_id, email)
     res.json({ quota })
   } catch {
     res.status(500).json({ error: 'Failed to fetch quota' })
   }
 })
-app.get('/api/drive/oauth/start', requireRole(['employee']), (req, res) => {
-  try {
-    const state = Buffer.from(JSON.stringify({ email: req.user?.sub, company_id: req.user?.company_id })).toString('base64url');
-    const u = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    u.searchParams.set('client_id', GOOGLE_CLIENT_ID);
-    u.searchParams.set('redirect_uri', GOOGLE_REDIRECT_URI);
-    u.searchParams.set('response_type', 'code');
-    u.searchParams.set('access_type', 'offline');
-    u.searchParams.set('prompt', 'consent');
-    u.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.file');
-    u.searchParams.set('state', state);
-    res.json({ url: u.toString() });
-  } catch {
-    res.status(500).json({ error: 'failed_start' });
-  }
-});
 
-async function handleGoogleDriveOAuthCallback(req, res) {
-  try {
-    const { code, state } = req.query || {};
-    if (!code || !state) return res.status(400).send('error');
-    const parsed = JSON.parse(Buffer.from(String(state), 'base64url').toString('utf8'));
-    const body = new URLSearchParams({
-      code: String(code),
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
-      redirect_uri: GOOGLE_REDIRECT_URI,
-      grant_type: 'authorization_code'
-    });
-    const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-    const j = await r.json();
-    const refresh = j.refresh_token || '';
-    if (!refresh) return res.status(400).send('error');
-    const tokens = readJSON(driveTokensFile);
-    const idx = tokens.findIndex(t => t.employee_id === parsed.email && t.company_id == parsed.company_id);
-    const enc = aeadEncrypt(refresh);
-    const record = { employee_id: parsed.email, company_id: parsed.company_id, enc_refresh_token: enc, scope: 'drive.file', status: 'connected', updated_at: new Date().toISOString() };
-    if (idx >= 0) { tokens[idx] = { ...tokens[idx], ...record }; } else { tokens.push({ ...record, created_at: new Date().toISOString() }); }
-    writeJSON(driveTokensFile, tokens);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(
-      `<!doctype html><html><head><meta charset="utf-8"/><title>Drive Connected</title></head><body style="font-family:system-ui;margin:40px;line-height:1.5;">
-      <h2>Google Drive connected</h2>
-      <p>You can close this window and return to the TimeTracker desktop app.</p>
-      </body></html>`
-    );
-  } catch {
-    res.status(500).send('error');
-  }
-}
-
-// Main callback route (recommended)
-app.get('/api/drive/oauth/callback', handleGoogleDriveOAuthCallback);
-// Backward-compatible callback route (matches env examples / older config)
-app.get('/api/auth/google/callback', handleGoogleDriveOAuthCallback);
 app.post('/api/uploads/drive', requireRole(['employee']), multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }).single('screenshot'), async (req, res) => {
   try {
-    const company_id = req.user?.company_id;
-    const employee_id = req.user?.sub;
-    const tokens = readJSON(driveTokensFile);
-    const t = tokens.find(x => x.employee_id === employee_id && x.company_id == company_id);
-    if (!t?.enc_refresh_token) return res.status(403).json({ error: 'drive_not_connected' });
-    const refresh = aeadDecrypt(t.enc_refresh_token);
-    const access = await googleTokenFromRefresh(refresh);
-    const now = new Date();
-    const yyyy = String(now.getUTCFullYear());
-    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(now.getUTCDate()).padStart(2, '0');
-    const hh = String(now.getUTCHours()).padStart(2, '0');
-    const mn = String(now.getUTCMinutes()).padStart(2, '0');
-    const baseId = await driveCreateOrFindFolder(access, 'TimeTracker', null);
-    const company = getCompanyById(company_id)
-    const companyName = safeDriveFolderName(company?.name || String(company_id))
-    const managerName = getManagerDisplayNameForEmployee(employee_id, company_id)
-    const employeeName = getEmployeeDisplayName(employee_id)
-    const compId = await driveCreateOrFindFolder(access, companyName, baseId);
-    const mgrId = await driveCreateOrFindFolder(access, managerName, compId);
-    const empId = await driveCreateOrFindFolder(access, employeeName, mgrId);
-    const yearId = await driveCreateOrFindFolder(access, yyyy, empId);
-    const monId = await driveCreateOrFindFolder(access, mm, yearId);
-    const dayId = await driveCreateOrFindFolder(access, `${yyyy}-${mm}-${dd}`, monId);
-    const name = `screenshot_${hh}-${mn}.jpg`;
-    const fileId = await driveMultipartUpload(access, name, [dayId], 'image/jpeg', req.file?.buffer || Buffer.alloc(0));
-    const meta = readJSON(screenshotsDriveFile);
+    const company_id = req.user?.company_id
+    const employee_id = req.user?.sub
+    const now = new Date()
+    const { key } = await uploadScreenshot(req.file?.buffer || Buffer.alloc(0), company_id, employee_id, now)
+    const meta = readJSON(screenshotsS3File)
     let manager_id = null
     try {
       const emp = getUserByEmail(employee_id)
       manager_id = emp?.managerId || emp?.manager_id || emp?.manager || null
     } catch {}
-    meta.push({ company_id, manager_id, employee_id, drive_file_id: fileId, captured_at: now.toISOString() });
-    writeJSON(screenshotsDriveFile, meta);
-    res.json({ ok: true, drive_file_id: fileId, captured_at: now.toISOString() });
+    meta.push({ company_id, manager_id, employee_id, s3_key: key, captured_at: now.toISOString() })
+    writeJSON(screenshotsS3File, meta)
+    res.json({ ok: true, s3_key: key, captured_at: now.toISOString() })
   } catch (e) {
-    res.status(500).json({ error: 'upload_failed' });
+    res.status(500).json({ error: 'upload_failed' })
   }
-});
-app.get('/api/uploads/preview/:fileId', async (req, res) => {
+})
+
+app.get('/api/uploads/preview/:key', async (req, res) => {
   try {
-    const fileId = String(req.params.fileId);
-    const meta = readJSON(screenshotsDriveFile);
-    const m = meta.find(x => x.drive_file_id === fileId);
-    if (!m) return res.status(404).end();
+    const s3key = String(req.params.key)
+    // Auth check
     let user = null
     try {
       const auth = req.headers.authorization || ''
@@ -1085,46 +815,40 @@ app.get('/api/uploads/preview/:fileId', async (req, res) => {
     } catch {}
     if (!user && req.query?.pt) {
       const pt = verifyPreviewToken(req.query.pt)
-      if (pt && pt.fileId === fileId) {
+      if (pt && pt.fileId === s3key) {
         user = { sub: pt.sub, role: pt.role, uid: pt.uid || null, company_id: pt.company_id }
       }
     }
     if (!user) return res.status(401).json({ error: 'Unauthorized' })
+    const meta = readJSON(screenshotsS3File)
+    const m = meta.find(x => x.s3_key === s3key)
+    if (!m) return res.status(404).end()
     const role = user?.role
     const company_id = user?.company_id
-    if (role === 'super_admin') return res.status(403).end();
-    if (m.company_id != company_id) return res.status(403).end();
-    if (role === 'employee' && m.employee_id !== user?.sub) return res.status(403).end();
+    if (role === 'super_admin') return res.status(403).end()
+    if (m.company_id != company_id) return res.status(403).end()
+    if (role === 'employee' && m.employee_id !== user?.sub) return res.status(403).end()
     if (role === 'manager') {
-      const teamEmails = getTeamEmailsForManager(user?.uid || user?.sub, company_id);
-      if (!teamEmails.includes(m.employee_id)) return res.status(403).end();
+      const teamEmails = getTeamEmailsForManager(user?.uid || user?.sub, company_id)
+      if (!teamEmails.includes(m.employee_id)) return res.status(403).end()
     }
-    const tokens = readJSON(driveTokensFile);
-    const t = tokens.find(x => x.employee_id === m.employee_id && x.company_id == m.company_id);
-    if (!t?.enc_refresh_token) return res.status(403).end();
-    const refresh = aeadDecrypt(t.enc_refresh_token);
-    const access = await googleTokenFromRefresh(refresh);
-    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${access}` } });
-    if (!r.ok) {
-      try { console.error('[drive:preview] fetch failed', { status: r.status, fileId }); } catch {}
-      return res.status(500).end();
-    }
-    res.setHeader('Content-Type', r.headers.get('content-type') || 'image/jpeg');
-    res.setHeader('Content-Disposition', 'inline');
-    if (!r.body) return res.status(500).end();
+    const { stream, contentType } = await getScreenshotStream(s3key)
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Content-Disposition', 'inline')
     try {
-      const nodeStream = Readable.fromWeb(r.body);
-      nodeStream.on('error', () => { try { res.end(); } catch {} });
-      nodeStream.pipe(res);
+      const nodeStream = Readable.fromWeb(stream)
+      nodeStream.on('error', () => { try { res.end() } catch {} })
+      nodeStream.pipe(res)
     } catch {
-      const ab = await r.arrayBuffer();
-      res.end(Buffer.from(ab));
+      const ab = await stream.arrayBuffer()
+      res.end(Buffer.from(ab))
     }
   } catch (e) {
-    try { console.error('[drive:preview] error', e?.message || e); } catch {}
-    res.status(500).end();
+    res.status(500).end()
   }
-});
+})
+
+// ── End S3 Storage Routes ──
 
 // Employees
 app.post('/api/employees', requireRole(['manager', 'company_admin']), (req, res) => {
@@ -3323,7 +3047,7 @@ app.post('/api/uploads/cleanup', requireRole(['super_admin']), (req, res) => {
 app.get('/api/uploads/list', requireRole(['manager', 'company_admin']), async (req, res) => {
   try {
     const company_id = req.user?.company_id;
-    let items = readJSON(screenshotsDriveFile).filter(x => x.company_id == company_id);
+    let items = readJSON(screenshotsS3File).filter(x => x.company_id == company_id);
 
     if (req.user?.role === 'manager') {
       const teamEmails = getTeamEmailsForManager(req.user?.uid || req.user?.sub, company_id);
@@ -3335,14 +3059,14 @@ app.get('/api/uploads/list', requireRole(['manager', 'company_admin']), async (r
     const out = items.map(it => {
       const tz = getEmployeeTimezone(it.employee_id, company_id) || 'UTC'
       const ms = it.captured_at ? Date.parse(it.captured_at) : null
-      const pt = signPreviewToken({ fileId: it.drive_file_id, sub: req.user?.sub, role: req.user?.role, uid: req.user?.uid || null, company_id, exp: now + 600_000 })
+      const pt = signPreviewToken({ fileId: it.s3_key, sub: req.user?.sub, role: req.user?.role, uid: req.user?.uid || null, company_id, exp: now + 600_000 })
       return {
         employeeId: it.employee_id,
         ts: it.captured_at,
         timezone: tz,
         ts_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null,
-        drive_file_id: it.drive_file_id,
-        preview_url: `/api/uploads/preview/${it.drive_file_id}?pt=${pt}`
+        s3_key: it.s3_key,
+        preview_url: `/api/uploads/preview/${encodeURIComponent(it.s3_key)}?pt=${pt}`
       }
     })
     res.json({ files: out });
@@ -3357,7 +3081,7 @@ app.get('/api/uploads/query', requireRole(['manager', 'company_admin']), async (
   try {
     const { employeeId, from, to } = req.query || {};
     const company_id = req.user?.company_id;
-    let meta = readJSON(screenshotsDriveFile).filter(x => x.company_id == company_id);
+    let meta = readJSON(screenshotsS3File).filter(x => x.company_id == company_id);
 
     // Manager scoping to team
     if (req.user?.role === 'manager') {
@@ -3390,14 +3114,14 @@ app.get('/api/uploads/query', requireRole(['manager', 'company_admin']), async (
     const out = meta.map(m => {
       const tz = getEmployeeTimezone(m.employee_id, company_id) || 'UTC'
       const ms = m.captured_at ? Date.parse(m.captured_at) : null
-      const pt = signPreviewToken({ fileId: m.drive_file_id, sub: req.user?.sub, role: req.user?.role, uid: req.user?.uid || null, company_id, exp: now + 600_000 })
+      const pt = signPreviewToken({ fileId: m.s3_key, sub: req.user?.sub, role: req.user?.role, uid: req.user?.uid || null, company_id, exp: now + 600_000 })
       return {
         employeeId: m.employee_id,
         ts: m.captured_at,
         timezone: tz,
         ts_local: ms ? formatLocalDateTime(ms, tz, { withSeconds: true }) : null,
-        drive_file_id: m.drive_file_id,
-        preview_url: `/api/uploads/preview/${m.drive_file_id}?pt=${pt}`
+        s3_key: m.s3_key,
+        preview_url: `/api/uploads/preview/${encodeURIComponent(m.s3_key)}?pt=${pt}`
       }
     })
     res.json({ files: out });
@@ -3419,7 +3143,7 @@ app.get('/api/uploads/zip', requireRole(['manager', 'company_admin']), async (re
       if (!teamEmails.includes(employeeId)) return res.status(403).json({ error: 'Forbidden' })
     }
 
-    let meta = readJSON(screenshotsDriveFile).filter(x => x.company_id == company_id)
+    let meta = readJSON(screenshotsS3File).filter(x => x.company_id == company_id)
     if (req.user?.role === 'manager') {
       meta = meta.filter(m => m.employee_id && teamEmails.includes(String(m.employee_id).toLowerCase()))
     }
@@ -3442,6 +3166,11 @@ app.get('/api/uploads/zip', requireRole(['manager', 'company_admin']), async (re
     if (toMs) meta = meta.filter(m => new Date(m.captured_at).getTime() <= toMs)
     meta.sort((a, b) => (a.captured_at > b.captured_at ? 1 : -1))
 
+    // Extract the auth token for internal API calls
+    const bearerToken = (req.headers.authorization || '').startsWith('Bearer ')
+      ? (req.headers.authorization || '').slice(7)
+      : null
+
     let localMeta = []
     try {
       const u = JSON.parse(fs.readFileSync(metaFile, 'utf-8'))
@@ -3462,26 +3191,13 @@ app.get('/api/uploads/zip', requireRole(['manager', 'company_admin']), async (re
     archive.on('error', () => { try { res.status(500).end() } catch {} })
     archive.pipe(res)
 
-    let driveAccess = null
-    if (meta.length) {
-      try {
-        const tokens = readJSON(driveTokensFile)
-        const t = tokens.find(x => String(x.employee_id || '').toLowerCase() === employeeId && x.company_id == company_id)
-        if (t?.enc_refresh_token) {
-          const refresh = aeadDecrypt(t.enc_refresh_token)
-          driveAccess = await googleTokenFromRefresh(refresh)
-        }
-      } catch {}
-    }
-
     for (const m of meta) {
       try {
-        if (!driveAccess) continue
-        const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(m.drive_file_id)}?alt=media`
-        const fr = await fetch(url, { headers: { Authorization: `Bearer ${driveAccess}` } })
+        const url = `/api/uploads/preview/${encodeURIComponent(m.s3_key)}`
+        const fr = await fetch(url, { headers: { Authorization: `Bearer ${bearerToken}` } })
         if (!fr.ok || !fr.body) continue
         const iso = String(m.captured_at || new Date().toISOString())
-        const name = `drive_${iso.replace(/[:]/g, '-').replace('T', '_').replace('Z', '')}.jpg`
+        const name = `screenshot_${iso.replace(/[:]/g, '-').replace('T', '_').replace('Z', '')}.jpg`
         archive.append(Readable.fromWeb(fr.body), { name })
       } catch {}
     }

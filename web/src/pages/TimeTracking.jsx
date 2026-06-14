@@ -4,7 +4,7 @@ import { resolveApiBase } from '../api.js'
 import Pagination from '../components/ui/Pagination.jsx'
 import { usePagination } from '../hooks/usePagination.js'
 import ImageViewerModal from '../components/ui/ImageViewerModal.jsx'
-import DriveQuotaBadge from '../components/ui/DriveQuotaBadge.jsx'
+import StorageQuotaBadge from '../components/ui/StorageQuotaBadge.jsx'
 import { Clock, Download, HardDrive, Search, Users } from 'lucide-react'
 
 let API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
@@ -58,9 +58,9 @@ export default function TimeTracking() {
   const [msg, setMsg] = useState('')
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState(0)
-  const [driveQuota, setDriveQuota] = useState(null)
+  const [storageQuota, setStorageQuota] = useState(null)
   const [quotaLoading, setQuotaLoading] = useState(false)
-  const [driveModalOpen, setDriveModalOpen] = useState(false)
+  const [storageModalOpen, setStorageModalOpen] = useState(false)
 
   const employeeNameByEmail = useMemo(() => {
     const map = new Map()
@@ -152,14 +152,14 @@ export default function TimeTracking() {
 
   useEffect(() => {
     const eid = String(selectedEmployee || '').trim()
-    if (!eid) { setDriveQuota(null); return }
+    if (!eid) { setStorageQuota(null); return }
     setQuotaLoading(true)
     const token = localStorage.getItem('token')
     const headers = { Authorization: `Bearer ${token}` }
     resolveApiBase().then((BASE) =>
-      axios.get(`${BASE}/api/drive/quota`, { headers, params: { employeeId: eid } })
-        .then(r => setDriveQuota(r.data?.quota || null))
-        .catch(() => setDriveQuota(null))
+      axios.get(`${BASE}/api/storage/quota`, { headers, params: { employeeId: eid } })
+        .then(r => setStorageQuota(r.data?.quota || null))
+        .catch(() => setStorageQuota(null))
         .finally(() => setQuotaLoading(false))
     )
   }, [selectedEmployee])
@@ -278,12 +278,12 @@ export default function TimeTracking() {
             className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-50 inline-flex items-center gap-1.5 text-sm">
             <Download className="w-4 h-4" />ZIP
           </button>
-          <button onClick={() => setDriveModalOpen(true)} disabled={!selectedEmployee}
+          <button onClick={() => setStorageModalOpen(true)} disabled={!selectedEmployee}
             className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/40 disabled:opacity-50 inline-flex items-center gap-1.5 text-sm">
             <HardDrive className="w-4 h-4" />Drive
           </button>
-          {selectedEmployee && driveQuota?.connected && (
-            <DriveQuotaBadge quota={driveQuota} size="sm" />
+          {selectedEmployee && storageQuota?.connected && (
+            <StorageQuotaBadge quota={storageQuota} size="sm" />
           )}
         </div>
       </div>
@@ -294,9 +294,9 @@ export default function TimeTracking() {
         <StatCard icon={Clock} label="Idle Time" value={formatDuration(overall.idleSeconds)} />
         <StatCard icon={Clock} label="Active Time" value={formatDuration(overall.activeSeconds)} />
         <StatCard icon={Users} label="Sessions" value={String(overall.sessionsCount)} sub={focusEmail ? focusName || focusEmail : ''} />
-        {driveQuota?.connected && (
+        {storageQuota?.connected && (
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
-            <DriveQuotaBadge quota={driveQuota} size="lg" />
+            <StorageQuotaBadge quota={storageQuota} size="lg" />
           </div>
         )}
       </div>
@@ -423,34 +423,31 @@ export default function TimeTracking() {
         </div>
       )}
 
-      {/* Drive Modal */}
-      {driveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onMouseDown={(e) => { if (e.target === e.currentTarget) setDriveModalOpen(false) }}>
+      {/* Storage Modal */}
+      {storageModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onMouseDown={(e) => { if (e.target === e.currentTarget) setStorageModalOpen(false) }}>
           <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
             <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div>
-                <div className="text-sm font-bold text-slate-900 dark:text-white">Drive Space</div>
+                <div className="text-sm font-bold text-slate-900 dark:text-white">Storage</div>
                 <div className="text-xs text-slate-500 truncate max-w-[18rem]">{String(selectedEmployee || '').trim()}</div>
               </div>
-              <button onClick={() => setDriveModalOpen(false)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Close</button>
+              <button onClick={() => setStorageModalOpen(false)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Close</button>
             </div>
             <div className="p-5">
               {quotaLoading ? <div className="text-sm text-slate-600">Loading…</div>
-              : (!driveQuota || !driveQuota.connected) ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">Drive not connected.</div>
+              : (!storageQuota || !storageQuota.connected) ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">Storage not connected.</div>
               : (() => {
-                  const limit = driveQuota?.limit_bytes != null ? Number(driveQuota.limit_bytes) : null
-                  const remaining = driveQuota?.remaining_bytes != null ? Number(driveQuota.remaining_bytes) : null
-                  const used = (limit != null && remaining != null) ? Math.max(0, limit - remaining) : null
-                  const pct = (limit != null && used != null && limit > 0) ? Math.min(100, Math.max(0, (used / limit) * 100)) : null
+                  const usedBytes = storageQuota?.used_bytes != null ? Number(storageQuota.used_bytes) : null
                   const formatBytes = (b) => { const n = Number(b); if (!Number.isFinite(n) || n < 0) return '—'; const gb = n / 1e9; if (gb >= 1) return `${gb.toFixed(2)} GB`; const mb = n / 1e6; return mb >= 1 ? `${mb.toFixed(2)} MB` : `${(n / 1024).toFixed(2)} KB` }
                   return (
                     <div className="space-y-3">
                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Remaining</div>
-                        <div className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{(remaining != null && limit != null) ? `${formatBytes(remaining)} / ${formatBytes(limit)}` : 'Unknown'}</div>
-                        {pct != null && <div className="mt-3"><div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden"><div className="h-2 rounded-full bg-blue-600" style={{ width: `${pct.toFixed(2)}%` }} /></div><div className="mt-1 text-xs text-slate-500">{pct.toFixed(1)}% used</div></div>}
+                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Used</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{usedBytes != null ? formatBytes(usedBytes) : 'Unknown'}</div>
+                        {storageQuota?.total_files != null && <div className="text-xs text-slate-500 mt-1">{storageQuota.total_files} file(s)</div>}
                       </div>
-                      {!!driveQuota?.updated_at && <div className="text-xs text-slate-500">Updated: {new Date(driveQuota.updated_at).toLocaleString()}</div>}
+                      {!!storageQuota?.updated_at && <div className="text-xs text-slate-500">Updated: {new Date(storageQuota.updated_at).toLocaleString()}</div>}
                     </div>
                   )
                 })()
