@@ -1,0 +1,582 @@
+{
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\vite.config.js": {
+    "mtime": 1762867324.1377566,
+    "ast_hash": "2394f60f8617db43f01d2f0470b93fa9",
+    "semantic_hash": "2394f60f8617db43f01d2f0470b93fa9"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\package.json": {
+    "mtime": 1781451521.2526095,
+    "ast_hash": "191f240b9950af23582d1d6a9cdb4dc6",
+    "semantic_hash": "191f240b9950af23582d1d6a9cdb4dc6"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\scripts\\verify_drive_path.mjs": {
+    "mtime": 1769699354.1829352,
+    "ast_hash": "ea508dd6bc9f6ad517177211a663c828",
+    "semantic_hash": "ea508dd6bc9f6ad517177211a663c828"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\bootstrap.js": {
+    "mtime": 1770996648.8446317,
+    "ast_hash": "7877b34d9bed0a9f4d73759dde7d6431",
+    "semantic_hash": "7877b34d9bed0a9f4d73759dde7d6431"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\db.js": {
+    "mtime": 1762866961.4295504,
+    "ast_hash": "f7b259d052800e2a78024a2ff903435e",
+    "semantic_hash": "f7b259d052800e2a78024a2ff903435e"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\email.js": {
+    "mtime": 1783449996.5273416,
+    "ast_hash": "0ded1c5234d11f8392513ffd97b5345c",
+    "semantic_hash": "0ded1c5234d11f8392513ffd97b5345c"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\payment.js": {
+    "mtime": 1769273774.1490898,
+    "ast_hash": "a6fa4debc2cf117b2c35cc0c798bbe2b",
+    "semantic_hash": "a6fa4debc2cf117b2c35cc0c798bbe2b"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\s3.js": {
+    "mtime": 1781452165.5418446,
+    "ast_hash": "19819a9b6044b27094a4815b3fdec909",
+    "semantic_hash": "19819a9b6044b27094a4815b3fdec909"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\server.js": {
+    "mtime": 1783529182.160561,
+    "ast_hash": "af82f6494d2a8e06a504c0b3b6b0bd47",
+    "semantic_hash": "af82f6494d2a8e06a504c0b3b6b0bd47"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\sqlite.js": {
+    "mtime": 1783529182.3756707,
+    "ast_hash": "10fa419ad8b13fcac77b3428b63b4c9c",
+    "semantic_hash": "10fa419ad8b13fcac77b3428b63b4c9c"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\subscriptionBilling.js": {
+    "mtime": 1769802897.3058624,
+    "ast_hash": "45cedea28ed050f455c25cbd57466e3d",
+    "semantic_hash": "45cedea28ed050f455c25cbd57466e3d"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\timezone.js": {
+    "mtime": 1769620822.4909754,
+    "ast_hash": "707b783fb277d4767d81946ca187438b",
+    "semantic_hash": "707b783fb277d4767d81946ca187438b"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\invoices\\pdf.js": {
+    "mtime": 1780138360.1281135,
+    "ast_hash": "d44fad21c0119d39df20c2d32904edc3",
+    "semantic_hash": "d44fad21c0119d39df20c2d32904edc3"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\models\\Screenshot.js": {
+    "mtime": 1762867006.6332586,
+    "ast_hash": "4ba6e0b91bc89b79bd166aa00731f6b0",
+    "semantic_hash": "4ba6e0b91bc89b79bd166aa00731f6b0"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\models\\User.js": {
+    "mtime": 1762866993.4034393,
+    "ast_hash": "1beb95c26194dba3e7f4b660eb88d116",
+    "semantic_hash": "1beb95c26194dba3e7f4b660eb88d116"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\models\\WorkSession.js": {
+    "mtime": 1762866978.9036808,
+    "ast_hash": "1acb0511383cc3447effedd0d5eb65c6",
+    "semantic_hash": "1acb0511383cc3447effedd0d5eb65c6"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\src\\payments\\stripe.js": {
+    "mtime": 1779486386.4018526,
+    "ast_hash": "861335792cab9850552e81a0acd1cfb1",
+    "semantic_hash": "861335792cab9850552e81a0acd1cfb1"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\desktop\\app.py": {
+    "mtime": 1781452446.7365274,
+    "ast_hash": "d5a72fa60eb8f4793d9c2ac62d989132",
+    "semantic_hash": "d5a72fa60eb8f4793d9c2ac62d989132"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\components.json": {
+    "mtime": 1779482753.593434,
+    "ast_hash": "2cab59bb8e7e4e65875b91437a2e1e59",
+    "semantic_hash": "2cab59bb8e7e4e65875b91437a2e1e59"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\eslint.config.js": {
+    "mtime": 1770826195.2759466,
+    "ast_hash": "f5a59c1a5e4b001df4e952a7f0279fcc",
+    "semantic_hash": "f5a59c1a5e4b001df4e952a7f0279fcc"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\jsconfig.json": {
+    "mtime": 1779484071.1909397,
+    "ast_hash": "ecfe3437357932431fa02b5b4b5cf34d",
+    "semantic_hash": "ecfe3437357932431fa02b5b4b5cf34d"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\package.json": {
+    "mtime": 1779482572.6130507,
+    "ast_hash": "4a607428407c5239228d0b14445fef18",
+    "semantic_hash": "4a607428407c5239228d0b14445fef18"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\postcss.config.js": {
+    "mtime": 1762887061.380302,
+    "ast_hash": "470cfd3ee10fbff840b377e769485f3e",
+    "semantic_hash": "470cfd3ee10fbff840b377e769485f3e"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\tailwind.config.js": {
+    "mtime": 1779480893.9437919,
+    "ast_hash": "31a28bb7b098cc8ea7511f4f9aaa84d9",
+    "semantic_hash": "31a28bb7b098cc8ea7511f4f9aaa84d9"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\vite.config.js": {
+    "mtime": 1779482589.09466,
+    "ast_hash": "19677dff1e376b6188ba160d6356ccbe",
+    "semantic_hash": "19677dff1e376b6188ba160d6356ccbe"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\.vercel\\project.json": {
+    "mtime": 1779494302.3962128,
+    "ast_hash": "cd9e99d6b8fef1d5201939c306da8682",
+    "semantic_hash": "cd9e99d6b8fef1d5201939c306da8682"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\api.js": {
+    "mtime": 1770901272.207656,
+    "ast_hash": "27c3c9a3d36ab0f34d9a5bcd6bfdb98c",
+    "semantic_hash": "27c3c9a3d36ab0f34d9a5bcd6bfdb98c"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\config.js": {
+    "mtime": 1770901257.6952672,
+    "ast_hash": "581e778dc307b2550f1e81ba85c96c28",
+    "semantic_hash": "581e778dc307b2550f1e81ba85c96c28"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\CreditsContext.jsx": {
+    "mtime": 1770995126.9870665,
+    "ast_hash": "2e8af4ad58366dcc422e2c70c4cc6493",
+    "semantic_hash": "2e8af4ad58366dcc422e2c70c4cc6493"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\main.jsx": {
+    "mtime": 1780776489.2994063,
+    "ast_hash": "932fe9a13e14519237856cbe5d3f28a7",
+    "semantic_hash": "932fe9a13e14519237856cbe5d3f28a7"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\socket.js": {
+    "mtime": 1770842625.9064424,
+    "ast_hash": "86e04adc47a41e31593057bc117793a3",
+    "semantic_hash": "86e04adc47a41e31593057bc117793a3"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\ThemeContext.jsx": {
+    "mtime": 1769248657.725134,
+    "ast_hash": "ad7f49b880d585fa6ce1b12734b68233",
+    "semantic_hash": "ad7f49b880d585fa6ce1b12734b68233"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\AddCreditsModal.jsx": {
+    "mtime": 1769420149.0828469,
+    "ast_hash": "793be1f02ae1992d9130208471ce9cd8",
+    "semantic_hash": "793be1f02ae1992d9130208471ce9cd8"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\EmployeeLayout.jsx": {
+    "mtime": 1770826196.3833528,
+    "ast_hash": "b4615067b1ac45f040898d23392ccccf",
+    "semantic_hash": "b4615067b1ac45f040898d23392ccccf"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\EmployeeSidebar.jsx": {
+    "mtime": 1780385271.2536302,
+    "ast_hash": "97eb7644ba4c72a0b0ee02663c6b2511",
+    "semantic_hash": "97eb7644ba4c72a0b0ee02663c6b2511"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\FormControls.jsx": {
+    "mtime": 1769795733.0333314,
+    "ast_hash": "2875a418eedaba06dbe49c447c7ae881",
+    "semantic_hash": "2875a418eedaba06dbe49c447c7ae881"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\Layout.jsx": {
+    "mtime": 1770826196.8271773,
+    "ast_hash": "3501a8f5b05971457a036f9b3f97c321",
+    "semantic_hash": "3501a8f5b05971457a036f9b3f97c321"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\Sidebar.jsx": {
+    "mtime": 1780601009.919763,
+    "ast_hash": "0458e306d2dfab244bdb8bf9093d481f",
+    "semantic_hash": "0458e306d2dfab244bdb8bf9093d481f"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\admin\\AuditDetailsDrawer.jsx": {
+    "mtime": 1780084579.6220777,
+    "ast_hash": "f16b4ba3bbab9c21f5a972a385bc3030",
+    "semantic_hash": "f16b4ba3bbab9c21f5a972a385bc3030"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\admin\\Tabs.jsx": {
+    "mtime": 1769701469.5510511,
+    "ast_hash": "58949a807c5fe1c06da308ca1bb3dcf1",
+    "semantic_hash": "58949a807c5fe1c06da308ca1bb3dcf1"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\legal\\LegalPage.jsx": {
+    "mtime": 1769703127.0473907,
+    "ast_hash": "76bf4090531945c6c36fcf305b493a89",
+    "semantic_hash": "76bf4090531945c6c36fcf305b493a89"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\platform\\credits\\CompanyPicker.jsx": {
+    "mtime": 1770826196.9041312,
+    "ast_hash": "77ba682ba5ba057ae4a2de3b94fde6b7",
+    "semantic_hash": "77ba682ba5ba057ae4a2de3b94fde6b7"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\platform\\credits\\ConfirmGrantModal.jsx": {
+    "mtime": 1769788452.8836782,
+    "ast_hash": "0046186bbcb708508a1155b52bef13e3",
+    "semantic_hash": "0046186bbcb708508a1155b52bef13e3"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\platform\\credits\\GrantCreditsCard.jsx": {
+    "mtime": 1769788385.5532818,
+    "ast_hash": "33f790301265ca03c2c12bc79316c8c5",
+    "semantic_hash": "33f790301265ca03c2c12bc79316c8c5"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\platform\\credits\\LedgerTable.jsx": {
+    "mtime": 1769790916.2538364,
+    "ast_hash": "426410f3809ab386a723fa795f9a8112",
+    "semantic_hash": "426410f3809ab386a723fa795f9a8112"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\platform\\credits\\Notice.jsx": {
+    "mtime": 1769788324.4937317,
+    "ast_hash": "25a92109338620fc3c9481300df59981",
+    "semantic_hash": "25a92109338620fc3c9481300df59981"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\public\\PublicShell.jsx": {
+    "mtime": 1769703076.844261,
+    "ast_hash": "17b636c82f544c3953e4b98e598cc9be",
+    "semantic_hash": "17b636c82f544c3953e4b98e598cc9be"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\support\\SupportRequestForm.jsx": {
+    "mtime": 1770826197.6734476,
+    "ast_hash": "691e55d992395f48a43b20ebded92479",
+    "semantic_hash": "691e55d992395f48a43b20ebded92479"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\ui\\DatePicker.jsx": {
+    "mtime": 1769807096.104387,
+    "ast_hash": "6e11f3845ab89e594e9926cfacb5a81a",
+    "semantic_hash": "6e11f3845ab89e594e9926cfacb5a81a"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\ui\\EmployeeSelect.jsx": {
+    "mtime": 1770826197.7494013,
+    "ast_hash": "1a04aee0e2ab01d0541448787e57f695",
+    "semantic_hash": "1a04aee0e2ab01d0541448787e57f695"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\ui\\FinanceLineChart.jsx": {
+    "mtime": 1769974266.8367329,
+    "ast_hash": "d6288c0c089733817ec50ab0d0709961",
+    "semantic_hash": "d6288c0c089733817ec50ab0d0709961"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\ui\\ImageViewerModal.jsx": {
+    "mtime": 1770826197.8243568,
+    "ast_hash": "8028474cec27b4499e5280d326b8ffd7",
+    "semantic_hash": "8028474cec27b4499e5280d326b8ffd7"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\ui\\Pagination.jsx": {
+    "mtime": 1770826197.9023075,
+    "ast_hash": "c1e7b53636a52d52ed8c059eb1d7c9bc",
+    "semantic_hash": "c1e7b53636a52d52ed8c059eb1d7c9bc"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\ui\\StorageQuotaBadge.jsx": {
+    "mtime": 1781452165.5418446,
+    "ast_hash": "21cfb91dd386dde5f4b15f6073337688",
+    "semantic_hash": "21cfb91dd386dde5f4b15f6073337688"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\ui\\skiper-ui\\skiper40.jsx": {
+    "mtime": 1779482813.9289248,
+    "ast_hash": "a43e4fa89568a04311f0bb850ab58e61",
+    "semantic_hash": "a43e4fa89568a04311f0bb850ab58e61"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\components\\ui\\skiper-ui\\skiper41.jsx": {
+    "mtime": 1779482783.546689,
+    "ast_hash": "9dfc8901189761f3210868a1c6e7c16a",
+    "semantic_hash": "9dfc8901189761f3210868a1c6e7c16a"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\hooks\\usePagination.js": {
+    "mtime": 1770826198.0562124,
+    "ast_hash": "fb4330262c50674a010d6751fa35dac5",
+    "semantic_hash": "fb4330262c50674a010d6751fa35dac5"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\lib\\utils.js": {
+    "mtime": 1779482607.156957,
+    "ast_hash": "6251218fdd2ed855fe261ddcb9f7a7e7",
+    "semantic_hash": "6251218fdd2ed855fe261ddcb9f7a7e7"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Activity.jsx": {
+    "mtime": 1780604290.9213593,
+    "ast_hash": "0149884daf35c105cb4fab4198629284",
+    "semantic_hash": "0149884daf35c105cb4fab4198629284"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Admin.jsx": {
+    "mtime": 1780084116.4939551,
+    "ast_hash": "68d1384bf0ed740dc2d1d22ded6dab9a",
+    "semantic_hash": "68d1384bf0ed740dc2d1d22ded6dab9a"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\AuditLogs.jsx": {
+    "mtime": 1779808549.8767495,
+    "ast_hash": "86e9f7969df7ad1414f7b4991c509b6e",
+    "semantic_hash": "86e9f7969df7ad1414f7b4991c509b6e"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Billing.jsx": {
+    "mtime": 1780142038.949711,
+    "ast_hash": "e8612dcb87ab1afffb20cbf7dd3f83f7",
+    "semantic_hash": "e8612dcb87ab1afffb20cbf7dd3f83f7"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\CompanyProfile.jsx": {
+    "mtime": 1779806797.8129838,
+    "ast_hash": "8e0f802e7e91a42e42ddd2a6e7f4dc25",
+    "semantic_hash": "8e0f802e7e91a42e42ddd2a6e7f4dc25"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Contact.jsx": {
+    "mtime": 1780141421.9724996,
+    "ast_hash": "a02a57b499f5f3952ba95402bb18fb28",
+    "semantic_hash": "a02a57b499f5f3952ba95402bb18fb28"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Dashboard.jsx": {
+    "mtime": 1781452446.7445276,
+    "ast_hash": "938ecfe619b7b2fe9138edb72fc45cdb",
+    "semantic_hash": "938ecfe619b7b2fe9138edb72fc45cdb"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Docs.jsx": {
+    "mtime": 1769368773.5607705,
+    "ast_hash": "cc7dd7f970c862c6b3d113b9309ebd75",
+    "semantic_hash": "cc7dd7f970c862c6b3d113b9309ebd75"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Downloads.jsx": {
+    "mtime": 1780777109.811404,
+    "ast_hash": "a7ee95c931ca0303b86df6c07a513eae",
+    "semantic_hash": "a7ee95c931ca0303b86df6c07a513eae"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\ForgotPassword.jsx": {
+    "mtime": 1769526323.9217975,
+    "ast_hash": "2af65fa288d8e00a18ab94fbc47b4410",
+    "semantic_hash": "2af65fa288d8e00a18ab94fbc47b4410"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Home.jsx": {
+    "mtime": 1779830506.2202866,
+    "ast_hash": "eb99b5d8af8f71c4960f82acfc1a8852",
+    "semantic_hash": "eb99b5d8af8f71c4960f82acfc1a8852"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\LiveView.jsx": {
+    "mtime": 1780256192.9021173,
+    "ast_hash": "ddcebdd4c686baf9c319fcdc7a33b4d2",
+    "semantic_hash": "ddcebdd4c686baf9c319fcdc7a33b4d2"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Login.jsx": {
+    "mtime": 1780776489.3483753,
+    "ast_hash": "98c854d5f59c545150b4cb64aaf2c2f5",
+    "semantic_hash": "98c854d5f59c545150b4cb64aaf2c2f5"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Privacy.jsx": {
+    "mtime": 1770826207.8791144,
+    "ast_hash": "9efe582532dd699f18bb5e059de0d4fb",
+    "semantic_hash": "9efe582532dd699f18bb5e059de0d4fb"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Report.jsx": {
+    "mtime": 1770842620.3257248,
+    "ast_hash": "18129ea812cd8864a9e8b40e1248af80",
+    "semantic_hash": "18129ea812cd8864a9e8b40e1248af80"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Requests.jsx": {
+    "mtime": 1780601595.0094967,
+    "ast_hash": "616dfc73121311a579dd77e6ec0317bf",
+    "semantic_hash": "616dfc73121311a579dd77e6ec0317bf"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\ResetPassword.jsx": {
+    "mtime": 1769527199.3913352,
+    "ast_hash": "20ad2295cc1bda93a43f47d7ff94ba83",
+    "semantic_hash": "20ad2295cc1bda93a43f47d7ff94ba83"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Setup.jsx": {
+    "mtime": 1780085204.0966232,
+    "ast_hash": "e813e51989ccc7fc8dec586dbe2b7c01",
+    "semantic_hash": "e813e51989ccc7fc8dec586dbe2b7c01"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Signup.jsx": {
+    "mtime": 1780384704.4930253,
+    "ast_hash": "477bb59c8a454daa1f28de97de1d49a3",
+    "semantic_hash": "477bb59c8a454daa1f28de97de1d49a3"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\SuperAdminLogin.jsx": {
+    "mtime": 1780776489.3503747,
+    "ast_hash": "ecb1cf2ed2127ffa372e3188ec5fc45b",
+    "semantic_hash": "ecb1cf2ed2127ffa372e3188ec5fc45b"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Support.jsx": {
+    "mtime": 1769786836.207409,
+    "ast_hash": "e239708678f04828ff13741b87730669",
+    "semantic_hash": "e239708678f04828ff13741b87730669"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\Terms.jsx": {
+    "mtime": 1770826212.7290847,
+    "ast_hash": "c6042ccb593dfd877336e2b724960187",
+    "semantic_hash": "c6042ccb593dfd877336e2b724960187"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\TimeTracking.jsx": {
+    "mtime": 1781452956.8367674,
+    "ast_hash": "ed067aba59cdc753f0af3049659aa95f",
+    "semantic_hash": "ed067aba59cdc753f0af3049659aa95f"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\employee\\Activity.jsx": {
+    "mtime": 1770826202.8878016,
+    "ast_hash": "1825678765dea82646d1993d8142442f",
+    "semantic_hash": "1825678765dea82646d1993d8142442f"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\employee\\Dashboard.jsx": {
+    "mtime": 1781452165.5178485,
+    "ast_hash": "cecc1c6b6c063bfb1bee7435f08144be",
+    "semantic_hash": "cecc1c6b6c063bfb1bee7435f08144be"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\employee\\Profile.jsx": {
+    "mtime": 1779692769.0076592,
+    "ast_hash": "867984dfb4e6347411138c4b4f4cae02",
+    "semantic_hash": "867984dfb4e6347411138c4b4f4cae02"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\employee\\Reports.jsx": {
+    "mtime": 1780073300.0846744,
+    "ast_hash": "70e6bc79c500ce8426f6393742ca5674",
+    "semantic_hash": "70e6bc79c500ce8426f6393742ca5674"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\platform\\SACompanies.jsx": {
+    "mtime": 1770826203.5968335,
+    "ast_hash": "d3ea6e314e4c62f17602117b627db9d1",
+    "semantic_hash": "d3ea6e314e4c62f17602117b627db9d1"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\platform\\SACredits.jsx": {
+    "mtime": 1770826205.900612,
+    "ast_hash": "878990fca5c3b52428909ff6814748f3",
+    "semantic_hash": "878990fca5c3b52428909ff6814748f3"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\platform\\SADashboard.jsx": {
+    "mtime": 1770826206.1461542,
+    "ast_hash": "89ec7187d131ca4e7ebd5dc0d878ea88",
+    "semantic_hash": "89ec7187d131ca4e7ebd5dc0d878ea88"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\pages\\platform\\SARevenue.jsx": {
+    "mtime": 1780085547.5208073,
+    "ast_hash": "90b32b930bfbb48ba30aba12c6476ebb",
+    "semantic_hash": "90b32b930bfbb48ba30aba12c6476ebb"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\src\\utils\\geo.js": {
+    "mtime": 1770826213.008365,
+    "ast_hash": "234d2e81e62b87b8ab17eb6f418d5beb",
+    "semantic_hash": "234d2e81e62b87b8ab17eb6f418d5beb"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\docker-compose.yml": {
+    "mtime": 1780072916.1916244,
+    "ast_hash": "e5aa2a9dc0fcdf19336c51cb901b4b25",
+    "semantic_hash": "e5aa2a9dc0fcdf19336c51cb901b4b25"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\README.md": {
+    "mtime": 1769464295.5125618,
+    "ast_hash": "281881d14a719e36a880ed14ac3e2eb5",
+    "semantic_hash": "281881d14a719e36a880ed14ac3e2eb5"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Admin Console Modernization + Company-Scoped Audit Logs (PRD).md": {
+    "mtime": 1769701012.783857,
+    "ast_hash": "964c60e3185ceb08627c3f470538c6ef",
+    "semantic_hash": "964c60e3185ceb08627c3f470538c6ef"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Admin Console Modernization + Company-Scoped Audit Logs (Technical Architecture).md": {
+    "mtime": 1769701070.8131514,
+    "ast_hash": "93dbd36bf9029e2aa619266075acf3c9",
+    "semantic_hash": "93dbd36bf9029e2aa619266075acf3c9"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Administration Page (Light-Dark) - Design Spec.md": {
+    "mtime": 1769701130.2159476,
+    "ast_hash": "8e989b5424d36a67584554627fc3bc5d",
+    "semantic_hash": "8e989b5424d36a67584554627fc3bc5d"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Employee Reporting_ Local Timezones Everywhere.md": {
+    "mtime": 1769639904.6812544,
+    "ast_hash": "cd4c6a02afc1c595cdc092b9ca9ab92f",
+    "semantic_hash": "cd4c6a02afc1c595cdc092b9ca9ab92f"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Employee-Owned Google Drive Screenshot Storage (Secure, Scalable).md": {
+    "mtime": 1769691601.6015584,
+    "ast_hash": "bb61fdc6b6ff956e2135cb97750e6986",
+    "semantic_hash": "bb61fdc6b6ff956e2135cb97750e6986"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\employee_dashboard_architecture.md": {
+    "mtime": 1769373463.8134916,
+    "ast_hash": "a7c2c42b8ff3d4de54b47f7a512d6572",
+    "semantic_hash": "a7c2c42b8ff3d4de54b47f7a512d6572"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\employee_dashboard_prd.md": {
+    "mtime": 1769373318.3694403,
+    "ast_hash": "6d4a4a8169e1723cee5f32c19b5cd64e",
+    "semantic_hash": "6d4a4a8169e1723cee5f32c19b5cd64e"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Fix Invoice Download 500_ Secure Streaming and Tenant Isolation.md": {
+    "mtime": 1769511498.5154693,
+    "ast_hash": "b30ac08d45898743ac761fdae82a96c5",
+    "semantic_hash": "b30ac08d45898743ac761fdae82a96c5"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Fix Multi\u2011Tenant Live View, Billing Sync, and Invoice Download (No UI Changes).md": {
+    "mtime": 1769455730.150526,
+    "ast_hash": "62e23d7e27d3992eee707fa68c42f146",
+    "semantic_hash": "62e23d7e27d3992eee707fa68c42f146"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Fix Report.jsx undefined variable error.md": {
+    "mtime": 1769640238.8039756,
+    "ast_hash": "a452c40f8dabad0763bbe14a6ddebb56",
+    "semantic_hash": "a452c40f8dabad0763bbe14a6ddebb56"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Make Country_Timezone Dropdowns Clearly Visible In Dark Mode.md": {
+    "mtime": 1769559657.132133,
+    "ast_hash": "304eefb07b69c0880335f708525b82e0",
+    "semantic_hash": "304eefb07b69c0880335f708525b82e0"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Multi-Tenant URL Namespacing and Guards.md": {
+    "mtime": 1769641418.0863297,
+    "ast_hash": "5972a13ad0f7442ae843b46e3cd23b69",
+    "semantic_hash": "5972a13ad0f7442ae843b46e3cd23b69"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Secure RBAC + Super Admin Platform Dashboard.md": {
+    "mtime": 1769610913.9274855,
+    "ast_hash": "31a086ab12018710ff7c689355d611f0",
+    "semantic_hash": "31a086ab12018710ff7c689355d611f0"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Stripe-Only Billing Migration (Disable Razorpay).md": {
+    "mtime": 1769418813.4185286,
+    "ast_hash": "9e04248587dce931438abc02ba96370b",
+    "semantic_hash": "9e04248587dce931438abc02ba96370b"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\Artchitectural View\\Update Downloads Page with Python Client and OS Guides.md": {
+    "mtime": 1769637321.34359,
+    "ast_hash": "ff78917cf884d4ed81081a35f9719114",
+    "semantic_hash": "ff78917cf884d4ed81081a35f9719114"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\STRIPE.md": {
+    "mtime": 1771002855.57762,
+    "ast_hash": "39c4d254c14f812fe6dda56fea31302c",
+    "semantic_hash": "39c4d254c14f812fe6dda56fea31302c"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\backend\\public\\downloads\\PLACEHOLDER.txt": {
+    "mtime": 1779653689.6574214,
+    "ast_hash": "1be0c5f9f50d15a25e3c29b7c1149baa",
+    "semantic_hash": "1be0c5f9f50d15a25e3c29b7c1149baa"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\desktop\\build_log.txt": {
+    "mtime": 1762242994.2435884,
+    "ast_hash": "11d12487f1895a8f6f3dbf4588a3ca73",
+    "semantic_hash": "11d12487f1895a8f6f3dbf4588a3ca73"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\desktop\\requirements.txt": {
+    "mtime": 1770826194.660203,
+    "ast_hash": "12f83c530d1d2c7f04971a39e72d1747",
+    "semantic_hash": "12f83c530d1d2c7f04971a39e72d1747"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\docs\\superpowers\\plans\\2026-06-14-s3-migration-plan.md": {
+    "mtime": 1781452165.5418446,
+    "ast_hash": "8a969961aa68aa33ad83c2653df70472",
+    "semantic_hash": "8a969961aa68aa33ad83c2653df70472"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\docs\\superpowers\\specs\\2026-06-14-s3-migration-design.md": {
+    "mtime": 1781452165.53385,
+    "ast_hash": "e08cf999ca5de83b8ccc59a84c5655d4",
+    "semantic_hash": "e08cf999ca5de83b8ccc59a84c5655d4"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\index.html": {
+    "mtime": 1770826195.4383602,
+    "ast_hash": "68b8f882aeaac0de2d66c05e3c18c3b4",
+    "semantic_hash": "68b8f882aeaac0de2d66c05e3c18c3b4"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\README.md": {
+    "mtime": 1762234384.863851,
+    "ast_hash": "bfb7e5adfb1917aaf14f04874aec6566",
+    "semantic_hash": "bfb7e5adfb1917aaf14f04874aec6566"
+  },
+  "C:\\Users\\hP\\Documents\\trae_projects\\Time_Tracker_System\\web\\.vercel\\README.txt": {
+    "mtime": 1779494302.3962128,
+    "ast_hash": "2b13c79d37d6ed82a3255b83b6815034",
+    "semantic_hash": "2b13c79d37d6ed82a3255b83b6815034"
+  }
+}
